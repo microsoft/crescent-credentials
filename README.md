@@ -1,5 +1,10 @@
 # Crescent
-WIP
+Crescent is a library to generate proofs of possession of JWT (JSON web tokens) credentials. 
+By creating a proof for a JWT, rather than sending it directly, the credential holder may choose
+to keep some of the claims in the token private, while still providing the verifier with assurance
+that the revealed claims are as correct (as they were issued).
+
+
 
 # Setting up
 ```

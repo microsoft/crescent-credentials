@@ -1,23 +1,16 @@
 
-# Crescent: A library for adding privacy to existing credentials
+# Crescent Setup
 
-Crescent is a library to generate proofs of possession of JWT (JSON web tokens) credentials. 
-By creating a proof for a JWT, rather than sending it directly, the credential holder may choose
-to keep some of the claims in the token private, while still providing the verifier with assurance
-that the revealed claims are as correct (as they were issued).
 
-The project is built with a few main dependencies
+The Setup part of the project is built with a few main dependencies
 
 - [Circom](https://github.com/iden3/circom) used as a front end to describe circuits,
 - [Circomlib](https://github.com/iden3/circomlib) We use some of the gadgets from Circomlib
-- [Spartan2](https://github.com/microsoft/spartan2) a new implementation of [Spartan](https://ia.cr/2019/550) with support for bellperson circuits and the Hyrax polynomial commitment scheme
+
 
 and we acknowledge code we used from these projects 
 - [Nozee (zkemail for JWT)](https://github.com/sehyunc/nozee) 
-We use some of the Circom code from this project 
-- [Nova-Scotia](https://github.com/nalinbhardwaj/Nova-Scotia)
-We took a subset of the code in this project to read Circom generated R1CS instances and witness generators and create a [bellperson](https://github.com/filecoin-project/bellperson) 
-circuit that we can pass to [Spartan2](https://github.com/Microsoft/Spartan2/).
+
 
 ## Installing Dependencies
 Tested under Ubutnu Linux and Ubuntu in the WSL.
@@ -25,9 +18,7 @@ Tested under Ubutnu Linux and Ubuntu in the WSL.
 1. Install required packages (pip, cmake, )
 ```
 sudo apt update
-sudo apt install python3-pip libgmp-dev nasm nodejs
-sudo apt remove cmake  # Remove existing version
-sudo pip install cmake --upgrade
+sudo apt install python3-pip nodejs
 ```
 
 2. Install Rust if not present (not included by default on WSL Ubuntu)
@@ -37,20 +28,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 3. Install required Python modules
 ```
-pip install requests msal python_jwt
-```
-
-4. Install json. (This is required by Circom's C++ witness generator; inputs are provided as JSON)
-```
-# json
-git clone https://github.com/nlohmann/json.git
-cd json
-git checkout v3.11.2
-mkdir build
-cd build
-cmake ..
-cmake --build .
-sudo cmake --install .
+pip install python_jwt
 ```
 
 5. Install [Circom](https://github.com/iden3/circom) (we need a version supporting the [pasta curves](https://github.com/zcash/pasta_curves)).
@@ -73,90 +51,42 @@ git submodule update --init --recursive
 ```
 
 
-## Get a JWT (optional)
+## Sample JWT
 To work with Crescent, the prover and verifier both need the issuer's public key, and the prover needs a JWT. 
-We provide sample files in `inputs/demo`.
+We provide sample files in `inputs/rs256`.
 ```
-    inputs/demo/token.jwt
-    inputs/demo/issuer.pub
+    inputs/rs256/token.jwt
+    inputs/rs256/issuer.pub
 ```
 
-<b> TODO: generate new samples rather than use AAD ones </b>
+## Running Setup
+We describe how to run setup for the sample token provided in `inputs/rs256/`.  This is a JWT, with similar claims to those issued by Microsoft Entra for enterprise users, but created with the sample keypair `inputs/rs256/issuer.prv`, `inputs/rs256/issuer.pub`.
+All of the artifacts created by Crescent for the instance  `rs256` will be written to `generated_files/rs256/`. 
 
-### Microsoft-internal *(TODO: Remove before release)*
-To get a token run the python script in `creds/ms-identity-python-devicecodeflow`:
-```
-python3 ./device_flow_sample.py
-```
-and follow the instructions, it will provide a URL and a code to enter. 
-(This is a modified version of the [sample provided by Microsoft Identity](https://github.com/Azure-Samples/ms-identity-python-devicecodeflow).)
-By default it will cache tokens, so you may have to delete the file `creds/ms-identity-python-devicecodeflow/token_cache.bin` in order to get a fresh token. 
-
-To look at a JWT, you can copy and paste it into `https://jwt.ms` and it will be parsed in your browser.  The python script above will also parse and dump the credential information (as will our prover setup script).
-
-<i>As of 8/15/2023 we have been testing only with AAD tokens, and have not tested MSA tokens in a month or so.
-Everything should work with MSAs but this needs to be tested</i>
-
-## Creating and verifying proofs
-There are three steps that must be run in order: Setup, Prove and Verify. 
-To get started, create a directory `inputs/my_proof` where we'll store information related to the proof being created.
-A sample directory `inputs/demo` is also provided (replace `my_proof` with `demo` in the following instructions to run the demo).
-All of the artifacts created by Crescent for your configuration `my_proof` will be written to `generated_files/my_proof/`. 
-
-The *proof specification* (a description of what to prove) is in the file `inputs/my_proof/config.json`, 
-this is considered public information, and always present.  There is an example proof specification in `inputs/demo/config.json`.
+The *proof specification* (a description of what to prove) is in the file `inputs/rs256/config.json`, 
+this is considered public information, and always present.  
 Basically this file lists which claims are revealed, or have a predicate applied to them.
 
 Before running the scripts for setup/prover/verifier, it's handy to watch the log file that will get created:
 ```
-tail -f --follow=name --retry generated_files/my_proof/my_proof.log
+tail -f --follow=name --retry generated_files/rs256/rs256.log
 ```
 
-### Running Setup
-During setup, the directory `my_proof` must contain three files: `config.json`, `token.jwt`, and `issuer.pub`. 
-At this point, `token.jwt` must be a "sample" token created by the issuer, i.e., it must have the same schema as tokens that will
+During setup, the directory `rs256` must contain three files: `config.json`, `token.jwt`, and `issuer.pub`. 
+At this point, `token.jwt` would be a "sample" token created by the issuer, i.e., it must have the same schema as tokens that will
 be used later by provers.  Setup uses the token to check that the proof specification is applicable.  
-To run setup, from the `scripts` directory, run the command
+To run setup, change to the `scripts` directory, run the command
 ```
-./run_setup my_proof
+./run_setup.sh rs256
 ```
-to run your new proof as specified in `inputs/my_proof` (or `./run_setup demo` to run the demo).
 Setup runs Circom and creates the R1CS instance to verify the JWT and prove the predicates from the proof spec, as well
-as run's Spartan2's setup to get the prover and verifier paramters (output as files in `generated_files/my_proof`). 
+as the setup steps of the ZK proof system to get the prover and verifier parameters (output as files in `generated_files/rs256`). 
 Overall this is the slowest part, but need only be run once for a given token issuer and proof specification. 
+(TODO: we don't actually call the right ZK setup yet)
 
-### Running the Prover
-During proof generation, all three files must also be present, and the `token.jwt` file must be the prover's credential. 
-It may be necessary to update `config.json` when generating the proof, if some of the predicates require input values. 
-For example, in `demo`, with a fresh JWT, you first have to update the timestamp in `config.json` to be the current time (or near it). 
-The line
-```
-"special_inputs": {"current_ts": "1685752974"}
-```
-has a unix timstamp.  To create one for the current time, you can use the command:
-```
-date +%s
-```
-and to get the date back from a timestamp, use
-```
-date -d @1685752974
-Fri Jun  2 17:42:54 PDT 2023
-```
-
-To run the prover, from the `scripts` directory, run the command
-```
-./run_prover my_proof
-```
-The proof is written to `generated_files/my_proof/proof.bin` and the inputs used by the prover are in `generated_files/my_proof/prover_inputs.json`.
-
-### Running the Verifier
-The verifier does not use `token.jwt` (obviously!) and expects to find `proof.bin` in `generated_files/my_proof` along with the verifier parameters created during Setup.
-
-To run the verifier, from the `scripts` directory, run the command
-```
-./run_verifier my_proof
-```
-The verifier script prints out whether the proof was successfully verified, whether the outputs of the circuit were correct, and prints out any revealed claims. 
+# *
+# TODO: Documentation below is out-of-date
+# *
 
 
 ## Rust command-line program and API
