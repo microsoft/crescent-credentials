@@ -1,6 +1,11 @@
-#Crescent
+# Crescent
 WIP
 
+# Setting up
+```
+git submodule init
+git submodule update
+```
 
 # Project
 
