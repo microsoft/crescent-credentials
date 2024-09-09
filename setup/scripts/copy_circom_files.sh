@@ -19,6 +19,7 @@ cd ..
 ROOT_DIR=`pwd`
 
 OUTPUTS_DIR=${ROOT_DIR}/generated_files/$NAME
+COPY_DEST=${ROOT_DIR}/../creds/test-vectors/$NAME
 
 PROVER_INPUT_FILE=${OUTPUTS_DIR}/prover_inputs.json
 PROVER_AUX_FILE=${OUTPUTS_DIR}/prover_aux.json
@@ -28,11 +29,11 @@ WIT_GEN_FILE=${OUTPUTS_DIR}/circom/main_js/main.wasm
 SYM_FILE=${OUTPUTS_DIR}/circom/io_locations.sym
 
 # Copy the prover inputs, r1cs and wasm into a directory
-rm -rf ${OUTPUTS_DIR}/ark_inputs
-mkdir -p ${OUTPUTS_DIR}/ark_inputs
-cp ${PROVER_INPUT_FILE} ${OUTPUTS_DIR}/ark_inputs/
-cp ${PROVER_AUX_FILE} ${OUTPUTS_DIR}/ark_inputs/
-cp ${PUBLIC_IO_FILE} ${OUTPUTS_DIR}/ark_inputs/
-cp ${R1CS_FILE} ${OUTPUTS_DIR}/ark_inputs/
-cp ${WIT_GEN_FILE} ${OUTPUTS_DIR}/ark_inputs/
-cp ${SYM_FILE} ${OUTPUTS_DIR}/ark_inputs/
+rm -rf ${COPY_DEST}
+mkdir -p ${COPY_DEST}
+cp ${PROVER_INPUT_FILE} ${COPY_DEST}/ 
+cp ${PROVER_AUX_FILE} ${COPY_DEST}/ 
+cp ${PUBLIC_IO_FILE} ${COPY_DEST}/ 
+cp ${R1CS_FILE} ${COPY_DEST}/  
+cp ${WIT_GEN_FILE} ${COPY_DEST}/ 
+cp ${SYM_FILE} ${COPY_DEST}/ 
