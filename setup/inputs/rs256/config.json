@@ -1,0 +1,17 @@
+{
+    "alg": "RS256",
+    "exp": {
+        "type" : "number",
+        "max_claim_byte_len": 31,
+        "reveal": true
+    },
+    "email": {
+        "type" : "string",
+        "reveal": false,
+        "predicates": [
+            {
+                "name": "AssertMicrosoftDomain"
+            }
+        ]
+    }
+}
