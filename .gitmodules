@@ -1,0 +1,3 @@
+[submodule "setup/circom/circomlib"]
+	path = setup/circom/circomlib
+	url = https://github.com/iden3/circomlib
