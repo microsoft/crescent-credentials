@@ -1,0 +1,53 @@
+pragma circom 2.1.6;
+
+include "./utils/jwt.circom";
+include "./circomlib/circuits/comparators.circom";
+include "./circomlib/circuits/gates.circom";
+include "./match_claim.circom";
+include "./predicates.circom";
+
+template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
+
+    // #################### JWT signature verification ####################
+
+    signal input message[max_msg_bytes]; // header + . + payload
+    signal input modulus[k]; // Modulus from RSA public key (assumes e = 2^16 + 1)
+    signal input signature[k];
+
+    signal input message_padded_bytes; // length of the message including the padding
+    signal input period_idx; // index of the period in the base64 encoded msg
+
+    component jwt_verify = JWTVerify(max_msg_bytes, max_json_bytes, n, k);
+    
+    for (var i = 0; i < max_msg_bytes; i++) {
+        jwt_verify.message[i] <== message[i];
+    }
+
+    for (var i = 0; i < k; i++) {
+        jwt_verify.modulus[i] <== modulus[i];
+        jwt_verify.signature[i] <== signature[i];
+    }
+
+    jwt_verify.message_padded_bytes <== message_padded_bytes;
+    jwt_verify.period_idx <== period_idx;
+
+    signal jwt_bytes[max_json_bytes];
+    for (var i = 0; i < max_json_bytes; i++) {
+        jwt_bytes[i] <== jwt_verify.jwt_bytes[i];
+    }
+
+    // #################### JWT claim predicates ####################
+
+    // Compute the nested level of each position.
+    component is_curly_bracket_l[max_json_bytes];
+    component is_curly_bracket_r[max_json_bytes];
+    signal object_nested_level[max_json_bytes + 1];
+    object_nested_level[0] <== 0;
+    for (var i = 0; i < max_json_bytes; i++) {
+        is_curly_bracket_l[i] = IsZero();
+        is_curly_bracket_r[i] = IsZero();
+        is_curly_bracket_l[i].in <== jwt_bytes[i] - 123;
+        is_curly_bracket_r[i].in <== jwt_bytes[i] - 125;
+        object_nested_level[i + 1] <== object_nested_level[i] + is_curly_bracket_l[i].out - is_curly_bracket_r[i].out;
+    }
+
