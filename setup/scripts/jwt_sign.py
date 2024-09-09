@@ -76,7 +76,9 @@ for i in range(1,11):
     v = "Sample claim value {}".format(i)
     claims[k] = v
 
-
+# load the claims from a file
+# with open('eg-claims.json', 'r') as file:
+#     claims = json.load(file)
 
 
 # Create the new token with the modified claims, and one year lifetime
