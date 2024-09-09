@@ -1,0 +1,76 @@
+[package]
+name = "jwt-ac"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-crypto-primitives = { version = "=0.4.0" }
+ark-ec = { version = "=0.4.1", default-features = false, features = [
+    "parallel",
+] }
+ark-ff = { version = "=0.4.1", default-features = false, features = [
+    "parallel",
+    "asm",
+] }
+ark-std = { version = "=0.4.0", default-features = false, features = [
+    "parallel",
+] }
+ark-bn254 = { version = "=0.4.0" }
+ark-bls12-381 = "0.4.0"
+ark-poly = { version = "=0.4.1", default-features = false, features = [
+    "parallel",
+] }
+ark-relations = { version = "=0.4.0", default-features = false }
+ark-serialize = { version = "=0.4.1", default-features = false }
+
+merlin = { version = "3.0", default-features = false }
+
+# json parsing
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+
+# wasmer
+num-bigint = { version = "=0.4.3", default-features = false, features = [
+    "rand",
+] }
+num-traits = "0.2.14"
+
+halo2curves = { version = "0.4.0", features = ["derive_serde"] }
+ff = { version = "0.13.0", features = ["derive"] }
+
+hex = "0.4.3"
+rand = ">=0.8.5"
+bincode = "1.3"
+sha2 = "0.10.8"
+rayon = "1.7"
+# Local dependencies
+ark-circom = { path = "../forks/circom-compat" }
+spartan-ecdsa = { path = "../../spartan-ecdsa" }
+ark-groth16 = { path = "../forks/groth16", default-features = false, features = [
+    "parallel",
+] }
+ark-poly-commit = { path = "../forks/ark-poly-commit", default-features = false, features = [
+    "parallel",
+] }
+
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[build-dependencies]
+cargo-patch = "0.3"
+
+[features]
+print-trace = ["ark-std/print-trace"]
+
+[[bench]]
+name = "proof_benchmark"
+harness = false
+
+[[bench]]
+name = "range_bench"
+harness = false
+
+[[bench]]
+name = "ecc_bench"
+harness = false
