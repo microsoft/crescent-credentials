@@ -4,6 +4,17 @@ By creating a proof for a JWT, rather than sending it directly, the credential h
 to keep some of the claims in the token private, while still providing the verifier with assurance
 that the revealed claims are as correct (as they were issued).
 
+## Setup and demo cheat sheet
+Once the dev dependencies are installed, to run the end-to-end demo use these commands.
+From the root of the git repo
+```
+cd setup/scripts
+./run_setup.sh rs256
+./run_prover.sh rs256
+./copy_circom_files.sh rs256
+cd ../../creds
+cargo run --release --features print-trace --example demo rs256 -- --nocapture
+```
 
 
 # Setting up
