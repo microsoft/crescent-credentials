@@ -5,7 +5,7 @@ use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_bn254::{Bn254, Fr};
 use ark_ec::VariableBaseMSM;
 use ark_std::{rand::SeedableRng, UniformRand};
-use jwt_ac::utils::msm_select;
+use crescent::utils::msm_select;
 
 
 

@@ -6,9 +6,9 @@ use ark_groth16::Groth16;
 use ark_serialize::CanonicalSerialize;
 use ark_std::io::BufWriter;
 use ark_std::{end_timer, rand::thread_rng, start_timer};
-use jwt_ac::rangeproof::RangeProofPK;
-use jwt_ac::structs::IOLocations;
-use jwt_ac::{
+use crescent::rangeproof::RangeProofPK;
+use crescent::structs::{PublicIOType, IOLocations};
+use crescent::{
     groth16rand::ClientState,
     structs::{GenericInputsJSON, ProverInput},
 };
@@ -19,7 +19,8 @@ use std::{
     fs::{self, OpenOptions},
 };
 
-// cargo run --features print-trace --example demo es256k-spartan -- --nocapture
+// Run this file with the command:
+// cargo run --release --features print-trace --example demo rs256 -- --nocapture
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();
@@ -122,8 +123,8 @@ fn main() {
     let (range_pk, range_vk) = RangeProofPK::<ECPairing>::setup(32);
 
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    let mut io_types = vec![jwt_ac::structs::PublicIOType::Revealed; client_state.inputs.len()];
-    io_types[exp_value_pos - 1] = jwt_ac::structs::PublicIOType::Committed;
+    let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
+    io_types[exp_value_pos - 1] = PublicIOType::Committed;
 
     let mut revealed_inputs = client_state.inputs.clone();
     revealed_inputs.remove(exp_value_pos - 1);

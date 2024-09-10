@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ark_ec::AffineRepr;
 use criterion::{criterion_group, criterion_main, Criterion};
 use ark_bn254::{Bn254, Fr};
-use jwt_ac::{dlog::DLogPoK, rangeproof::{RangeProof, RangeProofPK}};
+use crescent::{dlog::DLogPoK, rangeproof::{RangeProof, RangeProofPK}};
 use ark_ff::PrimeField;
 use rayon::ThreadPoolBuilder;
 

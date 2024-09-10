@@ -5,11 +5,11 @@ use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::Groth16;
 use ark_serialize::CanonicalSerialize;
 use ark_std::io::BufWriter;
-use jwt_ac::rangeproof::RangeProofPK;
+use crescent::rangeproof::RangeProofPK;
 use ark_std::{end_timer, rand::thread_rng, start_timer};
-use jwt_ac::{
+use crescent::{
     groth16rand::ClientState,
-    structs::{GenericInputsJSON, IOLocations, ProverAuxInputs, ProverInput},
+    structs::{GenericInputsJSON, IOLocations, ProverAuxInputs, ProverInput, PublicIOType},
 };
 use spartan_ecdsa::{ECDSAParams, ECDSAProof, NamedCurve};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -145,11 +145,11 @@ fn main() {
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
 
     // Default to all hidden:
-    let mut io_types = vec![jwt_ac::structs::PublicIOType::Hidden; client_state.inputs.len()]; 
+    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()]; 
     // The digest is committed, for the spartan-ecdsa sub-prover:
-    io_types[digest248_pos - 1] = jwt_ac::structs::PublicIOType::Committed;
+    io_types[digest248_pos - 1] = PublicIOType::Committed;
     // Also the token expiry is committed, for the RP sub-prover: (TODO: add RP)
-    io_types[exp_value_pos - 1] = jwt_ac::structs::PublicIOType::Committed;
+    io_types[exp_value_pos - 1] = PublicIOType::Committed;
     // For now we refer to digest commitment as the first committed attribute, 
     // the exp_value is the 2nd. TODO: this will be changed once we use a hashmap to refer to these by name
     let digest_commitment_index = 0;

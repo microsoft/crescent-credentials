@@ -7,7 +7,7 @@ use ark_relations::{
     r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError},
 };
 use ark_std::{rand::SeedableRng, UniformRand, Zero};
-use jwt_ac::{groth16rand::ClientState, rangeproof::{RangeProofPK, RangeProofVK}, structs::IOLocations};
+use crescent::{groth16rand::ClientState, rangeproof::{RangeProofPK, RangeProofVK}, structs::{IOLocations, PublicIOType}};
 use std::collections::BTreeMap;
 
 const NUM_CONSTRAINTS: usize = (1 << 10) - 100;
@@ -94,9 +94,9 @@ pub fn range_test() {
 
     let (range_pk, range_vk) = RangeProofPK::<Bn254>::setup(32);    
 
-    let mut io_types = vec![jwt_ac::structs::PublicIOType::Hidden; client_state.inputs.len()];
-    io_types[0] = jwt_ac::structs::PublicIOType::Revealed;
-    io_types[1] = jwt_ac::structs::PublicIOType::Committed;
+    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
+    io_types[0] = PublicIOType::Revealed;
+    io_types[1] = PublicIOType::Committed;
 
     let showing = client_state.show_groth16(&io_types);
     showing.verify(&vk, &pvk, &io_types, &vec![inputs[0]]);

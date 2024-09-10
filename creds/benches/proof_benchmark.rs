@@ -11,7 +11,8 @@ use ark_relations::{
     r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError},
 };
 use ark_std::{rand::SeedableRng, UniformRand, Zero};
-use jwt_ac::groth16rand::{ClientState, ShowGroth16};
+use crescent::groth16rand::{ClientState, ShowGroth16};
+use crescent::structs::PublicIOType;
 
 const NUM_CONSTRAINTS: usize = (1 << 10) - 100;
 const NUM_VARIABLES: usize = (1 << 10) - 100;
@@ -109,7 +110,7 @@ pub fn show_bench(c: &mut Criterion) {
         pvk.clone(),
     );
 
-    let io_types = vec![jwt_ac::structs::PublicIOType::Hidden; client_state.inputs.len()];
+    let io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
 
     let showing = client_state.show_groth16(&io_types);
     c.bench_function("Show", |b| {

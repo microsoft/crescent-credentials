@@ -5,9 +5,9 @@ use ark_groth16::Groth16;
 use ark_serialize::CanonicalSerialize;
 use ark_std::io::BufWriter;
 use ark_std::{end_timer, rand::thread_rng, start_timer};
-use jwt_ac::rangeproof::RangeProofPK;
-use jwt_ac::structs::{IOLocations, PublicIOType};
-use jwt_ac::{
+use crescent::rangeproof::RangeProofPK;
+use crescent::structs::{IOLocations, PublicIOType};
+use crescent::{
     groth16rand::ClientState,
     structs::{GenericInputsJSON, ProverInput},
 };
@@ -128,9 +128,9 @@ fn main() {
     println!("num inputs: {}", client_state.inputs.len());
     println!("Keys = {:?}", io_locations.public_io_locations.keys());
     // Set all to Hidden by default
-    let mut io_types = vec![jwt_ac::structs::PublicIOType::Hidden; client_state.inputs.len()];
+    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
     // Set exp to Committed so the range prover can use it
-    io_types[exp_value_pos - 1] = jwt_ac::structs::PublicIOType::Committed;
+    io_types[exp_value_pos - 1] = PublicIOType::Committed;
     // Set the modulus values to public (TODO: need to use the public_IOs.json file instead of hardcoding)
     for i in 0..17 {
         let modulus_i_pos = io_locations.get_io_location(&format!("modulus[{}]", i)).expect("Didn't find RSA modulus in IOs. Expected RSA-2048, with the public modulus encoded as 17 limbs");
