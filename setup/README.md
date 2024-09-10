@@ -67,7 +67,7 @@ The *proof specification* (a description of what to prove) is in the file `input
 this is considered public information, and always present.  
 Basically this file lists which claims are revealed, or have a predicate applied to them.
 
-Before running the scripts for setup/prover/verifier, it's handy to watch the log file that will get created:
+Before running the script for setup, you can optionally watch the log file that will get created:
 ```
 tail -f --follow=name --retry generated_files/rs256/rs256.log
 ```
@@ -82,7 +82,28 @@ To run setup, change to the `scripts` directory, run the command
 Setup runs Circom and creates the R1CS instance to verify the JWT and prove the predicates from the proof spec, as well
 as the setup steps of the ZK proof system to get the prover and verifier parameters (output as files in `generated_files/rs256`). 
 Overall this is the slowest part, but need only be run once for a given token issuer and proof specification. 
-(TODO: we don't actually call the right ZK setup yet)
+(TODO: we don't actually call the right ZK setup yet, the Groth16 params are called in `creds` as part of the demo)
+
+Next we run a prover setup step, to generate the input files the prover needs for each token.
+```
+./run_prover.sh rs256
+```
+
+Then we copy the circom outputs to `creds` with the command:
+```
+./copy_circom_files.sh rs256
+```
+
+## Setup and demo cheat sheet
+From the root of the git repo
+```
+cd setup/scripts
+./run_setup.sh rs256
+./run_prover.sh rs256
+./copy_circom_files.sh rs256
+cd ../../creds
+cargo run --release --features print-trace --example demo rs256 -- --nocapture
+```
 
 # *
 # TODO: Documentation below is out-of-date
