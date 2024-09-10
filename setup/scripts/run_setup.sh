@@ -92,8 +92,8 @@ cd ${ROOT_DIR}
 
 echo "=== circom output end ===" >> ${LOG_FILE}
 
-echo "- Generate pk and vk ..."
-echo "=== Generate key pair output start ===" >> ${LOG_FILE}
+#echo "- Generate pk and vk ..."
+#echo "=== Generate key pair output start ===" >> ${LOG_FILE}
 
 R1CS_FILE=${OUTPUTS_DIR}/main_c.r1cs
 PK_FILE=${OUTPUTS_DIR}/pk.bin
@@ -108,7 +108,7 @@ awk -v max="$NUM_PUBLIC_INPUTS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, 
 
 #cargo run --release --features print-trace -- setup --r1cs ${R1CS_FILE} --pk ${PK_FILE} --vk ${VK_FILE}  >> ${LOG_FILE}
 
-echo "=== Generate key pair output end ===" >> ${LOG_FILE}
+#echo "=== Generate key pair output end ===" >> ${LOG_FILE}
 
 cd scripts
 echo "Done."
