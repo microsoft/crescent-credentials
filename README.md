@@ -8,7 +8,7 @@ that the revealed claims are as correct (as they were issued).
 
 # Setting up
 
-See instructions in `/setup`.
+See instructions in [`/setup/README.md`](https://github.com/microsoft/crescent/blob/main/setup/README.md)
 
 Once the dev dependencies are installed, the main things to run there are:
 ```
