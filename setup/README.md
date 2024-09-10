@@ -15,7 +15,7 @@ and we acknowledge code we used from these projects
 ## Installing Dependencies
 Tested under Ubutnu Linux and Ubuntu in the WSL.
 
-1. Install required packages (pip, cmake, )
+1. Install required packages 
 ```
 sudo apt update
 sudo apt install python3-pip nodejs
@@ -23,7 +23,7 @@ sudo apt install python3-pip nodejs
 
 2. Install Rust if not present (not included by default on WSL Ubuntu)
 ```
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+curl --proto '=https' --tlsv1.3 -sSf https://sh.rustup.rs | sh
 ```
 
 3. Install required Python modules
@@ -31,7 +31,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 pip install python_jwt
 ```
 
-5. Install [Circom](https://github.com/iden3/circom) (we need a version supporting the [pasta curves](https://github.com/zcash/pasta_curves)).
+5. Install [Circom](https://github.com/iden3/circom) 
 
 ```
 git clone https://github.com/iden3/circom.git
@@ -94,16 +94,7 @@ Then we copy the circom outputs to `creds` with the command:
 ./copy_circom_files.sh rs256
 ```
 
-## Setup and demo cheat sheet
-From the root of the git repo
-```
-cd setup/scripts
-./run_setup.sh rs256
-./run_prover.sh rs256
-./copy_circom_files.sh rs256
-cd ../../creds
-cargo run --release --features print-trace --example demo rs256 -- --nocapture
-```
+
 
 # *
 # TODO: Documentation below is out-of-date
