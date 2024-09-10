@@ -7,9 +7,23 @@ that the revealed claims are as correct (as they were issued).
 
 
 # Setting up
+
+See instructions in `/setup`.
+
+Once the dev dependencies are installed, the main things to run there are:
 ```
-git submodule init
-git submodule update
+cd scripts
+./run_setup.sh rs256
+./run_prover.sh rs256
+./copy_circom_files.sh rs256
+```
+TODO: this will merged into a single script 
+
+## Running the example
+
+Once setup is done, to run the main example, from `creds`:
+```
+cargo run --release --features print-trace --example demo rs256 -- --nocapture
 ```
 
 # Project
