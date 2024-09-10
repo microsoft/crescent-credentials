@@ -6,7 +6,7 @@ use ark_groth16::Groth16;
 use ark_serialize::CanonicalSerialize;
 use ark_std::io::BufWriter;
 use ark_std::{end_timer, rand::thread_rng, start_timer};
-use crescent::rangeproof::RangeProofPK;
+use crescent::rangeproof::{RangeProofPK, RangeProofVK};
 use crescent::structs::{PublicIOType, IOLocations};
 use crescent::{
     groth16rand::ClientState,
@@ -46,6 +46,8 @@ fn main() {
     let mut client_state;
     let pvk;
     let vk;
+    let range_pk;
+    let range_vk;
     if use_cache {
         // TODO: if loading from cache fails; delete the /cache dir
         let load_timer = start_timer!(|| "Loading client state");
@@ -55,6 +57,9 @@ fn main() {
 
         vk = client_state.vk.clone();
         pvk = client_state.pvk.clone();
+
+        range_pk = RangeProofPK::<ECPairing>::new_from_file(&format!("{}range_pk.bin", &cache_path));
+        range_vk = RangeProofVK::<ECPairing>::new_from_file(&format!("{}range_vk.bin", &cache_path));
 
         // TODO: loading the groth16 params takes 12 seconds. We need logic to do this only if necessary
         // let load_timer = start_timer!(||"Loading Groth16 params");
@@ -104,9 +109,16 @@ fn main() {
             pvk.clone(),
         );
 
+        let (p, v) = RangeProofPK::<ECPairing>::setup(32);
+        range_pk = p;   // Compiler doesn't see that range_pk, vk are initialized if part of a tuple on the prev. line
+        range_vk = v;
+
         println!("Serializing state to {}", cache_path);
         fs::create_dir(&cache_path).unwrap();
+
         client_state.write_to_file(&format!("{}client_state.bin", &cache_path));
+        range_pk.write_to_file(&format!("{}range_pk.bin", &cache_path));
+        range_vk.write_to_file(&format!("{}range_vk.bin", &cache_path));
 
         let params_file = format!("{}groth16_params.bin", &cache_path);
         let f = OpenOptions::new()
@@ -119,8 +131,7 @@ fn main() {
         params.serialize_uncompressed(buf_writer).unwrap();
     }
 
-    // Range proof. TODO: Load setup params from file if it exists
-    let (range_pk, range_vk) = RangeProofPK::<ECPairing>::setup(32);
+
 
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
     let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];

@@ -13,9 +13,10 @@ use ark_poly_commit::{
     PCRandomness,
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{One, Zero};
+use ark_std::{One, Zero, io::{BufWriter, BufReader}, fs::File};
 use merlin::Transcript;
 use rand::thread_rng;
+use std::fs::OpenOptions;
 
 #[derive(Clone, Debug, CanonicalDeserialize, CanonicalSerialize)]
 pub struct RangeProofPK<'b, E: Pairing> {
@@ -64,12 +65,54 @@ impl<'a, E: Pairing> RangeProofPK<'a, E> {
             },
         )
     }
+
+    pub fn write_to_file(&self, file: &str) {
+        let f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(file)
+            .unwrap();
+        let buf_writer = BufWriter::new(f);
+
+        self.serialize_uncompressed(buf_writer).unwrap();
+    }
+    pub fn new_from_file(path: &str) -> Self {
+        let f = File::open(path).unwrap();
+        let buf_reader = BufReader::new(f);
+        let state = RangeProofPK::<E>::deserialize_uncompressed_unchecked(buf_reader).unwrap();
+
+        state
+    }    
 }
 
 #[derive(Clone, Debug, CanonicalDeserialize, CanonicalSerialize)]
 pub struct RangeProofVK<E: Pairing> {
     pub kzg_vk: ark_poly_commit::kzg10::VerifierKey<E>,
     pub com_f_basis: [E::G1; 4],
+}
+
+impl<E: Pairing> RangeProofVK<E> {
+
+    pub fn write_to_file(&self, file: &str) {
+        let f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(file)
+            .unwrap();
+        let buf_writer = BufWriter::new(f);
+
+        self.serialize_uncompressed(buf_writer).unwrap();
+    }
+
+    pub fn new_from_file(path: &str) -> Self {
+        let f = File::open(path).unwrap();
+        let buf_reader = BufReader::new(f);
+        let state = RangeProofVK::<E>::deserialize_uncompressed_unchecked(buf_reader).unwrap();
+
+        state
+    }
 }
 
 /// A range proofthat a value is in [0,2^n). Following the notation in https://hackmd.io/@dabo/B1U4kx8XI
