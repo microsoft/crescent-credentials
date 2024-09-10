@@ -74,3 +74,9 @@ harness = false
 [[bench]]
 name = "ecc_bench"
 harness = false
+
+
+[profile.dev.package."*"]
+opt-level = 3               # optimize dependencies, even in dev builds
+debug-assertions = false    # We need this to work around a bug in Wasmer
+
