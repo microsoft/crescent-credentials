@@ -37,6 +37,26 @@ Once setup is done, to run the main example, from `creds`:
 cargo run --release --features print-trace --example demo rs256 -- --nocapture
 ```
 
+# Running the demo steps separately 
+There is a command line tool that can be used to run the individual parts of the demo separately.  This clearly separates the roles of prover and verifier, and shows what parameters are required by each.    The filesystem is used to store data between steps, and also to "communicate" show proofs from prover to verifier. 
+
+The steps are
+* `zksetup` Generates the (circuit-specific) system parameters 
+* `prove` Generates the Groth16 proof for a credential.  Stored for future presentation proofs in the "client state"
+* `show` Creates a fresh and unlinkable presentation proof to be sent to the verifier
+* `verify` Checks that the show proof is valid
+
+After the circuit is setup and the data copied into, e.g., `test-vectors/rs256`, we can run each of the demo steps as follows.
+
+```
+cargo run --release --features print-trace zksetup --name rs256
+cargo run --release --features print-trace prove --name rs256
+cargo run --release --features print-trace show --name rs256
+cargo run --release --features print-trace verify --name rs256
+```
+
+Note that the steps have to be run in order, but once the client state is created by `prove`, the `show` and `verify` steps can be run repeatedly.
+
 # Project
 
 > This repo has been populated by an initial template to help get you started. Please
