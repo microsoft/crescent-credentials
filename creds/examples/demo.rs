@@ -4,7 +4,6 @@ use ark_circom::{CircomBuilder, CircomConfig};
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::Groth16;
 use ark_serialize::CanonicalSerialize;
-use ark_std::io::BufWriter;
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use crescent::rangeproof::{RangeProofPK, RangeProofVK};
 use crescent::structs::{PublicIOType, IOLocations};
@@ -14,10 +13,8 @@ use crescent::{
 };
 
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{
-    env,
-    fs::{self, OpenOptions},
-};
+use std::{fs, env};
+use crescent::utils::{new_from_file, write_to_file};
 
 // Run this file with the command:
 // cargo run --release --features print-trace --example demo rs256 -- --nocapture
@@ -46,8 +43,8 @@ fn main() {
     let mut client_state;
     let pvk;
     let vk;
-    let range_pk;
-    let range_vk;
+    let range_pk : RangeProofPK::<ECPairing>;
+    let range_vk : RangeProofVK::<ECPairing>;
     if use_cache {
         // TODO: if loading from cache fails; delete the /cache dir
         let load_timer = start_timer!(|| "Loading client state");
@@ -58,8 +55,8 @@ fn main() {
         vk = client_state.vk.clone();
         pvk = client_state.pvk.clone();
 
-        range_pk = RangeProofPK::<ECPairing>::new_from_file(&format!("{}range_pk.bin", &cache_path));
-        range_vk = RangeProofVK::<ECPairing>::new_from_file(&format!("{}range_vk.bin", &cache_path));
+        range_pk = new_from_file(&format!("{}range_pk.bin", &cache_path));
+        range_vk = new_from_file(&format!("{}range_vk.bin", &cache_path));
 
         // TODO: loading the groth16 params takes 12 seconds. We need logic to do this only if necessary
         // let load_timer = start_timer!(||"Loading Groth16 params");
@@ -117,18 +114,12 @@ fn main() {
         fs::create_dir(&cache_path).unwrap();
 
         client_state.write_to_file(&format!("{}client_state.bin", &cache_path));
-        range_pk.write_to_file(&format!("{}range_pk.bin", &cache_path));
-        range_vk.write_to_file(&format!("{}range_vk.bin", &cache_path));
+        write_to_file(&range_pk, &format!("{}range_pk.bin", &cache_path));
+        write_to_file(&range_vk, &format!("{}range_vk.bin", &cache_path));
 
         let params_file = format!("{}groth16_params.bin", &cache_path);
-        let f = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(params_file)
-            .unwrap();
-        let buf_writer = BufWriter::new(f);
-        params.serialize_uncompressed(buf_writer).unwrap();
+        write_to_file(&params, &params_file);
+
     }
 
 

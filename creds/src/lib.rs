@@ -1,27 +1,22 @@
-#![allow(unused_variables, unused_imports)] // TODO: remove this 
-
-use std::{env::current_dir, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 use ark_bn254::{Bn254 as ECPairing, Fr};
 //use ark_bls12_381::Bls12_381 as ECPairing;
 use ark_circom::{CircomBuilder, CircomConfig};
 use ark_crypto_primitives::snark::SNARK;
-use ark_groth16::Groth16;
-use ark_serialize::CanonicalSerialize;
-use ark_std::io::BufWriter;
+use ark_ec::pairing::Pairing;
+use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
-use crate::rangeproof::RangeProofPK;
+use groth16rand::{ShowGroth16, ShowRange};
+use utils::new_from_file;
+use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
 use crate::{
     groth16rand::ClientState,
     structs::{GenericInputsJSON, ProverInput},
 };
-
+use crate::utils::write_to_file;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{
-    env,
-    fs::OpenOptions,
-};
-use std::error::Error;
 
 pub mod dlog;
 pub mod groth16rand;
@@ -29,88 +24,234 @@ pub mod rangeproof;
 pub mod structs;
 pub mod utils;
 
+const RANGE_PROOF_INTERVAL_BITS: usize = 32;
+const SHOW_PROOF_VALIDITY_SECONDS: u64 = 60;    // The verifier only accepts proofs fresher than this
+
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+struct ShowProof<E: Pairing> {
+    pub show_groth16: ShowGroth16<E>,
+    pub show_range: ShowRange<E>, 
+    pub revealed_inputs: Vec<E::ScalarField>, 
+    pub inputs_len: usize, 
+    pub cur_time: u64
+}
+
+// Central struct to configure the paths data stored between operations
+struct CachePaths {
+   pub _base: String,
+   pub prover_inputs : String,
+   pub io_locations: String,
+   pub wasm: String,
+   pub r1cs: String,
+   pub _cache: String,
+   pub range_pk: String,
+   pub range_vk: String,
+   pub groth16_vk: String,
+   pub groth16_pvk: String,
+   pub groth16_params: String,
+   pub client_state: String, 
+   pub show_proof: String
+}
+
+impl CachePaths {
+    pub fn new(base_path: PathBuf) -> Self{
+        let base_path_str = base_path.into_os_string().into_string().unwrap();
+        let base_path_str = format!("{}/", base_path_str);
+        if fs::metadata(&base_path_str).is_err() {
+            println!("base_path = {}", base_path_str);
+            panic!("invalid path");
+        }
+        print!("base_path_str = {}\n", base_path_str);
+        let cache_path = format!("{}cache/", base_path_str);
+    
+        if fs::metadata(&cache_path).is_ok() {
+            println!("Found directory {} to store data", cache_path);
+        } else {
+            println!("Creating directory {} to store data", cache_path);
+            fs::create_dir(&cache_path).unwrap();        
+        }
+
+        CachePaths {
+            _base: base_path_str.clone(),
+            prover_inputs: format!("{}prover_inputs.json", base_path_str),
+            io_locations: format!("{}io_locations.sym", base_path_str),
+            wasm: format!("{}main.wasm", base_path_str),
+            r1cs: format!("{}main_c.r1cs", base_path_str),
+            _cache: cache_path.clone(),
+            range_pk: format!("{}range_pk.bin", &cache_path),
+            range_vk: format!("{}range_vk.bin", &cache_path),
+            groth16_vk: format!("{}groth16_vk.bin", &cache_path),
+            groth16_pvk: format!("{}groth16_pvk.bin", &cache_path),
+            groth16_params: format!("{}groth16_params.bin", &cache_path),
+            client_state: format!("{}client_state.bin", &cache_path),
+            show_proof: format!("{}show_proof.bin", &cache_path),
+        }        
+    }
+}
 
 pub fn run_zksetup(base_path: PathBuf) -> i32 {
 
-    let base_path_str = base_path.into_os_string().into_string().unwrap();
-    let base_path_str = format!("{}/", base_path_str);
-    if fs::metadata(&base_path_str).is_err() {
-        println!("base_path = {}", base_path_str);
-        return -1;  // TODO: use error types
-    }
-    print!("base_path_str = {}\n", base_path_str);
+    let paths = CachePaths::new(base_path);
 
-    let prover_inputs_path = format!("{}prover_inputs.json", base_path_str);
-    let io_locations_path = format!("{}io_locations.sym", base_path_str);
-    let wasm_path = format!("{}main.wasm", base_path_str);
-    let r1cs_path = format!("{}main_c.r1cs", base_path_str);
-    let cache_path = format!("{}/cache/", base_path_str);
-    let groth16_params_file = format!("{}groth16_params.bin", &cache_path);
-
-    if fs::metadata(&cache_path).is_ok() {
-        println!("Found directory {} to store data", cache_path);
-    } else {
-        println!("Creating directory {} to store data", cache_path);
-        fs::create_dir(&cache_path).unwrap();        
-    }
-
-
-    let io_locations = IOLocations::new(&io_locations_path);
-    let prover_inputs = GenericInputsJSON::new(&prover_inputs_path);        
-
-    let circom_timer = start_timer!(|| "Circom Reading");
+    let circom_timer = start_timer!(|| "Reading R1CS instance at witness generator");
     let cfg = CircomConfig::<ECPairing>::new(
-        &wasm_path,
-        &r1cs_path,
+        &paths.wasm,
+        &paths.r1cs,
     )
     .unwrap();
-    let mut builder = CircomBuilder::new(cfg);
-    prover_inputs.push_inputs(&mut builder);
-
+    let builder = CircomBuilder::new(cfg);
     let circom = builder.setup();
     end_timer!(circom_timer);
 
+    let groth16_setup_timer = start_timer!(|| "Generating Groth16 system parameters");
     let mut rng = thread_rng();
     let params =
         Groth16::<ECPairing>::generate_random_parameters_with_reduction(circom, &mut rng)
             .unwrap();
 
-    let build_timer = start_timer!(|| "Building");
-    let circom = builder.build().unwrap();
-    end_timer!(build_timer);
+    let vk = params.vk.clone();
+    let pvk = Groth16::<ECPairing>::process_vk(&params.vk).unwrap();  
+    end_timer!(groth16_setup_timer);
 
-    let f = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(groth16_params_file)
-        .unwrap();
-    let buf_writer = BufWriter::new(f);
-    params.serialize_uncompressed(buf_writer).unwrap();
+    let range_setup_timer = start_timer!(|| "Generating parameters for range proofs");    
+    let (range_pk, range_vk) = RangeProofPK::<ECPairing>::setup(RANGE_PROOF_INTERVAL_BITS);
+    end_timer!(range_setup_timer);
+
+      
+    let serialize_timer = start_timer!(|| "Writing everything to files");
+    write_to_file(&range_pk, &paths.range_pk);
+    write_to_file(&range_vk, &paths.range_vk);    
+    write_to_file(&params, &paths.groth16_params);
+    write_to_file(&vk, &paths.groth16_vk);
+    write_to_file(&pvk, &paths.groth16_pvk);
+    end_timer!(serialize_timer);
 
     return 0;
 }
 
 pub fn run_prover(
-    input_file: PathBuf,
-    r1cs_file: PathBuf,
-    pk_file: PathBuf,
-    witness_generator_file: PathBuf,
-    proof_file: PathBuf,
+    base_path: PathBuf,
 ) {
-    todo!("Not implemented");
+    let paths = CachePaths::new(base_path);
+
+    let prover_inputs = GenericInputsJSON::new(&paths.prover_inputs);
+
+    let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
+    let cfg = CircomConfig::<ECPairing>::new(
+        &paths.wasm,
+        &paths.r1cs,
+    )
+    .unwrap();
+    let mut builder = CircomBuilder::new(cfg);
+    prover_inputs.push_inputs(&mut builder);
+    end_timer!(circom_timer);
+
+    let load_params_timer = start_timer!(||"Reading Groth16 params from file");
+    let params : ProvingKey<ECPairing> = new_from_file(&paths.groth16_params);
+    end_timer!(load_params_timer);
+    
+    let build_timer = start_timer!(|| "Witness Generation");
+    let circom = builder.build().unwrap();
+    end_timer!(build_timer);    
+    let inputs = circom.get_public_inputs().unwrap();
+
+    let mut rng = thread_rng();
+    let prove_timer = start_timer!(|| "Groth16 prove");    
+    let proof = Groth16::<ECPairing>::prove(&params, circom, &mut rng).unwrap();    
+    end_timer!(prove_timer);
+
+    let pvk : PreparedVerifyingKey<ECPairing> = new_from_file(&paths.groth16_pvk);
+    let verify_timer = start_timer!(|| "Groth16 verify");
+    let verified =
+        Groth16::<ECPairing>::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap();
+    assert!(verified);
+    end_timer!(verify_timer);
+
+    let client_state = ClientState::<ECPairing>::new(
+        inputs.clone(),
+        proof.clone(),
+        params.vk.clone(),
+        pvk.clone(),
+    );
+
+    write_to_file(&client_state, &paths.client_state);
 }
 
 pub fn run_show(
-    input_file: PathBuf,
-    r1cs_file: PathBuf,
-    pk_file: PathBuf,
-    witness_generator_file: PathBuf,
-    proof_file: PathBuf,
+    base_path: PathBuf
 ) {
-    todo!("Not implemented");
+    let paths = CachePaths::new(base_path);
+    let io_locations = IOLocations::new(&paths.io_locations);    
+    let mut client_state: ClientState<ECPairing> = new_from_file(&paths.client_state);
+    let range_pk : RangeProofPK<ECPairing> = new_from_file(&paths.range_pk);
+    
+    let proof_timer = std::time::Instant::now();
+
+    // Create Groth16 rerandomized proof for showing
+    let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
+    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
+    io_types[exp_value_pos - 1] = PublicIOType::Committed;
+    let mut revealed_inputs = client_state.inputs.clone();
+    revealed_inputs.remove(exp_value_pos - 1);  // TODO: seems error-prone to do this by hand
+    let show_groth16 = client_state.show_groth16(&io_types);    
+    
+    // Create fresh range proof 
+    let time_sec = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap()
+    .as_secs();
+    let cur_time = Fr::from( time_sec );
+
+    let mut com_exp_value = client_state.committed_input_openings[0].clone();
+    com_exp_value.m -= cur_time;
+    com_exp_value.c -= com_exp_value.bases[0] * cur_time;
+    let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
+    println!("Proving time: {:?}", proof_timer.elapsed());
+
+    // Asssemble proof and serialize
+    let show_proof = ShowProof{ show_groth16, show_range, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
+    write_to_file(&show_proof, &paths.show_proof);
 }
 
-pub fn run_verifier(input_file: PathBuf, vk_file: PathBuf, proof_file: PathBuf) {
-    todo!("Not implemented");
+pub fn run_verifier(base_path: PathBuf) {
+    let paths = CachePaths::new(base_path);
+    let show_proof : ShowProof<ECPairing> = new_from_file(&paths.show_proof);
+    let pvk : PreparedVerifyingKey<ECPairing> = new_from_file(&paths.groth16_pvk);
+    let vk : VerifyingKey<ECPairing> = new_from_file(&paths.groth16_vk);
+    let range_vk : RangeProofVK<ECPairing> = new_from_file(&paths.range_vk);
+    let io_locations = IOLocations::new(&paths.io_locations);    
+
+    let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
+    let mut io_types = vec![PublicIOType::Hidden; show_proof.inputs_len];
+    io_types[exp_value_pos - 1] = PublicIOType::Committed;
+
+    let verify_timer = std::time::Instant::now();
+    show_proof.show_groth16.verify(&vk, &pvk, &io_types, &show_proof.revealed_inputs);
+    let cur_time = Fr::from(show_proof.cur_time);
+    let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let delta = 
+        if show_proof.cur_time < now_seconds {
+            now_seconds - show_proof.cur_time
+        } else {
+            0
+    };
+    println!("Proof created {} seconds ago", delta);    
+
+    if delta > SHOW_PROOF_VALIDITY_SECONDS {
+        println!("Invalid show proof -- older than {} seconds", SHOW_PROOF_VALIDITY_SECONDS);
+        assert!(delta <= SHOW_PROOF_VALIDITY_SECONDS);
+    }
+
+    let mut ped_com_exp_value = show_proof.show_groth16.commited_inputs[0].clone();
+    ped_com_exp_value -= pvk.vk.gamma_abc_g1[exp_value_pos] * cur_time;
+    show_proof.show_range.verify(
+        &ped_com_exp_value,
+        RANGE_PROOF_INTERVAL_BITS,
+        &range_vk,
+        &io_locations,
+        &pvk,
+        "exp_value",
+    );
+    println!("Verification time: {:?}", verify_timer.elapsed());  
+
 }

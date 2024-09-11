@@ -1,10 +1,12 @@
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
-use ark_serialize::CanonicalSerialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::thread_rng;
 use merlin::Transcript;
 use num_bigint::BigUint;
 use sha2::{Digest, Sha512};
+use std::fs::OpenOptions;
+use ark_std::{io::BufWriter, io::BufReader, fs::File};
 
 pub fn bigint_from_str(s: &str) -> num_bigint::BigUint {
     num_bigint::BigUint::parse_bytes(s.as_bytes(), 10).unwrap()
@@ -88,6 +90,31 @@ pub fn msm_select<G: CurveGroup>(bases: &[G::Affine], scalars: &[G::ScalarField]
     else {
         direct_msm(bases, scalars)
     }
+}
+
+pub fn write_to_file<T>(obj : &T, path: &str)
+where 
+    T: CanonicalSerialize
+{
+    let f = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .unwrap();
+    let buf_writer = BufWriter::new(f);
+    obj.serialize_uncompressed(buf_writer).unwrap();
+}
+
+pub fn new_from_file<T>(path: &str) -> T 
+where
+    T: CanonicalDeserialize
+{
+    let f = File::open(path).unwrap();
+    let buf_reader = BufReader::new(f);
+    let state = T::deserialize_uncompressed_unchecked(buf_reader).unwrap();
+
+    state
 }
 
 #[cfg(test)]
