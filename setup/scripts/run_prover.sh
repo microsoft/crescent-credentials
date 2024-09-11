@@ -29,7 +29,7 @@ touch ${LOG_FILE}
 # Create the prover's inputs and public IOs
 PROVER_INPUT_FILE=${OUTPUTS_DIR}/prover_inputs.json
 PUBLIC_INPUT_FILE=${OUTPUTS_DIR}/public_IOs.json
-./scripts/prepare_prover.py ${TOKEN_DIR}/config.json ${TOKEN_DIR}/issuer.pub ${TOKEN_DIR}/token.jwt ${PUBLIC_INPUT_FILE} > ${PROVER_INPUT_FILE}
+python3 ./scripts/prepare_prover.py ${TOKEN_DIR}/config.json ${TOKEN_DIR}/issuer.pub ${TOKEN_DIR}/token.jwt ${PUBLIC_INPUT_FILE} > ${PROVER_INPUT_FILE}
 
 #echo "- Generate Spartan proof for proving ${NAME}..."
 #echo -e "\n=== Generate proof output start ===" >> ${LOG_FILE}

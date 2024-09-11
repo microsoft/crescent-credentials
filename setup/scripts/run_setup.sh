@@ -49,7 +49,7 @@ touch ${LOG_FILE}
 echo "- Generating ${NAME}_main.circom..."
 
 # Generate the circom main file.  
-scripts/prepare_setup.py ${INPUTS_DIR}/config.json ${CIRCOM_DIR}/main.circom
+python3 scripts/prepare_setup.py ${INPUTS_DIR}/config.json ${CIRCOM_DIR}/main.circom
 
 echo "- Compiling main.circom..."
 echo -e "\n=== circom output start ===" >> ${LOG_FILE}
