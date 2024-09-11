@@ -2,10 +2,10 @@
 # Crescent Setup
 
 
-The Setup part of the project is built with a few main dependencies
+The setup part of the project is built with a few main dependencies
 
 - [Circom](https://github.com/iden3/circom) used as a front end to describe circuits,
-- [Circomlib](https://github.com/iden3/circomlib) We use some of the gadgets from Circomlib
+- [Circomlib](https://github.com/iden3/circomlib) provides gadgets
 
 
 and we acknowledge code we used from these projects 
@@ -75,7 +75,7 @@ tail -f --follow=name --retry generated_files/rs256/rs256.log
 During setup, the directory `rs256` must contain three files: `config.json`, `token.jwt`, and `issuer.pub`. 
 At this point, `token.jwt` would be a "sample" token created by the issuer, i.e., it must have the same schema as tokens that will
 be used later by provers.  Setup uses the token to check that the proof specification is applicable.  
-To run setup, change to the `scripts` directory, run the command
+To run setup, change to the `scripts` directory and run the command
 ```
 ./run_setup.sh rs256
 ```
