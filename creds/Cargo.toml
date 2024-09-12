@@ -55,6 +55,7 @@ ark-poly-commit = { path = "../forks/ark-poly-commit", default-features = false,
     "parallel",
 ] }
 
+jwt-simple = "0.12.10"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
