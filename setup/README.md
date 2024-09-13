@@ -8,8 +8,8 @@ The setup part of the project is built with a few main dependencies
 - [Circomlib](https://github.com/iden3/circomlib) provides gadgets
 
 
-and we acknowledge code we used from these projects 
-- [Nozee (zkemail for JWT)](https://github.com/sehyunc/nozee) 
+and we acknowledge Circom circuits we used from
+- [Zkemail](https://github.com/zkemail/zk-email-verify/tree/main) 
 
 
 ## Installing Dependencies
