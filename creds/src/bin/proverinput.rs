@@ -1,3 +1,4 @@
+use ark_ec::pairing::prepare_g2;
 use ark_std::path::PathBuf;
 use std::fs;
 //use jwt_simple::reexports::anyhow::Ok;
@@ -192,7 +193,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let header_pad = base_64_decoded_header_padding(period_idx)?;
     let header_and_payload = format!("{}{}{}", jwt_header_decoded, header_pad, claims_decoded);
-    //prepare_prover_claim_inputs(header_and_payload, &config, &claims)?;
+    prepare_prover_claim_inputs(header_and_payload, &config, &claims, &mut prover_inputs_json)?;
 
 
     println!("{}", serde_json::to_string_pretty(&prover_inputs_json)?);
@@ -201,10 +202,178 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::Map<String, Value>, claims: &Value) -> Result<(), Box<dyn Error>> {
-    todo!("Continue here");
+// For each of the claims that are specified in the config file, the prover will need some info about each one
+// (e.g., the value, where in the payload it starts and ends)
+fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::Map<String, Value>, claims: &Value, prover_inputs_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
+    let msg = header_and_payload;
+
+    if !is_minified(&msg) {
+        return_error!("JSON is not minified, Circom circuit will fail.")
+    }
+    let keys = config.keys();
+
+    for key in keys {
+        if CRESCENT_CONFIG_KEYS.contains(key.as_str()) {
+            continue;
+        }
+
+        let name = key.clone();
+        let name = name.as_str();
+
+        let entry = config[name].as_object().ok_or(format!("Config file entry for claim {}, does not have object type", name))?;
+
+        let type_string = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", name))?;
+
+        let claim_name = format!("\"{}\"", name);
+        let (claim_l, claim_r) = find_value_interval(&msg, &claim_name, type_string)?;
+
+        let name_l = format!("{}_l", name);
+        let name_r = format!("{}_r", name);
+
+        prover_inputs_json.insert(name_l, json!(claim_l.to_string()));
+        prover_inputs_json.insert(name_r, json!(claim_r.to_string()));
+
+        if entry.contains_key("reveal") {
+            let reveal = entry["reveal"].as_bool().ok_or("reveal for predicate {} is not of type bool")?;
+            if reveal {
+                match type_string {
+                    "number" => {
+                        prover_inputs_json.insert(format!("{}_value", name), json!(claims[name].clone().to_string()));
+                    }
+                    "string" => {
+                        let max_claim_byte_len = config["max_claim_byte_len"].as_u64().unwrap();    // validated by load_config
+                        let packed = pack_string_to_int(claims[name].as_str().ok_or("invalid_type")?, max_claim_byte_len.try_into()?)?;
+                        prover_inputs_json.insert(format!("{}_value", name), json!(packed));
+                    }
+                    _ => {
+                        return_error!("Can only reveal number types and string types as a single field element for now. See also `reveal_bytes`.")
+                    }
+                }
+            }
+        }
+        
+        if entry.contains_key("predicates") {
+            let predicates = entry["predicates"].as_array().ok_or(format!("predicates for entry {} must be an array", name))?;
+            for p in predicates {
+                let predicate = p.as_object().ok_or(format!("A predicate for entry {} is not an object", name))?;
+                // Some predicates might have additional inputs, and others do not
+                // E.g., AssertMicrosoftDomain has no extra inputs, but AssertEmailDomain needs the domain as special input. 
+                // TODO: we don't implement this for now in Rust (it's python though)
+                if predicate.contains_key("special_inputs") {
+                    return_error!("Support for predicates with 'special_inputs' not implemented ");
+                }
+
+            }
+        }
+
+    }
+
+
     Ok(())
 }
+
+fn pack_string_to_int(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Error>> {
+    // Must match function "RevealClaimValue" in match_claim.circom
+    // so we add quotes to the string TODO: maybe reveal the unquoted claim value instead?
+
+    //First convert "s" to bytes and pad with zeros
+    let s_quoted = format!("\"{}\"",s);
+    let s_bytes = s_quoted.bytes();
+    if s_bytes.len() > n_bytes {
+        return_error!(format!("String to large to convert to integer of n_bytes = {}", n_bytes));
+    }
+    let mut s_bytes = s_bytes.collect::<Vec<u8>>();
+    for _ in 0 .. n_bytes - s_bytes.len() {
+        s_bytes.push(0x00);
+    }
+    // Convert to an integer with base-256 digits equal to s_bytes
+    let mut n = BigInt::from_u32(0).unwrap();
+    let twofiftysix = BigInt::from_u32(256).unwrap();
+    for i in 0..s_bytes.len() {
+        assert!(i < u32::MAX as usize);
+        n += s_bytes[i] * twofiftysix.pow(i as u32);
+    }
+    
+    Ok(n.to_str_radix(10))
+}
+
+fn find_value_interval(msg: &str, claim_name: &str, type_string: &str) -> Result<(usize, usize), Box<dyn Error>> {
+    let l = msg.find(claim_name).ok_or(format!("Failed to find claim {} in token payload", claim_name))?;
+    let value_start = l + claim_name.len();
+    let mut r = 0;
+    match type_string {
+        "string" => {
+            let close_quote = msg[value_start+2..].find("\"").ok_or(format!("Parse error, no closing quote, claim {}", claim_name))?;
+            r = close_quote + value_start + 3;
+        },
+        "number" => {
+            for (i, c) in msg[value_start + 1..].chars().enumerate() {
+                if "0123456789".find(c).is_none() {
+                    r = value_start + 1 + i;
+                    break;
+                }
+            }
+        },
+        "bool" => {
+            for (i, c) in msg[value_start..].chars().enumerate() {
+                if "truefalse".find(c).is_none() {
+                    r = value_start + i;
+                    break;
+                }
+            }            
+        },
+        "null" => {
+            r = value_start + 4;
+        }, 
+        "array" => {
+            let mut nested_level = 0;
+            for (i, c) in msg[value_start..].chars().enumerate() {
+                if c == '[' {
+                    nested_level += 1;
+                }
+                else if c == ']' {
+                    nested_level -= 1;
+                    if nested_level == 0 {
+                        r = value_start + i + 1;
+                        break;
+                    }
+                }
+            }
+        },
+        "object" => {
+            let mut nested_level = 0;
+            for (i, c) in msg[value_start..].chars().enumerate() {
+                if c == '{' {
+                    nested_level += 1;
+                }
+                else if c == '}' {
+                    nested_level -= 1;
+                    if nested_level == 0 {
+                        r = value_start + i + 1;
+                        break;
+                    }
+                }
+            }
+        },
+        _ => return_error!(format!("Unsupported claim type: {}", type_string)),
+    }
+    Ok((l,r))
+}
+
+
+fn is_minified(msg: &String) -> bool {
+    // Check for extra spaces, e.g.,
+    //     "exp" : 123456789
+    // is not sufficiently minified, but
+    //     "exp":123456789
+    // is minified. Our Circom circuit currently does not support extra space(s).
+    if msg.find("\": ").is_some() {
+        return false;
+    }
+    true
+}
+    
+
 
 // This function creates zero-padding to go between the JSON header and payload
 // in order to match what the Circom base64 decoder outputs.
@@ -265,7 +434,7 @@ fn sha256_padding(prepad_m: &[u32]) -> Vec<u32> {
     padded_m.push(0x80);
 
     // Append zero bytes until the length of the padded message is congruent to 448 modulo 512
-    while (padded_m.len() + 8) % 64 != 56 {
+    while (padded_m.len()) % 64 != 56 {
         padded_m.push(0);
     }
 
