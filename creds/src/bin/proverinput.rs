@@ -15,6 +15,8 @@ use num_bigint::BigInt;
 use num_traits::FromPrimitive;
 use std::ops::{Shl, BitAnd};
 use base64_url::decode;
+use std::fs::OpenOptions;
+use ark_std::{io::BufWriter, io::BufReader, fs::File};
 
 lazy_static! {
     static ref CRESCENT_SUPPORTED_ALGS: HashSet<&'static str> = {
@@ -53,9 +55,9 @@ struct Opts {
     #[structopt(parse(from_os_str), long)]
     jwt: PathBuf,
 
-    /// The output file (optional, defaults to stdout)
+    /// The output path (writes prover_inputs.json, prover_aux.json and public_IOs.json here)
     #[structopt(parse(from_os_str), long)]
-    outfile: Option<PathBuf>,
+    outpath: PathBuf,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -151,7 +153,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Begin creating prover's output. Everthing must have string type for Circom
     let mut prover_inputs_json = serde_json::Map::new();
     let mut public_ios_json = serde_json::Map::new();
-    let mut prover_aux_data = serde_json::Map::new();
+    let mut prover_aux_json = serde_json::Map::new();
     prover_inputs_json.insert("message".to_string(), json!(padded_m.into_iter().map(|c| c.to_string()).collect::<Vec<_>>()));
 
     // Signature
@@ -195,10 +197,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     let header_and_payload = format!("{}{}{}", jwt_header_decoded, header_pad, claims_decoded);
     prepare_prover_claim_inputs(header_and_payload, &config, &claims, &mut prover_inputs_json)?;
 
+    // Write out prover inputs, public IOs and prover aux data. Always create a file, even if they're empty
+    write_json_file(opts.outpath.join("prover_inputs.json"), &mut prover_inputs_json)?;
+    write_json_file(opts.outpath.join("prover_aux.json"), &mut prover_aux_json)?;
+    write_json_file(opts.outpath.join("public_IOs.json"), &mut public_ios_json)?;
 
-    println!("{}", serde_json::to_string_pretty(&prover_inputs_json)?);
+    Ok(())
+}
 
-
+fn write_json_file(path: PathBuf, data: &mut serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
+    if data.is_empty() {
+        data.insert("_placeholder".to_string(), json!("empty file"));
+    }    
+    let f = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)?;
+    let buf_writer = BufWriter::new(f);    
+    serde_json::to_writer_pretty(buf_writer, data)?;
     Ok(())
 }
 
@@ -315,9 +332,9 @@ fn find_value_interval(msg: &str, claim_name: &str, type_string: &str) -> Result
             }
         },
         "bool" => {
-            for (i, c) in msg[value_start..].chars().enumerate() {
+            for (i, c) in msg[value_start + 1..].chars().enumerate() {
                 if "truefalse".find(c).is_none() {
-                    r = value_start + i;
+                    r = value_start + 1 + i;
                     break;
                 }
             }            

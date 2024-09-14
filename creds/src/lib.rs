@@ -189,10 +189,15 @@ pub fn run_show(
 
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
+    // The IOs are exp and the 17 limbs of the RSA modulus. We make them revealed
+    // TODO: don't add the modulus to revealed inputs, the verifier should know it. Maybe just a key identifier    
+    // TODO: seems error-prone to do this by hand; make a function to reveal 
+    // by name e.g, set_revealed("modulus")
+    //println!("io_locations: {:?}", io_locations.public_io_locations.keys());
+    let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
     let mut revealed_inputs = client_state.inputs.clone();
-    revealed_inputs.remove(exp_value_pos - 1);  // TODO: seems error-prone to do this by hand
+    revealed_inputs.remove(exp_value_pos - 1);  
     let show_groth16 = client_state.show_groth16(&io_types);    
     
     // Create fresh range proof 
@@ -220,9 +225,12 @@ pub fn run_verifier(base_path: PathBuf) {
     let vk : VerifyingKey<ECPairing> = new_from_file(&paths.groth16_vk);
     let range_vk : RangeProofVK<ECPairing> = new_from_file(&paths.range_vk);
     let io_locations = IOLocations::new(&paths.io_locations);    
+    // TODO: load public_IOs file and take modulus from there.  
+    // Or maybe the verifier should work directly from the issuer's public key?
 
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    let mut io_types = vec![PublicIOType::Hidden; show_proof.inputs_len];
+    let mut io_types = vec![PublicIOType::Revealed; show_proof.inputs_len];
+    println!("show_proof.inputs_len = {}", show_proof.inputs_len);
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
 
     let verify_timer = std::time::Instant::now();
