@@ -1,8 +1,12 @@
 # Crescent
+
 Crescent is a library to generate proofs of possession of JWT (JSON Web Tokens) credentials. 
 By creating a proof for a JWT, rather than sending it directly, the credential holder may choose
 to keep some of the claims in the token private, while still providing the verifier with assurance
 that the revealed claims are correct.
+
+This repository contains the Crescent library and a sample application consisting of a JWT issuer,
+a browser extension client, and a web server verifier.
 
 ## Setup and demo cheat sheet
 Once the dev dependencies are installed, to run the end-to-end demo use these commands.
@@ -16,10 +20,10 @@ cd ../../creds
 cargo run --release --features print-trace --example demo rs256 -- --nocapture
 ```
 
-
 # Setting up
 
-See instructions in [`/setup/README.md`](https://github.com/microsoft/crescent/blob/main/setup/README.md)
+To setup the library, see the instructions in [`/setup/README.md`](./setup/README.md);
+to setup the sample application, see [`sample/README.md`](./sample/README.md).
 
 Once the dev dependencies are installed, the main things to run there are:
 ```
