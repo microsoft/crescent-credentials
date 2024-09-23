@@ -23,6 +23,7 @@ pub mod groth16rand;
 pub mod rangeproof;
 pub mod structs;
 pub mod utils;
+pub mod prep_inputs;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 60;    // The verifier only accepts proofs fresher than this
