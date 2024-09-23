@@ -1,22 +1,16 @@
-use ark_ec::pairing::prepare_g2;
-use ark_std::path::PathBuf;
-use std::fs;
-//use jwt_simple::reexports::anyhow::Ok;
 use jwt_simple::prelude::*;
 use structopt::StructOpt;
-//use jwt_simple::JWTError;
 use serde_json::Value;
 use serde_json::json;
-use std::error::Error;
-use std::io::ErrorKind;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
 use num_bigint::BigInt;
 use num_traits::FromPrimitive;
 use std::ops::{Shl, BitAnd};
-use base64_url::decode;
+use std::error::Error;
 use std::fs::OpenOptions;
-use ark_std::{io::BufWriter, io::BufReader, fs::File};
+use std::fs;
+use ark_std::{path::PathBuf, io::BufWriter};
 
 lazy_static! {
     static ref CRESCENT_SUPPORTED_ALGS: HashSet<&'static str> = {
@@ -63,10 +57,8 @@ struct Opts {
 fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::from_args();
 
-    //     println!("got options: {:?}", opts);
-
     // Open config file
-    print!("Loading an checking config file... ");
+    print!("Loading and checking config file... ");
     let config = load_config(opts.config)?;
     println!("done");
 
@@ -85,15 +77,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut parts = token_str.split('.');
     let jwt_header_b64 = parts.next().ok_or("Missing JWT header")?;
     let claims_b64 = parts.next().ok_or("Missing JWT claims")?;
-    let signature_b64 = parts.next().ok_or("Missing JWT signature")?;
+    let _signature_b64 = parts.next().ok_or("Missing JWT signature")?;
 
-    let jwt_header_decoded = String::from_utf8(base64_url::decode(jwt_header_b64)?)?;
-    let claims_decoded = String::from_utf8(base64_url::decode(claims_b64)?)?;
+    let _jwt_header_decoded = String::from_utf8(base64_url::decode(jwt_header_b64)?)?;
+    let _claims_decoded = String::from_utf8(base64_url::decode(claims_b64)?)?;
 
-    // DEBUG 
     let claims: Value =
         serde_json::from_slice(&Base64UrlSafeNoPadding::decode_to_vec(claims_b64, None)?)?;
-
 
     println!("Claims:");
     if let Value::Object(map) = claims.clone() {
@@ -104,9 +94,51 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("Claims are not a JSON object");
     }
 
-    // END DEBUG
+    let (mut prover_inputs_json, mut prover_aux_json, mut public_ios_json) = 
+        prepare_prover_inputs(&config, &token_str, &issuer_pem)?;
 
-    //let mut header_bytes = base64_url::decode(jwt_header_b64)?;
+    // Check if outpath is a directory and is writable
+    if !opts.outpath.is_dir() {
+        return_error!("Output path is not a directory");
+    }
+    if opts.outpath.metadata()?.permissions().readonly() {
+        return_error!("Output path is not writeable")
+    }
+
+    // Write out prover inputs, public IOs and prover aux data. Always create a file, even if they're empty
+    write_json_file(opts.outpath.join("prover_inputs.json"), &mut prover_inputs_json)?;
+    write_json_file(opts.outpath.join("prover_aux.json"), &mut prover_aux_json)?;
+    write_json_file(opts.outpath.join("public_IOs.json"), &mut public_ios_json)?;
+
+    Ok(())
+}
+
+pub fn prepare_prover_inputs(config : &serde_json::Map<String, Value>, token_str : &String, issuer_pem : &String ) -> 
+Result<(serde_json::Map<String, Value>, 
+    serde_json::Map<String, Value>, 
+    serde_json::Map<String, Value>), Box<dyn Error>>
+{
+
+    let issuer_pub = match config["alg"].as_str().unwrap() {
+        "RS256" => RS256PublicKey::from_pem(&issuer_pem)?,
+        _ => return_error!("Unsupported algorithm"),
+    };    
+
+    let claims_limited_set = issuer_pub.verify_token::<NoCustomClaims>(&token_str, None);
+    if !claims_limited_set.is_ok() {
+        return_error!("Token failed to verify");
+    }
+
+    let mut parts = token_str.split('.');
+    let jwt_header_b64 = parts.next().ok_or("Missing JWT header")?;
+    let claims_b64 = parts.next().ok_or("Missing JWT claims")?;
+    let signature_b64 = parts.next().ok_or("Missing JWT signature")?;
+
+    let jwt_header_decoded = String::from_utf8(base64_url::decode(jwt_header_b64)?)?;
+    let claims_decoded = String::from_utf8(base64_url::decode(claims_b64)?)?;
+    
+    let claims: Value =
+        serde_json::from_slice(&Base64UrlSafeNoPadding::decode_to_vec(claims_b64, None)?)?;
 
     // Convert the base64 encoded header and payload to UTF-8 integers in base-10 (e.g., 'e' -> 101, 'y' -> 121, ...)        
     let mut header_utf8 = to_utf8_integers(jwt_header_b64);
@@ -118,12 +150,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut padded_m = sha256_padding(&prepad_m);
 
-    let msg_len_after_SHA2_padding = padded_m.len() as u64;
+    let msg_len_after_sha2_padding = padded_m.len() as u64;
 
-    if msg_len_after_SHA2_padding > config["max_jwt_len"].as_u64().unwrap() {
+    if msg_len_after_sha2_padding > config["max_jwt_len"].as_u64().unwrap() {
         let errmsg = format!("Error: JWT too large.  Current token JSON header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.\nThe config file value `max_jwt_len` would have to be increased to {} bytes (currently config['max_jwt_len'] = {})", 
         header_utf8.len() + payload_utf8.len(), 
-        msg_len_after_SHA2_padding, 
+        msg_len_after_sha2_padding, 
         base64_decoded_size(config["max_jwt_len"].as_u64().unwrap()), 
         header_utf8.len() + payload_utf8.len() + 64, config["max_jwt_len"].as_u64().unwrap()
         );
@@ -153,7 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Begin creating prover's output. Everthing must have string type for Circom
     let mut prover_inputs_json = serde_json::Map::new();
     let mut public_ios_json = serde_json::Map::new();
-    let mut prover_aux_json = serde_json::Map::new();
+    let prover_aux_json = serde_json::Map::new();
     prover_inputs_json.insert("message".to_string(), json!(padded_m.into_iter().map(|c| c.to_string()).collect::<Vec<_>>()));
 
     // Signature
@@ -188,7 +220,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Other values the prover needs
-    prover_inputs_json.insert("message_padded_bytes".to_string(), json!(msg_len_after_SHA2_padding.to_string()));
+    prover_inputs_json.insert("message_padded_bytes".to_string(), json!(msg_len_after_sha2_padding.to_string()));
     let period_idx = header_utf8.len() - 1;
     prover_inputs_json.insert("period_idx".to_string(), json!(period_idx.to_string()));
 
@@ -197,12 +229,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let header_and_payload = format!("{}{}{}", jwt_header_decoded, header_pad, claims_decoded);
     prepare_prover_claim_inputs(header_and_payload, &config, &claims, &mut prover_inputs_json)?;
 
-    // Write out prover inputs, public IOs and prover aux data. Always create a file, even if they're empty
-    write_json_file(opts.outpath.join("prover_inputs.json"), &mut prover_inputs_json)?;
-    write_json_file(opts.outpath.join("prover_aux.json"), &mut prover_aux_json)?;
-    write_json_file(opts.outpath.join("public_IOs.json"), &mut public_ios_json)?;
+    Ok((prover_inputs_json, prover_aux_json, public_ios_json))
 
-    Ok(())
 }
 
 fn write_json_file(path: PathBuf, data: &mut serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
