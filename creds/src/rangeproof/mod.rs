@@ -13,10 +13,10 @@ use ark_poly_commit::{
     PCRandomness,
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{One, Zero, io::{BufWriter, BufReader}, fs::File};
+use ark_std::{One, Zero};
 use merlin::Transcript;
 use rand::thread_rng;
-use std::fs::OpenOptions;
+
 
 #[derive(Clone, Debug, CanonicalDeserialize, CanonicalSerialize)]
 pub struct RangeProofPK<'b, E: Pairing> {
