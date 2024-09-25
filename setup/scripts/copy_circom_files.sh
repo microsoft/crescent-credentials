@@ -19,6 +19,7 @@ cd ..
 ROOT_DIR=`pwd`
 
 OUTPUTS_DIR=${ROOT_DIR}/generated_files/$NAME
+INPUTS_DIR=${ROOT_DIR}/inputs/$NAME
 COPY_DEST=${ROOT_DIR}/../creds/test-vectors/$NAME
 
 PROVER_INPUT_FILE=${OUTPUTS_DIR}/prover_inputs.json
@@ -27,6 +28,9 @@ PUBLIC_IO_FILE=${OUTPUTS_DIR}/public_IOs.json
 R1CS_FILE=${OUTPUTS_DIR}/main_c.r1cs
 WIT_GEN_FILE=${OUTPUTS_DIR}/circom/main_js/main.wasm
 SYM_FILE=${OUTPUTS_DIR}/circom/io_locations.sym
+CONFIG_FILE=${INPUTS_DIR}/config.json
+TOKEN_FILE=${INPUTS_DIR}/token.jwt
+ISSUER_KEY_FILE=${INPUTS_DIR}/issuer.pub
 
 # Copy the prover inputs, r1cs and wasm into a directory
 rm -rf ${COPY_DEST}
@@ -36,4 +40,7 @@ cp ${PROVER_AUX_FILE} ${COPY_DEST}/
 cp ${PUBLIC_IO_FILE} ${COPY_DEST}/ 
 cp ${R1CS_FILE} ${COPY_DEST}/  
 cp ${WIT_GEN_FILE} ${COPY_DEST}/ 
-cp ${SYM_FILE} ${COPY_DEST}/ 
+cp ${SYM_FILE} ${COPY_DEST}/
+cp ${CONFIG_FILE} ${COPY_DEST}/
+cp ${TOKEN_FILE} ${COPY_DEST}/
+cp ${ISSUER_KEY_FILE} ${COPY_DEST}/

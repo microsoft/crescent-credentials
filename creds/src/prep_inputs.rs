@@ -402,8 +402,11 @@ fn to_utf8_integers(input_bytes: &str) -> Vec<u32> {
 }
 
 pub fn load_config(path: PathBuf) -> Result<serde_json::Map<String, Value>, Box<dyn Error>> {
-
     let config_str = fs::read_to_string(path)?;
+    parse_config(config_str)
+}
+
+pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>, Box<dyn Error>> {
     let mut config_v: Value = serde_json::from_str(&config_str)?;
     let config: &mut serde_json::Map<String, Value> = config_v.as_object_mut().ok_or("Invalid config")?;
 
@@ -472,4 +475,5 @@ pub fn load_config(path: PathBuf) -> Result<serde_json::Map<String, Value>, Box<
     }
 
     Ok(config.clone())
+
 }

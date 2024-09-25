@@ -49,10 +49,10 @@ The steps are
 After the circuit is setup and the data copied into, e.g., `test-vectors/rs256`, we can run each of the demo steps as follows.
 
 ```
-cargo run --release --features print-trace zksetup --name rs256
-cargo run --release --features print-trace prove --name rs256
-cargo run --release --features print-trace show --name rs256
-cargo run --release --features print-trace verify --name rs256
+cargo run --bin crescent --release --features print-trace zksetup --name rs256
+cargo run --bin crescent --release --features print-trace prove --name rs256
+cargo run --bin crescent --release --features print-trace show --name rs256
+cargo run --bin crescent --release --features print-trace verify --name rs256
 ```
 
 Note that the steps have to be run in order, but once the client state is created by `prove`, the `show` and `verify` steps can be run repeatedly.
