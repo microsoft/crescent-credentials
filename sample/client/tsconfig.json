@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": [
+      "es2023",
+      "DOM"
+    ],
+    "module": "ES2022",
+    "moduleResolution": "Node",
+    "outDir": "./dist",
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "target": "es2022"
+  },
+  "exclude": [],
+  "include": [
+    "src/**/*.ts",
+    "*.config.js"
+  ],
+  "typescript.tsdk": "./node_modules/typescript/lib"
+}
