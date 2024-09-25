@@ -206,7 +206,6 @@ pub fn run_show(
     // TODO: don't add the modulus to revealed inputs, the verifier should know it. Maybe just a key identifier    
     // TODO: seems error-prone to do this by hand; make a function to reveal 
     // by name e.g, set_revealed("modulus")
-    //println!("io_locations: {:?}", io_locations.public_io_locations.keys());
     let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
     let mut revealed_inputs = client_state.inputs.clone();

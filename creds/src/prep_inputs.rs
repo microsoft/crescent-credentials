@@ -12,14 +12,13 @@ use ark_std::{path::PathBuf};
 use crate::return_error;
 
 
+// If not set in config.json, the max_jwt_len is set to this value. 
 const DEFAULT_MAX_TOKEN_LENGTH : usize = 2048;
 const CIRCOM_RS256_LIMB_BITS : usize = 121;
 lazy_static! {
     static ref CRESCENT_SUPPORTED_ALGS: HashSet<&'static str> = {
         let mut set = HashSet::new();
-        set.insert("HS256");
         set.insert("RS256");
-        set.insert("ES256");
         set
     };
 }
@@ -88,21 +87,7 @@ Result<(serde_json::Map<String, Value>,
     while padded_m.len() < config["max_jwt_len"].as_u64().unwrap() as usize {
         padded_m.push(0);
     }
-
-    // TODO: add code to support 'defer_sig_ver' option
-    // Original python for outputting the digest:
-    // sha256hash = hashlib.sha256(bytes(prepad_m))
-    // digest_hex_str = sha256hash.hexdigest()
-    // digest_bits = hex_string_to_binary_array(digest_hex_str, 256)
-    // digest_b64 = base64url_encode(sha256hash.digest())
-    // digest_limbs = digest_to_limbs(digest_hex_str)
-    // if config['defer_sig_ver']:
-    //     prover_aux_data["digest"] = digest_hex_str.upper().strip();
-    //     print_debug("digest: ", digest_hex_str.upper().strip())    
-    if config["defer_sig_ver"].as_bool().unwrap() {
-        todo!("Not yet implemented");
-    }
-
+  
     // Begin creating prover's output. Everthing must have string type for Circom
     let mut prover_inputs_json = serde_json::Map::new();
     let mut public_ios_json = serde_json::Map::new();
@@ -110,34 +95,24 @@ Result<(serde_json::Map<String, Value>,
     prover_inputs_json.insert("message".to_string(), json!(padded_m.into_iter().map(|c| c.to_string()).collect::<Vec<_>>()));
 
     // Signature
-    if config["alg"].as_str().unwrap() == "RS256" {
+    let alg_str = config["alg"].as_str().unwrap();
+    if alg_str == "RS256" {
         let limbs = b64_to_circom_limbs(signature_b64, CIRCOM_RS256_LIMB_BITS)?;
         prover_inputs_json.insert("signature".to_string(), json!(limbs));
     }
-    else if config["alg"].as_str().unwrap() == "ES256K" {
-        todo!("Not yet implemented");
-    }
     else {
-        return_error!("Unsupported algorithm {}");
+        return_error!(format!("Unsupported algorithm {}", alg_str));
     }
 
     // Issuer's public key
-    if config["alg"].as_str().unwrap() == "RS256" {
+    if alg_str == "RS256" {
         let modulus_bytes = issuer_pub.to_components().n;
         let limbs = to_circom_limbs(&modulus_bytes, CIRCOM_RS256_LIMB_BITS)?;
         prover_inputs_json.insert("modulus".to_string(), json!(limbs));
         public_ios_json.insert("modulus".to_string(), json!(limbs));
     }
-    else if config["alg"].as_str().unwrap() == "ES256K" {
-        todo!("Not yet implemented");
-    }
     else {
-        return_error!("Unsupported algorithm {}");
-    }
-
-    if config["defer_sig_ver"].as_bool().unwrap() {
-        // Output "digest_248" to prover_inputs.json
-        todo!("Not yet implemented");
+        return_error!(format!("Unsupported algorithm {}", alg_str));
     }
 
     // Other values the prover needs
@@ -432,6 +407,7 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
     }
     if !config.contains_key("defer_sig_ver") {
         config.insert("defer_sig_ver".to_string(), json!(false));
+        return_error!("The 'defer_sig_ver' option not supported");        
     }
     else {
         if !config["defer_sig_ver"].is_boolean() {
@@ -458,7 +434,7 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
     if config["defer_sig_ver"].as_bool().unwrap() {
         if alg != "ES256K" {
             return_error!("The 'defer_sig_ver' option is only valid with the ES256K algorithm");
-        }
+        }    
     }
 
     // For all the config entries about claims (e.g, "email", "exp", etc.) make sure that if the claim 
