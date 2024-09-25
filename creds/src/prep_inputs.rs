@@ -405,15 +405,9 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
             return_error!("reveal_all_claims must have boolean type");
         }
     }
-    if !config.contains_key("defer_sig_ver") {
-        config.insert("defer_sig_ver".to_string(), json!(false));
-        return_error!("The 'defer_sig_ver' option not supported");        
+    if config.contains_key("defer_sig_ver") {
+        return_error!("The 'defer_sig_ver' option not supported");      
     }
-    else {
-        if !config["defer_sig_ver"].is_boolean() {
-            return_error!("defer_sig_ver must have boolean type");
-        }
-    }    
 
     if !config.contains_key("max_jwt_len") {
         config.insert("max_jwt_len".to_string(), json!(DEFAULT_MAX_TOKEN_LENGTH));
@@ -428,13 +422,6 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
             config["max_jwt_len"] = json!(round);
             println!("Warning: max_jwt_len not a multiple of 64. Rounded from {} to {}", max_jwt_len, round);
         }
-    }
-
-    // Additional checks
-    if config["defer_sig_ver"].as_bool().unwrap() {
-        if alg != "ES256K" {
-            return_error!("The 'defer_sig_ver' option is only valid with the ES256K algorithm");
-        }    
     }
 
     // For all the config entries about claims (e.g, "email", "exp", etc.) make sure that if the claim 
