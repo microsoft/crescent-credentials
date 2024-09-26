@@ -8,6 +8,7 @@ NAME=$1
 
 if [[ "$NAME" = "" ]] ;
 then
+    echo "\nDEPRECATED: This script is no longer required; prover inputs should be generated with crescent/creds/src/prep_inputs.rs\n" 
     echo "Usage: $0 <name of directory in inputs>"
     echo "Must be run from scripts/"
     echo "E.g.: $0 demo"     
@@ -19,7 +20,6 @@ cd ..
 ROOT_DIR=`pwd`
 
 OUTPUTS_DIR=${ROOT_DIR}/generated_files/$NAME
-CIRCOM_DIR=${OUTPUTS_DIR}/circom
 TOKEN_DIR=${ROOT_DIR}/inputs/$NAME
 
 LOG_FILE=${OUTPUTS_DIR}/${NAME}.log
