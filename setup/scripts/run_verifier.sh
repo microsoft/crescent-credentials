@@ -32,21 +32,7 @@ VERIFIER_INPUT_FILE=${OUTPUTS_DIR}/verifier_inputs.json
 PUBLIC_INPUT_FILE=${OUTPUTS_DIR}/public_IOs.json
 ./scripts/prepare_verifier.py ${TOKEN_DIR}/config.json ${TOKEN_DIR}/issuer.pub ${PUBLIC_INPUT_FILE} > ${VERIFIER_INPUT_FILE}
 
-echo "- Verify Spartan proof for proving ${NAME}..."
-echo -e "\n=== Verify proof output start ===" >> ${LOG_FILE}
 
-VK_FILE=${OUTPUTS_DIR}/vk.bin
-
-PROOF_FILE=${OUTPUTS_DIR}/proof.bin
-if [[ $2 != "" ]] ;
-then
-    PROOF_FILE=${OUTPUTS_DIR}/$2
-fi
-
-
-cargo run --release --features print-trace -- verify --input ${VERIFIER_INPUT_FILE} --vk ${VK_FILE} --proof ${PROOF_FILE} >> ${LOG_FILE}
-
-echo "=== Verify proof output end ===" >> ${LOG_FILE}
 
 cd scripts
 echo "Done."

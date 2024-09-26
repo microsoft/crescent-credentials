@@ -92,9 +92,6 @@ cd ${ROOT_DIR}
 
 echo "=== circom output end ===" >> ${LOG_FILE}
 
-#echo "- Generate pk and vk ..."
-#echo "=== Generate key pair output start ===" >> ${LOG_FILE}
-
 R1CS_FILE=${OUTPUTS_DIR}/main_c.r1cs
 PK_FILE=${OUTPUTS_DIR}/pk.bin
 VK_FILE=${OUTPUTS_DIR}/vk.bin
@@ -106,9 +103,6 @@ NUM_PUBLIC_INPUTS=$(grep -m 1 "public inputs:" "$LOG_FILE" | awk '{print $3}')
 # clean up the main.sym file as follows. Each entry is of the form #s, #w, #c, name as described in https://docs.circom.io/circom-language/formats/sym/
 awk -v max="$NUM_PUBLIC_INPUTS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, "."); printf "%s,%s\n", parts[2], $2}' "${CIRCOM_DIR}/main.sym" > "${CIRCOM_DIR}/io_locations.sym"
 
-#cargo run --release --features print-trace -- setup --r1cs ${R1CS_FILE} --pk ${PK_FILE} --vk ${VK_FILE}  >> ${LOG_FILE}
-
-#echo "=== Generate key pair output end ===" >> ${LOG_FILE}
 
 cd scripts
 echo "Done."

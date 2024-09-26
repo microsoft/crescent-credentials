@@ -31,22 +31,6 @@ PROVER_INPUT_FILE=${OUTPUTS_DIR}/prover_inputs.json
 PUBLIC_INPUT_FILE=${OUTPUTS_DIR}/public_IOs.json
 python3 ./scripts/prepare_prover.py ${TOKEN_DIR}/config.json ${TOKEN_DIR}/issuer.pub ${TOKEN_DIR}/token.jwt ${PUBLIC_INPUT_FILE} > ${PROVER_INPUT_FILE}
 
-#echo "- Generate Spartan proof for proving ${NAME}..."
-#echo -e "\n=== Generate proof output start ===" >> ${LOG_FILE}
-#
-#R1CS_FILE=${OUTPUTS_DIR}/main_c.r1cs
-#PK_FILE=${OUTPUTS_DIR}/pk.bin
-#PROOF_FILE=${OUTPUTS_DIR}/proof.bin
-#
-#WIT_GEN_FILE=${CIRCOM_DIR}/main_c_cpp/main_c
-#if [[ ! -e ${WIT_GEN_FILE} ]] ; 
-#then
-#    WIT_GEN_FILE=${CIRCOM_DIR}/main_js/main.wasm
-#fi
-#
-#cargo run --release --features print-trace -- prove --r1cs ${R1CS_FILE} --input ${PROVER_INPUT_FILE} --pk ${PK_FILE} --witness-generator ${WIT_GEN_FILE} --proof ${PROOF_FILE} >> ${LOG_FILE}
-#
-#echo "=== Generate proof output end ===" >> ${LOG_FILE}
 
 cd scripts
 echo "Done."
