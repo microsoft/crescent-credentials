@@ -90,7 +90,7 @@ fn issue(login: Json<LoginRequest>, private_key: &State<PrivateKey>, users: &Sta
             acct: 0, // TODO: what is that?
             aud: "relyingparty.example.com".to_string(),
             auth_time: (current_time).timestamp() as usize, // authentication time = now
-            exp: (current_time + Duration::hours(1)).timestamp() as usize, // expiration in 3 months (TODO)
+            exp: (current_time + Duration::days(30)).timestamp() as usize, // expiration in 30 days
             iat: (current_time).timestamp() as usize, // issued at time = now
             ipaddr: "203.0.113.0".to_string(), // user IP address
             iss: "https://localhost:8000".to_string(), // TODO: get ip from config
