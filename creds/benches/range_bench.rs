@@ -1,5 +1,4 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use ark_ec::AffineRepr;
 use criterion::{criterion_group, criterion_main, Criterion};
 use ark_bn254::{Bn254, Fr};
 use crescent::{dlog::DLogPoK, rangeproof::{RangeProof, RangeProofPK}};
@@ -16,7 +15,7 @@ pub fn range_proof_benchmark(c: &mut Criterion) {
     let token_exp_int = ark_ff::BigInt::from(1754434613 as u32);        // TODO: change this to now + a day
     let token_exp = Fr::from_bigint(token_exp_int).unwrap();
 
-    let (range_pk, range_vk) = RangeProofPK::<Bn254>::setup(N_BITS);
+    let (range_pk, _range_vk) = RangeProofPK::<Bn254>::setup(N_BITS);
 
     let cur_time = Fr::from(
     SystemTime::now()
