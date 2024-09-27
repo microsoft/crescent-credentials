@@ -1,4 +1,5 @@
 use std::{fs, path::PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use ark_bn254::{Bn254 as ECPairing, Fr};
 //use ark_bls12_381::Bls12_381 as ECPairing;
 use ark_circom::{CircomBuilder, CircomConfig};
@@ -8,6 +9,7 @@ use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
+use prep_inputs::parse_config;
 use utils::new_from_file;
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
@@ -16,13 +18,14 @@ use crate::{
     structs::{GenericInputsJSON, ProverInput},
 };
 use crate::utils::write_to_file;
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::prep_inputs::prepare_prover_inputs;
 
 pub mod dlog;
 pub mod groth16rand;
 pub mod rangeproof;
 pub mod structs;
 pub mod utils;
+pub mod prep_inputs;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 60;    // The verifier only accepts proofs fresher than this
@@ -39,7 +42,9 @@ struct ShowProof<E: Pairing> {
 // Central struct to configure the paths data stored between operations
 struct CachePaths {
    pub _base: String,
-   pub prover_inputs : String,
+   pub jwt : String,
+   pub issuer_pem : String,
+   pub config : String,
    pub io_locations: String,
    pub wasm: String,
    pub r1cs: String,
@@ -73,7 +78,9 @@ impl CachePaths {
 
         CachePaths {
             _base: base_path_str.clone(),
-            prover_inputs: format!("{}prover_inputs.json", base_path_str),
+            jwt: format!("{}token.jwt", base_path_str),
+            issuer_pem: format!("{}issuer.pub", base_path_str),
+            config: format!("{}config.json", base_path_str),
             io_locations: format!("{}io_locations.sym", base_path_str),
             wasm: format!("{}main.wasm", base_path_str),
             r1cs: format!("{}main_c.r1cs", base_path_str),
@@ -93,7 +100,7 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
 
     let paths = CachePaths::new(base_path);
 
-    let circom_timer = start_timer!(|| "Reading R1CS instance at witness generator");
+    let circom_timer = start_timer!(|| "Reading R1CS instance and witness generator");
     let cfg = CircomConfig::<ECPairing>::new(
         &paths.wasm,
         &paths.r1cs,
@@ -134,7 +141,13 @@ pub fn run_prover(
 ) {
     let paths = CachePaths::new(base_path);
 
-    let prover_inputs = GenericInputsJSON::new(&paths.prover_inputs);
+    let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
+    let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));
+    let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
+    let config = parse_config(config_str).expect("Failed to parse config");
+    let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
+         prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
+    let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
 
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
     let cfg = CircomConfig::<ECPairing>::new(
@@ -189,10 +202,14 @@ pub fn run_show(
 
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
+    // The IOs are exp and the 17 limbs of the RSA modulus. We make them revealed
+    // TODO: don't add the modulus to revealed inputs, the verifier should know it. Maybe just a key identifier    
+    // TODO: seems error-prone to do this by hand; make a function to reveal 
+    // by name e.g, set_revealed("modulus")
+    let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
     let mut revealed_inputs = client_state.inputs.clone();
-    revealed_inputs.remove(exp_value_pos - 1);  // TODO: seems error-prone to do this by hand
+    revealed_inputs.remove(exp_value_pos - 1);  
     let show_groth16 = client_state.show_groth16(&io_types);    
     
     // Create fresh range proof 
@@ -220,9 +237,12 @@ pub fn run_verifier(base_path: PathBuf) {
     let vk : VerifyingKey<ECPairing> = new_from_file(&paths.groth16_vk);
     let range_vk : RangeProofVK<ECPairing> = new_from_file(&paths.range_vk);
     let io_locations = IOLocations::new(&paths.io_locations);    
+    // TODO: load public_IOs file and take modulus from there.  
+    // Or maybe the verifier should work directly from the issuer's public key?
 
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    let mut io_types = vec![PublicIOType::Hidden; show_proof.inputs_len];
+    let mut io_types = vec![PublicIOType::Revealed; show_proof.inputs_len];
+    println!("show_proof.inputs_len = {}", show_proof.inputs_len);
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
 
     let verify_timer = std::time::Instant::now();

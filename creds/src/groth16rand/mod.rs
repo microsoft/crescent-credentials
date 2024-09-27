@@ -5,7 +5,7 @@ use crate::{
     utils::{add_to_transcript, biguint_to_scalar, msm_select},
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, Group, VariableBaseMSM};
-use ark_ff::{BigInt, PrimeField};
+use ark_ff::PrimeField;
 use ark_groth16::{Groth16, PreparedVerifyingKey, Proof, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
@@ -20,7 +20,7 @@ use num_bigint::BigUint;
 use rayon::ThreadPoolBuilder;
 use spartan_ecdsa::{ECDSAParams, ECDSAProof, NamedCurve};
 use std::fs::OpenOptions;
-use std::ops::AddAssign;
+
 
 
 // The (mutatable) state of the client. This struct will have methods that generate showings

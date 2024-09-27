@@ -8,6 +8,14 @@ use sha2::{Digest, Sha512};
 use std::fs::OpenOptions;
 use ark_std::{io::BufWriter, io::BufReader, fs::File};
 
+
+#[macro_export]
+macro_rules! return_error {
+    ($msg:expr) => {
+        return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, $msg)))
+    };
+}
+
 pub fn bigint_from_str(s: &str) -> num_bigint::BigUint {
     num_bigint::BigUint::parse_bytes(s.as_bytes(), 10).unwrap()
 }

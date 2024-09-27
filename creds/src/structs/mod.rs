@@ -15,7 +15,7 @@ pub trait ProverInput {
 
 #[derive(Clone, Debug, Default)]
 pub struct GenericInputsJSON {
-    prover_inputs: Map<String, Value>,
+    pub prover_inputs: Map<String, Value>,
 }
 
 /// Groth16 IO locations
