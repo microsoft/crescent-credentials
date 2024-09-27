@@ -81,37 +81,18 @@ To run setup, change to the `scripts` directory and run the command
 ```
 Setup runs Circom and creates the R1CS instance to verify the JWT and prove the predicates from the proof spec, as well
 as the setup steps of the ZK proof system to get the prover and verifier parameters (output as files in `generated_files/rs256`). 
-Overall this is the slowest part, but need only be run once for a given token issuer and proof specification. 
-(TODO: we don't actually call the right ZK setup yet, the Groth16 params are called in `creds` as part of the demo)
+Overall this is slow, but need only be run once for a given token issuer and proof specification. 
 
-Next we run a prover setup step, to generate the input files the prover needs for each token.
-```
-./run_prover.sh rs256
-```
-
-Then we copy the circom outputs to `creds` with the command:
-```
-./copy_circom_files.sh rs256
-```
+Once this script completes, all files required for showing and verifying proofs will have copied to `creds/test-vectors/rs256`.
 
 
 
-# *
-# TODO: Documentation below is out-of-date
-# *
-
-
-## Rust command-line program and API
-The scripts described above prepare inputs and call a Rust binary called `crescent` that implements the setup, prover and verifier steps. Other applications may wish to 
-use this Rust program directly, or call the Rust APIs behind it. See `src/main.rs` and `src/lib.rs`. 
-
-
-# Misc Notes
-For some large circuits, Circom may use more than 32GB of RAM which (on my system) will cause it to be killed. 
-If the log output during Circom compilation stops abrubptly, check towards the end of `/var/log/kern.log`
+# Troubleshooting
+For some large circuits, Circom may use a large amount of RAM and be killed. 
+If the log output during Circom compilation stops abruptly, check towards the end of `/var/log/kern.log`
 for an entry like 
 ```
-Oct  9 16:09:18 gregz-linux kernel: [22997.693985] Out of memory: Killed process 13747 (circom) total-vm:31880260kB, anon-rss:30334800kB, file-rss:0kB, shmem-rss:0kB, UID:1000 pgtables:62048kB oom_score_adj:0
+Oct  9 16:09:18 computer-name kernel: [22997.693985] Out of memory: Killed process 13747 (circom) total-vm:31880260kB, anon-rss:30334800kB, file-rss:0kB, shmem-rss:0kB, UID:1000 pgtables:62048kB oom_score_adj:0
 ```
 
 
