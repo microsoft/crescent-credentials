@@ -37,6 +37,7 @@ ROOT_DIR=`pwd`
 OUTPUTS_DIR=${ROOT_DIR}/generated_files/$NAME
 CIRCOM_DIR=${OUTPUTS_DIR}/circom
 INPUTS_DIR=${ROOT_DIR}/inputs/$NAME
+COPY_DEST=${ROOT_DIR}/../creds/test-vectors/$NAME
 
 LOG_FILE=${OUTPUTS_DIR}/${NAME}.log
 
@@ -92,10 +93,6 @@ cd ${ROOT_DIR}
 
 echo "=== circom output end ===" >> ${LOG_FILE}
 
-R1CS_FILE=${OUTPUTS_DIR}/main_c.r1cs
-PK_FILE=${OUTPUTS_DIR}/pk.bin
-VK_FILE=${OUTPUTS_DIR}/vk.bin
-
 # read the number of public inputs from $NAME.log
 # there is a line of the form "public inputs: NUM_PUBLIC_INPUTS". parse out NUM_PUBLIC_INPUTS into a variable
 NUM_PUBLIC_INPUTS=$(grep -m 1 "public inputs:" "$LOG_FILE" | awk '{print $3}')
@@ -103,6 +100,28 @@ NUM_PUBLIC_INPUTS=$(grep -m 1 "public inputs:" "$LOG_FILE" | awk '{print $3}')
 # clean up the main.sym file as follows. Each entry is of the form #s, #w, #c, name as described in https://docs.circom.io/circom-language/formats/sym/
 awk -v max="$NUM_PUBLIC_INPUTS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, "."); printf "%s,%s\n", parts[2], $2}' "${CIRCOM_DIR}/main.sym" > "${CIRCOM_DIR}/io_locations.sym"
 
+# Copy files needed for zksetup, prove, etc..
+PROVER_INPUT_FILE=${OUTPUTS_DIR}/prover_inputs.json
+PROVER_AUX_FILE=${OUTPUTS_DIR}/prover_aux.json
+PUBLIC_IO_FILE=${OUTPUTS_DIR}/public_IOs.json
+R1CS_FILE=${OUTPUTS_DIR}/main_c.r1cs
+WIT_GEN_FILE=${OUTPUTS_DIR}/circom/main_js/main.wasm
+SYM_FILE=${OUTPUTS_DIR}/circom/io_locations.sym
+CONFIG_FILE=${INPUTS_DIR}/config.json
+TOKEN_FILE=${INPUTS_DIR}/token.jwt
+ISSUER_KEY_FILE=${INPUTS_DIR}/issuer.pub
+
+rm -rf ${COPY_DEST}
+mkdir -p ${COPY_DEST}
+cp ${PROVER_INPUT_FILE} ${COPY_DEST}/ 
+cp ${PROVER_AUX_FILE} ${COPY_DEST}/ 
+cp ${PUBLIC_IO_FILE} ${COPY_DEST}/ 
+cp ${R1CS_FILE} ${COPY_DEST}/  
+cp ${WIT_GEN_FILE} ${COPY_DEST}/ 
+cp ${SYM_FILE} ${COPY_DEST}/
+cp ${CONFIG_FILE} ${COPY_DEST}/
+cp ${TOKEN_FILE} ${COPY_DEST}/
+cp ${ISSUER_KEY_FILE} ${COPY_DEST}/
 
 cd scripts
 echo "Done."
