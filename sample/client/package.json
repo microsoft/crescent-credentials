@@ -1,0 +1,36 @@
+{
+  "name": "crecent-client-extension",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "clean": "rimraf ./dist/**/*",
+    "build": "cross-env NODE_ENV=production rollup -c",
+    "build:debug": "cross-env NODE_ENV=development rollup -c",
+    "build:watch": "npm run build:debug -- -w",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix src/*.ts",
+    "test": "echo \"Error: no tests\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "28.0.0",
+    "@rollup/plugin-eslint": "^9.0.5",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "15.3.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@stylistic/eslint-plugin": "^2.8.0",
+    "@types/chrome": "0.0.272",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.4.5",
+    "eslint": "8.57.1",
+    "eslint-config-love": "71.0.0",
+    "rollup": "4.22.4",
+    "rollup-plugin-copy": "^3.5.0",
+    "rollup-plugin-dotenv": "^0.5.1",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "typescript": "5.5.4"
+  }
+}
