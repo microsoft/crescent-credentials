@@ -11,9 +11,9 @@ use std::path::PathBuf;
 use std::fs;
 use chrono::{Utc, Duration};
 
-// paths to the private key and JWKS file
-const PRIVATE_KEY_PATH : &str = "keys/issuer.prv";
-const JWKS_PATH: &str = ".well-known/jwks.json";
+// issuer config values
+const PRIVATE_KEY_PATH : &str = "keys/issuer.prv"; // private key path
+const JWKS_PATH: &str = ".well-known/jwks.json"; // JWKS path
 
 // struct for the incoming login request
 #[derive(Deserialize)]
@@ -26,17 +26,45 @@ struct LoginRequest {
 // struct for the personal claims related to the user
 #[derive(Serialize, Clone)]
 struct UserClaims {
-    sub: String,  // Subject (username)
-    role: String, // Custom field, e.g., user role
+    email: String,
+    family_name: String,
+    given_name: String,
+    login_hint: String,
+    name: String,
+    oid: String,
+    onprem_sid: String,
+    preferred_username: String,
+    rh: String,
+    sid: String,
+    sub: String,
+    upn: String,
+    uti: String,
+    verified_primary_email: Vec<String>,
+    verified_secondary_email: Vec<String>,
 }
 
 // struct for the full JWT claims, which includes both user-specific and dynamic fields
+// note: this emulates the schema of the Microsoft Entra JWT
 #[derive(Serialize, Clone)]
 struct Claims {
-    user_claims: UserClaims,  // Nested user claims
-    exp: usize,               // Expiration time (as a timestamp)
-    iss: String,              // Issuer field
-    aud: String,              // Audience field
+    // user-specific claims
+    user_claims: UserClaims,
+    // token-specific claims
+    acct: usize,
+    aud: String,
+    auth_time: usize,
+    exp: usize,
+    iat: usize,
+    ipaddr: String,
+    iss: String,
+    jti: String,
+    nbf: usize,
+    tenant_ctry: String,
+    tenant_region_scope: String,
+    tid: String,
+    ver: String,
+    xms_pdl: String,
+    xms_tpl: String
 }
 
 // struct to hold a user's data
@@ -55,12 +83,26 @@ struct PrivateKey {
 fn issue(login: Json<LoginRequest>, private_key: &State<PrivateKey>, users: &State<Vec<User>>) -> Result<String, &'static str> {
     // find the user based on the username and password provided
     if let Some(user) = users.iter().find(|user| user.username == login.username && user.password == login.password) {
-        // Set the dynamic claims and construct the full Claims struct
+        // set the dynamic claims and construct the full Claims struct
+        let current_time = Utc::now(); 
         let claims = Claims {
             user_claims: user.user_claims.clone(),
-            exp: (Utc::now() + Duration::hours(1)).timestamp() as usize,  // Expiration in 1 hour
-            iss: "my-issuer".to_string(),
-            aud: "my-audience".to_string(),
+            acct: 0, // TODO: what is that?
+            aud: "relyingparty.example.com".to_string(),
+            auth_time: (current_time).timestamp() as usize, // authentication time = now
+            exp: (current_time + Duration::hours(1)).timestamp() as usize, // expiration in 3 months (TODO)
+            iat: (current_time).timestamp() as usize, // issued at time = now
+            ipaddr: "203.0.113.0".to_string(), // user IP address
+            iss: "https://localhost:8000".to_string(), // TODO: get ip from config
+            jti: "fGYCO1mK2dBWTAfCjGAoTQ".to_string(), // token unique id (what's that value? TODO)
+            nbf: (current_time).timestamp() as usize, // not before time = now
+            tenant_ctry: "US".to_string(), // tenant country
+            tenant_region_scope: "WW".to_string(), // tenant region (what's that? TODO)
+            tid: "12345678-1234-abcd-1234-abcdef124567".to_string(), // tenant ID
+            ver: "2.0".to_string(),
+            xms_pdl: "NAM".to_string(),
+            xms_tpl: "en".to_string()
+        
         };
 
         // Create a header with RS256 algorithm
@@ -96,6 +138,14 @@ fn rocket() -> _ {
     let encoding_key = EncodingKey::from_rsa_pem(&private_key_data)
         .expect("Failed to create encoding key");
 
+    // read the kid from the JWK set in JWKS_PATH
+    let jwks_data = fs::read(JWKS_PATH)
+        .expect("Failed to read JWKS file");
+    let jwks: serde_json::Value = serde_json::from_slice(&jwks_data)
+        .expect("Failed to parse JWKS file");
+    let kid = jwks["keys"][0]["kid"].as_str();
+    println!("Loaded JWKS with kid: {:?}", kid);
+
     // create the private key struct
     let private_key = PrivateKey {
         key: encoding_key,
@@ -103,20 +153,48 @@ fn rocket() -> _ {
 
     // create a list of users with their personal claims
     let users = vec![
+        // Alice demo user
         User {
-            username: "user1".to_string(),
-            password: "password1".to_string(),
+            username: "alice".to_string(),
+            password: "password".to_string(),
             user_claims: UserClaims {
-                sub: "user1".to_string(),
-                role: "role1".to_string(),
+                email: "alice@example.com".to_string(),
+                family_name: "Example".to_string(),
+                given_name: "Alice".to_string(),
+                login_hint: "O.aaaaabbbbbbbbbcccccccdddddddeeeeeeeffffffgggggggghhhhhhiiiiiiijjjjjjjkkkkkkklllllllmmmmmmnnnnnnnnnnooooooopppppppqqqqrrrrrrsssssdddd".to_string(),
+                name: "Alice Example".to_string(),
+                oid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
+                onprem_sid: "S-1-2-34-5678901234-1234567890-1234567890-1234567".to_string(),
+                preferred_username: "alice@example.com".to_string(),
+                rh: "0.aaaaabbbbbccccddddeeeffff12345gggg12345_124_aaaaaaa.".to_string(),
+                sid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
+                sub: "aaabbbbccccddddeeeeffffgggghhhh123456789012".to_string(),
+                upn: "alice@example.com".to_string(),
+                uti: "AAABBBBccccdddd1234567".to_string(),
+                verified_primary_email: vec!["alice@example.com".to_string()],
+                verified_secondary_email: vec!["alice2@example.com".to_string()],
             },
         },
+        // Bob demo user
         User {
             username: "user2".to_string(),
             password: "password2".to_string(),
             user_claims: UserClaims {
-                sub: "user2".to_string(),
-                role: "role2".to_string(),
+                email: "bob@example.com".to_string(),
+                family_name: "Example".to_string(),
+                given_name: "Bob".to_string(),
+                login_hint: "O.aaaaabbbbbbbbbcccccccdddddddeeeeeeeffffffgggggggghhhhhhiiiiiiijjjjjjjkkkkkkklllllllmmmmmmnnnnnnnnnnooooooopppppppqqqqrrrrrrsssssdddd".to_string(),
+                name: "Bob Example".to_string(),
+                oid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
+                onprem_sid: "S-1-2-34-5678901234-1234567890-1234567890-1234567".to_string(),
+                preferred_username: "bob@example.com".to_string(),
+                rh: "0.aaaaabbbbbccccddddeeeffff12345gggg12345_124_aaaaaaa.".to_string(),
+                sid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
+                sub: "aaabbbbccccddddeeeeffffgggghhhh123456789012".to_string(),
+                upn: "bob@example.com".to_string(),
+                uti: "AAABBBBccccdddd1234567".to_string(),
+                verified_primary_email: vec!["bob@example.com".to_string()],
+                verified_secondary_email: vec!["bob2@example.com".to_string()],          
             },
         },
     ];
