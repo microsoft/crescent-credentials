@@ -48,7 +48,9 @@ struct UserClaims {
 #[derive(Serialize, Clone)]
 struct Claims {
     // user-specific claims
+    #[serde(flatten)]
     user_claims: UserClaims,
+
     // token-specific claims
     acct: usize,
     aud: String,
@@ -88,7 +90,7 @@ fn issue(login: Json<LoginRequest>, private_key: &State<PrivateKey>, users: &Sta
         let claims = Claims {
             user_claims: user.user_claims.clone(),
             acct: 0, // TODO: what is that?
-            aud: "relyingparty.example.com".to_string(),
+            aud: "relyingparty.microsoft.com".to_string(),
             auth_time: (current_time).timestamp() as usize, // authentication time = now
             exp: (current_time + Duration::days(30)).timestamp() as usize, // expiration in 30 days
             iat: (current_time).timestamp() as usize, // issued at time = now
@@ -152,27 +154,29 @@ fn rocket() -> _ {
     };
 
     // create a list of users with their personal claims
+    // NOTE: we currently assume a microsoft.com domain for all users
+    //       (assumed by the current ZK circuit)
     let users = vec![
         // Alice demo user
         User {
             username: "alice".to_string(),
             password: "password".to_string(),
             user_claims: UserClaims {
-                email: "alice@example.com".to_string(),
+                email: "alice@microsoft.com".to_string(),
                 family_name: "Example".to_string(),
                 given_name: "Alice".to_string(),
                 login_hint: "O.aaaaabbbbbbbbbcccccccdddddddeeeeeeeffffffgggggggghhhhhhiiiiiiijjjjjjjkkkkkkklllllllmmmmmmnnnnnnnnnnooooooopppppppqqqqrrrrrrsssssdddd".to_string(),
                 name: "Alice Example".to_string(),
                 oid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 onprem_sid: "S-1-2-34-5678901234-1234567890-1234567890-1234567".to_string(),
-                preferred_username: "alice@example.com".to_string(),
+                preferred_username: "alice@microsoft.com".to_string(),
                 rh: "0.aaaaabbbbbccccddddeeeffff12345gggg12345_124_aaaaaaa.".to_string(),
                 sid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 sub: "aaabbbbccccddddeeeeffffgggghhhh123456789012".to_string(),
-                upn: "alice@example.com".to_string(),
+                upn: "alice@microsoft.com".to_string(),
                 uti: "AAABBBBccccdddd1234567".to_string(),
-                verified_primary_email: vec!["alice@example.com".to_string()],
-                verified_secondary_email: vec!["alice2@example.com".to_string()],
+                verified_primary_email: vec!["alice@microsoft.com".to_string()],
+                verified_secondary_email: vec!["alice2@microsoft.com".to_string()],
             },
         },
         // Bob demo user
@@ -180,21 +184,21 @@ fn rocket() -> _ {
             username: "user2".to_string(),
             password: "password2".to_string(),
             user_claims: UserClaims {
-                email: "bob@example.com".to_string(),
+                email: "bob@microsoft.com".to_string(),
                 family_name: "Example".to_string(),
                 given_name: "Bob".to_string(),
                 login_hint: "O.aaaaabbbbbbbbbcccccccdddddddeeeeeeeffffffgggggggghhhhhhiiiiiiijjjjjjjkkkkkkklllllllmmmmmmnnnnnnnnnnooooooopppppppqqqqrrrrrrsssssdddd".to_string(),
                 name: "Bob Example".to_string(),
                 oid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 onprem_sid: "S-1-2-34-5678901234-1234567890-1234567890-1234567".to_string(),
-                preferred_username: "bob@example.com".to_string(),
+                preferred_username: "bob@microsoft.com".to_string(),
                 rh: "0.aaaaabbbbbccccddddeeeffff12345gggg12345_124_aaaaaaa.".to_string(),
                 sid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 sub: "aaabbbbccccddddeeeeffffgggghhhh123456789012".to_string(),
-                upn: "bob@example.com".to_string(),
+                upn: "bob@microsoft.com".to_string(),
                 uti: "AAABBBBccccdddd1234567".to_string(),
-                verified_primary_email: vec!["bob@example.com".to_string()],
-                verified_secondary_email: vec!["bob2@example.com".to_string()],          
+                verified_primary_email: vec!["bob@microsoft.com".to_string()],
+                verified_secondary_email: vec!["bob2@microsoft.com".to_string()],          
             },
         },
     ];
