@@ -1,6 +1,4 @@
-Cargo.lock
 generated_files/*
 !generated_files/README.md
-target
 logs
 scripts/__pycache__/*
