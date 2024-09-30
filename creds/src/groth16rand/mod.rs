@@ -1,11 +1,10 @@
 use crate::{
     dlog::{DLogPoK, PedersenOpening},
     rangeproof::{RangeProof, RangeProofPK, RangeProofVK},
-    structs::{IOLocations, ProverAuxInputs, PublicIOType},
-    utils::{add_to_transcript, biguint_to_scalar, msm_select},
+    structs::{IOLocations, PublicIOType},
+    utils::msm_select,
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, Group, VariableBaseMSM};
-use ark_ff::PrimeField;
 use ark_groth16::{Groth16, PreparedVerifyingKey, Proof, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
@@ -15,10 +14,7 @@ use ark_std::{
     rand::thread_rng,
     start_timer, UniformRand, Zero,
 };
-use merlin::Transcript;
-use num_bigint::BigUint;
 use rayon::ThreadPoolBuilder;
-use spartan_ecdsa::{ECDSAParams, ECDSAProof, NamedCurve};
 use std::fs::OpenOptions;
 
 
@@ -182,16 +178,6 @@ impl<E: Pairing> ClientState<E> {
         }
     }
 
-    // TODO: can/should we add some context here?
-    pub(crate) fn derive_commitment_challenge(com1: &E::G1, com2: &E::G1) -> String {
-        let mut ts: Transcript = Transcript::new(b"Challenge for commitment in NIZK adapter");
-        add_to_transcript(&mut ts, b"com1", com1);
-        add_to_transcript(&mut ts, b"com2", com2);
-        let mut c_bytes = [0u8; 30]; // 248 bit challenge
-        ts.challenge_bytes(&[0u8], &mut c_bytes);
-        hex::encode(c_bytes)
-    }
-
     /// Prove that a certain input to the groth16 proof is in [0,2^n)
     /// Takes as input
     /// 1. label of the input
@@ -222,135 +208,10 @@ impl<E: Pairing> ClientState<E> {
         ShowRange { range_proof }
     }
 
-    /// Show knowledge of an ecdsa signature using a spartan proof
-    pub fn show_ecdsa(
-        &self,
-        prover_aux_inputs: &ProverAuxInputs,
-        spartan_prover_key: &Vec<u8>,
-        digest_commitment_index: usize
-    ) -> ShowECDSA<E> 
-        where <E::G1 as Group>::ScalarField : PrimeField
-    {
-        type G1Scalar<E> = <<E as Pairing>::G1 as Group>::ScalarField;
-        let ecdsa_timer = start_timer!(|| "Prove committed digest is ECDSA-signed");
 
-        // Create the proof for the ECDSA signature
-        assert!(prover_aux_inputs.ensure_has_inputs(vec![
-            "digest".to_string(),
-            "signature_r".to_string(),
-            "signature_s".to_string(),
-            "pk_x".to_string(),
-            "pk_y".to_string()
-        ]));
-        let digest = prover_aux_inputs.get("digest");
-        let pk_x = prover_aux_inputs.get("pk_x");
-        let pk_y = prover_aux_inputs.get("pk_y");
-        let r = prover_aux_inputs.get("signature_r");
-        let s = prover_aux_inputs.get("signature_s");
-
-        let digest_pedersen = &self.committed_input_openings[digest_commitment_index];        
-
-        let params = ECDSAParams::new(NamedCurve::Secp256k1, NamedCurve::Bn254); // TODO: the BN curve should be from a central config
-        let commitment_opening = ECDSAProof::commit_digest_part1(&params, &digest);
-        let mask = ECDSAProof::get_mask(&commitment_opening);
-        let mask = biguint_to_scalar(&BigUint::from_bytes_le(&mask));
-
-        let mask_commitment = DLogPoK::pedersen_commit(&mask, &digest_pedersen.bases);
-        let challenge = Self::derive_commitment_challenge(&mask_commitment.c, &digest_pedersen.c);
-        let (commitment, commitment_opening) =
-            ECDSAProof::commit_digest_part2(&params, commitment_opening, &challenge);
-        let spartan_proof = ECDSAProof::prove(
-            &params,
-            &spartan_prover_key,
-            &digest,
-            &pk_x,
-            &pk_y,
-            &r,
-            &s,
-            &challenge,
-            &commitment_opening,
-        );
-        // We need to prove that the digest_commitment is well-formed with a sigma proof
-        // The input commitment digest_pedersen commits to an IO value h such that c = h*challenge + H(h, k)
-        let digest_commitment = biguint_to_scalar::<G1Scalar<E>>(&BigUint::from_bytes_le(&commitment));
-        let h = digest_pedersen.m;
-
-        // Sanity check: ensure h and digest are equal
-        let digest_scalar = <G1Scalar<E>>::from_be_bytes_mod_order(&hex::decode(&digest[0..62]).unwrap());
-        assert_eq!(h, digest_scalar);
-
-        // Create the sigma proof
-        let dl_proof = DLogPoK::<E::G1>::prove_for_ecdsa(
-            &mask_commitment,
-            &digest_pedersen,
-            &digest_commitment,
-            &challenge,
-        );
-
-        end_timer!(ecdsa_timer);
-
-        ShowECDSA {
-            dl_proof,
-            spartan_proof,
-            digest_commitment: commitment,
-        }
-    }
 }
 
-impl<E: Pairing> ShowECDSA<E> {
-    pub fn verify(
-        &self,
-        //vk: &VerifyingKey<E>,
-        pvk: &PreparedVerifyingKey<E>,
-        spartan_verifier_key: &Vec<u8>,
-        pk_x: &str,
-        pk_y: &str,
-        digest_commitment_index: usize
-    ) 
-        where <E::G1 as Group>::ScalarField : PrimeField
-    {
-        type G1Scalar<E> = <<E as Pairing>::G1 as Group>::ScalarField;     
-        let verify_timer = start_timer!(|| "Verify credential with external ECDSA proof");
 
-        // Check the sigma proof
-        let digest_commitment = biguint_to_scalar::<G1Scalar<E>>(&BigUint::from_bytes_le(&self.digest_commitment));
-
-        let challenge = ClientState::<E>::derive_commitment_challenge(
-            &self.dl_proof.extra_values.as_ref().unwrap().z,
-            &self.dl_proof.extra_values.as_ref().unwrap().l_prime,
-        );
-
-        // TODO: can we avoid this conversion between G1 and G1Affine and later unconversion in verify_for_ecdsa
-        let pedersen_bases = vec![
-            pvk.vk.gamma_abc_g1[digest_commitment_index + 1].clone().into_group(),      
-            pvk.vk.delta_g1.clone().into_group(),
-        ];
-
-        let result = self.dl_proof.verify_for_ecdsa(
-            &pedersen_bases,
-            &digest_commitment,
-            &challenge,
-        );
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
-
-        // Check the ECDSA proof
-        let params = ECDSAParams::new(NamedCurve::Secp256k1, NamedCurve::Bn254);
-        let is_valid = ECDSAProof::verify(
-            &params,
-            spartan_verifier_key,
-            pk_x,
-            pk_y,
-            &self.spartan_proof,
-            &challenge,
-            &self.digest_commitment,
-        );
-        assert!(is_valid);
-
-        end_timer!(verify_timer);
-    }
-}
 
 impl<E: Pairing> ShowGroth16<E> {
     pub fn verify(

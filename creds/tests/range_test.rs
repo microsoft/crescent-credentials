@@ -7,7 +7,7 @@ use ark_relations::{
     r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError},
 };
 use ark_std::{rand::SeedableRng, UniformRand, Zero};
-use crescent::{groth16rand::ClientState, rangeproof::{RangeProofPK, RangeProofVK}, structs::{IOLocations, PublicIOType}};
+use crescent::{groth16rand::ClientState, rangeproof::RangeProofPK, structs::{IOLocations, PublicIOType}};
 use std::collections::BTreeMap;
 
 const NUM_CONSTRAINTS: usize = (1 << 10) - 100;
