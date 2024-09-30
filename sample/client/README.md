@@ -1,46 +1,48 @@
 # Crescent sample client
 
+This project contains a Edge/Chrome/Firefox browser extension implementing a Crescent prover. The browser extension can interact with the [sample issuer](../issuer/README.md) to retrieve JSON Web Tokens (JWT) and present a Crescent zero-knowledge proof to the [sample verifier](../verifier/README.md). 
+
+## Setup
+
+Make sure [node.js](https://nodejs.org/) and [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) are installed on your system; the latest Long-Term Support (LTS) version is recommended for both.
+
+Run the install script:
+
+`npm install`
+
 ## Build
 
-production build (minified w/o sourcemapping)  
+Build the extension (3 modes):
+
+* production build (minified w/o sourcemapping)  
 `npm run build`
 
-debug build (no minification and sourcemapping enabled)  
+* debug build (no minification and sourcemapping enabled)  
 `npm run build:debug`
 
-watch build (watches files and does debug build on save)  
+* watch build (watches files and does debug build on save)  
 `npm run build:watch`
 
-&nbsp;
+## Installation
 
-## Install Extension
+<div style="padding-left: 2em">
+Follow the side-loading instruction for your browser to load the extension:
 
-After building the extension, the extensions files and manifests will be in `./dist/chrome` and `./dist/firefox`  
-For this template.  
-The code and manifests in both folders are currently identical. The code and manifests may diverage as you add functionality that differs between Chrome and Firefox
+[Edge](https://learn.microsoft.com/en-us/microsoft-edge/extensions-chromium/getting-started/extension-sideloading)  
+[Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/development-basics/#load-unpacked)  
+[Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/) 
 
-&nbsp;
+The Edge/Chrome `manifest.json` file is located at `samples/browser-extension/dist/chrome`  
+The Firefox `manifest.json` file is located at `samples/browser-extension/dist/firefox`  
 
-## Contributing
+Firefox requires additional extension permissions to download manifests from external sites
+1) In the Firefox address bar go to `about:addons` to see the installed extensions
+2) Find **Cross-Platform Origin of Content Extension** and click the `...` button to the right
+3) Select **Manage** from the pop-up menu
+4) Click the **Permission** tab
+5) Enable **Access your data for all websites**
+</div>
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit <https://cla.opensource.microsoft.com>.
+## Usage
 
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-&nbsp;
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+TODO
