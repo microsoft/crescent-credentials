@@ -1,6 +1,11 @@
+.vscode/
 target/
 Cargo.lock
 
 # ignore test vectors, but not the README
 creds/test-vectors
 !creds/test-vectors/README
+
+# sample files
+sample/issuer/.well-known/
+sample/issuer/keys/
