@@ -3,18 +3,23 @@ use ark_bn254::{Bn254 as ECPairing, Fr};
 use ark_circom::{CircomBuilder, CircomConfig};
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::Groth16;
+use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use crescent::rangeproof::{RangeProofPK, RangeProofVK};
 use crescent::structs::{PublicIOType, IOLocations};
+use crescent::prep_inputs::unpack_int_to_string_unquoted;
 use crescent::{
     groth16rand::ClientState,
     structs::{GenericInputsJSON, ProverInput},
 };
 
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, env};
 use crescent::utils::{new_from_file, write_to_file};
+use crescent::CachePaths;
+use crescent::prep_inputs::{parse_config, prepare_prover_inputs};
 
 // Run this file with the command:
 // cargo run --release --features print-trace --example demo rs256 -- --nocapture
@@ -33,9 +38,13 @@ fn main() {
         println!("Using cached proof data");
         use_cache = true;
     }
-
-    let prover_inputs_path = format!("{}prover_inputs.json", base_path);
-    let prover_inputs = GenericInputsJSON::new(&prover_inputs_path);
+    let paths = CachePaths::new(PathBuf::from(base_path.clone()));
+    let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
+    let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));
+    let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
+    let config = parse_config(config_str).expect("Failed to parse config");
+    let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
+         prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");   
 
     let io_locations_path = format!("{}io_locations.sym", base_path);
     let io_locations = IOLocations::new(&io_locations_path);
@@ -72,7 +81,7 @@ fn main() {
         )
         .unwrap();
         let mut builder = CircomBuilder::new(cfg);
-        prover_inputs.push_inputs(&mut builder);
+        //prover_inputs.push_inputs(&mut builder);
 
         let circom = builder.setup();
         end_timer!(circom_timer);
@@ -122,11 +131,11 @@ fn main() {
 
     }
 
-
-
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
+    let email_value_pos = io_locations.get_io_location("email_value").unwrap();
     let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
+    io_types[email_value_pos - 1] = PublicIOType::Revealed;
 
     let mut revealed_inputs = client_state.inputs.clone();
     revealed_inputs.remove(exp_value_pos - 1);
@@ -162,6 +171,12 @@ fn main() {
     );
     println!("Verification time: {:?}", now.elapsed());
 
+    // TODO: it's currently hacky how the verifier knows which revealed inputs correspond 
+    // to what.  In this example we have to subtract 2 (rather than 1) from email_value pos to account for
+    // the committed attribute.  When we refactor revealed inputs and the modulus IOs we can address this.
+    let domain = unpack_int_to_string_unquoted( &revealed_inputs[email_value_pos - 2].into_bigint()).unwrap();
+    println!("Token is valid, Prover revealed email domain: {}", domain);    
+
     let mut groth_showing_bytes = Vec::new();
     groth_showing
         .serialize_compressed(&mut groth_showing_bytes)
@@ -173,5 +188,6 @@ fn main() {
         .serialize_compressed(&mut show_range_bytes)
         .unwrap();
     println!("Range proof size: {} bytes", show_range_bytes.len());
+    
 
 }
