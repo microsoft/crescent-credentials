@@ -221,7 +221,56 @@ template RevealClaimValue(msg_json_len, claim_byte_len, field_byte_len, is_numbe
         }
         value <== intermediate_value[claim_byte_len-1];        
     }
+}
 
+
+// Reveal part of the claim value, following the @ symbol
+// E.g., reveals 'example.com' on input 'alice@example.com'
+// The claim_byte_len must be less than 32 so that it fits in a 254-bit field element
+template RevealDomainOnly(msg_json_len, claim_byte_len, field_byte_len, is_number) {
+    signal input json_bytes[msg_json_len];
+    signal input l;
+    signal input r;
+    
+    component reveal_claim = RevealClaimValueBytes(msg_json_len, claim_byte_len, field_byte_len, is_number);
+    reveal_claim.json_bytes <== json_bytes;
+    reveal_claim.l <== l;
+    reveal_claim.r <== r;
+    
+    // Create an indicator vector for where the domain occurs
+    // pow256 is a vector of powers of 256 we use to pack the string into a field elt.
+    component is_eq[claim_byte_len];
+    signal indicator[claim_byte_len];
+    signal  pow256[claim_byte_len];    
+
+    assert(reveal_claim.value[0] != 64);    
+    indicator[0] <== 0; // Assumes the claim doesn't start with @
+    pow256[0] <== 0;
+
+    is_eq[0] = IsEqual();
+    is_eq[0].in[0] <== 1;
+    is_eq[0].in[1] <== 0;
+
+    for(var i = 1; i < claim_byte_len; i++) {
+        is_eq[i] = IsEqual();
+        is_eq[i].in[0] <== reveal_claim.value[i];
+        is_eq[i].in[1] <== 64; // 64 is the ASCII code of '@'
+        indicator[i] <== is_eq[i].out + indicator[i-1];
+        (1 - indicator[i])*indicator[i] === 0;      // make sure it's in {0,1}, ensures only one @ symbol
+        
+        pow256[i] <== is_eq[i-1].out * 1 + (1-is_eq[i-1].out)*(pow256[i-1] * 256) ;      
+    }
+
+    // Pack the indicated bytes to a field element
+    // We skip the final quote character included by RevealClaimBytes (decimal value 34)
+    signal output value;
+    signal intermediate_value[claim_byte_len];
+    
+    intermediate_value[0] <== 0;    
+    for(var i = 1; i < claim_byte_len - 1; i++) {
+        intermediate_value[i] <== intermediate_value[i-1] + reveal_claim.value[i] * pow256[i];
+    }
+    value <== intermediate_value[claim_byte_len-2];        
 }
 
 // Hash and Reveal the claim value with claim_byte_len as the maximum length.

@@ -124,11 +124,16 @@ def prepare_circom(config, circom_output_file):
     var {}_max_claim_byte_len = max_json_bytes;
                             '''.format(name))
                 
+                reveal_function = "RevealClaimValue"
+                dom_only = config[name].get("reveal_domain_only");
+                if  dom_only is not None and dom_only == True:
+                    reveal_function = "RevealDomainOnly"
+
                 is_number = 0
                 if typ == 1:
                     is_number = 1
                 f.write('''
-    component reveal_{name} = RevealClaimValue(max_json_bytes, {name}_max_claim_byte_len, field_byte_len, {is_number});
+    component reveal_{name} = {reveal_function}(max_json_bytes, {name}_max_claim_byte_len, field_byte_len, {is_number});
     reveal_{name}.json_bytes <== jwt_bytes;
     reveal_{name}.l <== match_{name}_name.value_l;
     reveal_{name}.r <== match_{name}_name.value_r;
@@ -138,7 +143,7 @@ def prepare_circom(config, circom_output_file):
     log("reveal_{name}.value = ", reveal_{name}.value);                        
     {name}_value === reveal_{name}.value;
 
-'''.format(name = name, is_number = is_number))                
+'''.format(name = name, reveal_function = reveal_function, is_number = is_number))                
             
             elif config[name].get("hashed_reveal") is not None and config[name]["hashed_reveal"] == True:
                 if config[name].get("max_claim_byte_len") is not None:

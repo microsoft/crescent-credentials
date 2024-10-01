@@ -62,6 +62,14 @@ def find_value_interval(msg,  claim, typ):
             
     return l, r
 
+def get_domain(s):
+    at_index = s.find('@')
+    if at_index == -1:
+        print_debug("ERROR: no @ symbol found in input to get_domain()")
+        exit(-1)
+    domain = s[at_index + 1:]
+    return domain
+
 def is_minified(msg):
     # Check for extra spaces, e.g., 
     #     "exp" : 123456789
@@ -118,8 +126,14 @@ def prepare_prover_inputs(msg, config, msg_json):
             elif typ_string == "string":
                 # pack string to field element, use same packing function as in circuit
                 print_debug("max_claim_byte_len for {}: {}".format(name, config[name].get("max_claim_byte_len")))
+                domain_only = (config[name].get("reveal_domain_only") is not None and config[name].get("reveal_domain_only") == True)
+                if domain_only :
+                    domain = get_domain(msg_json[name])
+                    print_debug("Packing domain string: '{}'".format(domain))
+                    print_json_value(name + "_value", pack_string_to_int_unquoted(domain, config[name].get("max_claim_byte_len")))
+                else:
+                    print_json_value(name + "_value", pack_string_to_int(msg_json[name], config[name].get("max_claim_byte_len")))
 
-                print_json_value(name + "_value", pack_string_to_int(msg_json[name], config[name].get("max_claim_byte_len")))
             else:
                 print_debug("Error: can only reveal number types and string types as a single field element for now. See also `reveal_bytes`.")
                 sys.exit(-1)                
