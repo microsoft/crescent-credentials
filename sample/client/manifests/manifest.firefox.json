@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "crecent-client-extension",
+    "name": "Crescent Browser Extension",
     "version": "0.1",
-    "description": "crecent-client-extension",
+    "description": "Browser Extension client for the Crescent framework",
     "permissions": [
         "storage",
         "scripting",

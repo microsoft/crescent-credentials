@@ -9,3 +9,6 @@ creds/test-vectors
 # sample files
 sample/issuer/.well-known/
 sample/issuer/keys/
+sample/client/.vscode/crescent-client-extension.code-workspace
+sample/client/node_modules
+sample/client/dist
