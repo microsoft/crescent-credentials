@@ -148,7 +148,6 @@ pub fn run_prover(
     let config = parse_config(config_str).expect("Failed to parse config");
     let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
          prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
-    println!("prover_inputs_json: \n{:?}", prover_inputs_json.clone());         
     let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
     let cfg = CircomConfig::<ECPairing>::new(
