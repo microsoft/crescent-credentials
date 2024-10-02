@@ -5,11 +5,12 @@ use ark_bn254::{Bn254 as ECPairing, Fr};
 use ark_circom::{CircomBuilder, CircomConfig};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
+use ark_ff::PrimeField;
 use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
-use prep_inputs::parse_config;
+use prep_inputs::{parse_config, unpack_int_to_string_unquoted};
 use utils::new_from_file;
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
@@ -39,8 +40,8 @@ struct ShowProof<E: Pairing> {
     pub cur_time: u64
 }
 
-// Central struct to configure the paths data stored between operations
-struct CachePaths {
+/// Central struct to configure the paths data stored between operations
+pub struct CachePaths {
    pub _base: String,
    pub jwt : String,
    pub issuer_pem : String,
@@ -148,7 +149,6 @@ pub fn run_prover(
     let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
          prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
     let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
-
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
     let cfg = CircomConfig::<ECPairing>::new(
         &paths.wasm,
@@ -202,12 +202,14 @@ pub fn run_show(
 
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    // The IOs are exp and the 17 limbs of the RSA modulus. We make them revealed
+    let email_value_pos = io_locations.get_io_location("email_value").unwrap();
+    // The IOs are exp, email_domain and the 17 limbs of the RSA modulus. We make them revealed
     // TODO: don't add the modulus to revealed inputs, the verifier should know it. Maybe just a key identifier    
     // TODO: seems error-prone to do this by hand; make a function to reveal 
     // by name e.g, set_revealed("modulus")
     let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
+    io_types[email_value_pos -1] = PublicIOType::Revealed;
     let mut revealed_inputs = client_state.inputs.clone();
     revealed_inputs.remove(exp_value_pos - 1);  
     let show_groth16 = client_state.show_groth16(&io_types);    
@@ -241,9 +243,15 @@ pub fn run_verifier(base_path: PathBuf) {
     // Or maybe the verifier should work directly from the issuer's public key?
 
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
+    let email_value_pos = io_locations.get_io_location("email_value").unwrap();
     let mut io_types = vec![PublicIOType::Revealed; show_proof.inputs_len];
-    println!("show_proof.inputs_len = {}", show_proof.inputs_len);
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
+    io_types[email_value_pos - 1] = PublicIOType::Revealed;
+
+    // println!("Verifier got revealed inputs: {:?}", &show_proof.revealed_inputs);
+    // for (i, input) in show_proof.revealed_inputs.clone().into_iter().enumerate() {
+    //     println!("input {} =  {:?}", i, input.into_bigint().to_string());
+    // }
 
     let verify_timer = std::time::Instant::now();
     show_proof.show_groth16.verify(&vk, &pvk, &io_types, &show_proof.revealed_inputs);
@@ -273,5 +281,11 @@ pub fn run_verifier(base_path: PathBuf) {
         "exp_value",
     );
     println!("Verification time: {:?}", verify_timer.elapsed());  
+
+    // TODO: it's currently hacky how the verifier knows which revealed inputs correspond 
+    // to what.  In this example we have to subtract 2 (rather than 1) from email_value pos to account for
+    // the committed attribute.  When we refactor revealed inputs and the modulus IOs we can address this.
+    let domain = unpack_int_to_string_unquoted( &show_proof.revealed_inputs[email_value_pos - 2].into_bigint()).unwrap();
+    println!("Token is valid, Prover revealed email domain: {}", domain);
 
 }

@@ -84,6 +84,17 @@ def pack_string_to_int(s, n_bytes):
         n = n + s_bytes[i] * pow(256, i)
     return n
 
+def pack_string_to_int_unquoted(s, n_bytes):
+    s_bytes = bytearray(s, 'utf-8')
+    if len(s_bytes) > n_bytes:
+        print("String to large to convert to integer of n_bytes = {}".format(n_bytes))
+        sys.exit(-1)
+    s_bytes.extend([0x00]*(n_bytes - len(s_bytes)))
+    n = 0
+    for i in range(0, len(s_bytes)):
+        n = n + s_bytes[i] * pow(256, i)
+    return n
+
 def is_printable(byte_array):
     for c in byte_array:
         if not (chr(c) in string.printable):

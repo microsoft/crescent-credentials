@@ -7,11 +7,8 @@
     },
     "email": {
         "type" : "string",
-        "reveal": false,
-        "predicates": [
-            {
-                "name": "AssertMicrosoftDomain"
-            }
-        ]
+        "reveal": true,
+        "max_claim_byte_len": 31,
+        "reveal_domain_only": true
     }
 }

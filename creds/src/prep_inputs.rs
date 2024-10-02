@@ -9,6 +9,7 @@ use std::ops::{Shl, BitAnd};
 use std::error::Error;
 use std::fs;
 use ark_std::path::PathBuf;
+use ark_ff::BigInteger;
 use crate::return_error;
 
 
@@ -168,8 +169,16 @@ fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::
                         prover_inputs_json.insert(format!("{}_value", name), json!(claims[name].clone().to_string()));
                     }
                     "string" => {
-                        let max_claim_byte_len = config["max_claim_byte_len"].as_u64().unwrap();    // validated by load_config
-                        let packed = pack_string_to_int(claims[name].as_str().ok_or("invalid_type")?, max_claim_byte_len.try_into()?)?;
+                        let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().unwrap();    // validated by load_config
+                        let packed = if entry.contains_key("reveal_domain_only") && 
+                                        entry["reveal_domain_only"].as_bool().ok_or("reveal_domain_only is not of type bool")? {
+                            let domain = get_domain(claims[name].as_str().ok_or("invalid_type")?)?;
+                            pack_string_to_int_unquoted(domain, max_claim_byte_len.try_into()?)?
+                        }
+                        
+                        else {
+                            pack_string_to_int(claims[name].as_str().ok_or("invalid_type")?, max_claim_byte_len.try_into()?)?
+                        };
                         prover_inputs_json.insert(format!("{}_value", name), json!(packed));
                     }
                     _ => {
@@ -199,13 +208,26 @@ fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::
     Ok(())
 }
 
+fn get_domain(s: &str) -> Result<&str, Box<std::io::Error>> {
+    match s.find('@') {
+        Some(at_index) => Ok(&s[at_index + 1..]),
+        None => return_error!("No @ symbol found in input to get_domain()"),
+    }    
+}
+
 fn pack_string_to_int(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Error>> {
     // Must match function "RevealClaimValue" in match_claim.circom
     // so we add quotes to the string TODO: maybe reveal the unquoted claim value instead?
 
     //First convert "s" to bytes and pad with zeros
     let s_quoted = format!("\"{}\"",s);
-    let s_bytes = s_quoted.bytes();
+    pack_string_to_int_unquoted(&s_quoted, n_bytes)
+}
+fn pack_string_to_int_unquoted(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Error>> {
+    // Must match function "RevealDomainOnly" in match_claim.circom
+
+    //First convert "s" to bytes and pad with zeros
+    let s_bytes = s.bytes();
     if s_bytes.len() > n_bytes {
         return_error!(format!("String to large to convert to integer of n_bytes = {}", n_bytes));
     }
@@ -222,6 +244,16 @@ fn pack_string_to_int(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Er
     }
     
     Ok(n.to_str_radix(10))
+}
+
+pub fn unpack_int_to_string_unquoted(s_int: &ark_ff::BigInteger256) -> Result<String, Box<std::io::Error>> {
+
+    let s_bytes = s_int.to_bytes_le();
+    let string = String::from_utf8(s_bytes);
+    if string.is_err() {
+        return_error!("Failed to convert to string");
+    }
+    Ok(string.unwrap())
 }
 
 fn find_value_interval(msg: &str, claim_name: &str, type_string: &str) -> Result<(usize, usize), Box<dyn Error>> {
