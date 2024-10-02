@@ -14,8 +14,6 @@ From the root of the git repo
 ```
 cd setup/scripts
 ./run_setup.sh rs256
-./run_prover.sh rs256
-./copy_circom_files.sh rs256
 cd ../../creds
 cargo run --release --features print-trace --example demo rs256 -- --nocapture
 ```
@@ -24,15 +22,6 @@ cargo run --release --features print-trace --example demo rs256 -- --nocapture
 
 To setup the library, see the instructions in [`/setup/README.md`](./setup/README.md);
 to setup the sample application, see [`sample/README.md`](./sample/README.md).
-
-Once the dev dependencies are installed, the main things to run there are:
-```
-cd scripts
-./run_setup.sh rs256
-./run_prover.sh rs256
-./copy_circom_files.sh rs256
-```
-TODO: this will merged into a single script 
 
 ## Running the example
 
