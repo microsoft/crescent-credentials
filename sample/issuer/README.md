@@ -10,9 +10,6 @@ TODO: document how to add demo users
 
 ## Running the server
 
-To start the server, run `cargo run`.
+To start the server, run `cargo run`. By default, the server will listen on `http://localhost:8001`; this can be modified by changing the `port` variable in the [Rocket.toml](./Rocket.toml) file.
 
-You can test the server is working correctly by requesting a JWT using curl:
-```
-curl -X POST http://localhost:8000/issue -H "Content-Type: application/json" -d '{"username": "admin", "password": "password"}'
-```
+You can test the server is working correctly by visiting `http://localhost:8001/welcome` and entering the username `alice` and password `password`.
