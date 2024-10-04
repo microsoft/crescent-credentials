@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome</title>
+</head>
+<body>
+    <h1>Welcome, {{ username }}!</h1>
+    <p>Click the "Issue" button below to get an employment JSON Web Token.</p>
+    <form action="/issue" method="post">
+        <button type="submit">Issue</button>
+    </form>
+</body>
+</html>

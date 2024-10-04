@@ -1,27 +1,28 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+// NOTE: this sample is for demonstration purposes only and is not intended for production use.
+//       The weak authentication mechanism is used to illustrate a simple JWT issuance flow. In
+//       a real system, Crescent provers could interact with standard Identity Providers to obtain
+//       JWTs.
+
 #[macro_use] extern crate rocket;
-use rocket::serde::{Deserialize, Serialize};
-use rocket::serde::json::Json;
+
 use rocket::fs::NamedFile;
+use rocket::http::{Cookie, CookieJar};
+use rocket::response::Redirect;
+use rocket::serde::{Serialize};
+use rocket::response::content::RawHtml;
 use rocket::State;
-use jsonwebtoken::{encode, EncodingKey, Header};
+use rocket_dyn_templates::{context, Template};
 use std::path::PathBuf;
+use chrono::{Duration, Utc};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use std::fs;
-use chrono::{Utc, Duration};
 
 // issuer config values
 const PRIVATE_KEY_PATH : &str = "keys/issuer.prv"; // private key path
 const JWKS_PATH: &str = ".well-known/jwks.json"; // JWKS path
-
-// struct for the incoming login request
-#[derive(Deserialize)]
-#[serde(crate = "rocket::serde")]
-struct LoginRequest {
-    username: String,
-    password: String,
-}
 
 // struct for the personal claims related to the user
 #[derive(Serialize, Clone)]
@@ -81,51 +82,126 @@ struct PrivateKey {
     key: EncodingKey,
 }
 
-#[post("/issue", format = "json", data = "<login>")]
-fn issue(login: Json<LoginRequest>, private_key: &State<PrivateKey>, users: &State<Vec<User>>) -> Result<String, &'static str> {
-    // find the user based on the username and password provided
-    if let Some(user) = users.iter().find(|user| user.username == login.username && user.password == login.password) {
-        // set the dynamic claims and construct the full Claims struct
-        let current_time = Utc::now(); 
-        let claims = Claims {
-            user_claims: user.user_claims.clone(),
-            acct: 0, // TODO: what is that?
-            aud: "relyingparty.microsoft.com".to_string(),
-            auth_time: (current_time).timestamp() as usize, // authentication time = now
-            exp: (current_time + Duration::days(30)).timestamp() as usize, // expiration in 30 days
-            iat: (current_time).timestamp() as usize, // issued at time = now
-            ipaddr: "203.0.113.0".to_string(), // user IP address
-            iss: "https://localhost:8000".to_string(), // TODO: get ip from config
-            jti: "fGYCO1mK2dBWTAfCjGAoTQ".to_string(), // token unique id (what's that value? TODO)
-            nbf: (current_time).timestamp() as usize, // not before time = now
-            tenant_ctry: "US".to_string(), // tenant country
-            tenant_region_scope: "WW".to_string(), // tenant region (what's that? TODO)
-            tid: "12345678-1234-abcd-1234-abcdef124567".to_string(), // tenant ID
-            ver: "2.0".to_string(),
-            xms_pdl: "NAM".to_string(),
-            xms_tpl: "en".to_string()
-        
-        };
+// add a new struct for the login form data
+#[derive(FromForm)]
+struct LoginForm {
+    username: String,
+    password: String,
+}
 
-        // Create a header with RS256 algorithm
-        let header = Header::new(jsonwebtoken::Algorithm::RS256);
+// route to serve the login page
+#[get("/login")]
+fn login_page() -> Template {
+    Template::render("login", context! {})
+}
 
-        // Sign the JWT using the private key from Rocket's state
-        let token = encode(
-            &header,
-            &claims,
-            &private_key.key
-        )
-        .map_err(|_| "Failed to generate token")?;
+// route to handle login form submission
+#[post("/login", data = "<form>")]
+fn login(
+    form: rocket::form::Form<LoginForm>,
+    jar: &CookieJar<'_>,
+    users: &State<Vec<User>>,
+) -> Result<Redirect, Template> {
+    let login = form.into_inner();
 
-        // Return the JWT token
-        Ok(token)
+    // authenticate the user.
+    if let Some(user) = users
+        .iter()
+        .find(|user| user.username == login.username && user.password == login.password)
+    {
+        // store the username in a cookie
+        jar.add(Cookie::new("username", user.username.clone()));
+        Ok(Redirect::to(uri!(welcome_page)))
     } else {
-        Err("Invalid credentials\n")
+        // if authentication fails, reload the login page with an error message
+        Err(Template::render(
+            "login",
+            context! {
+                error: "Invalid username or password."
+            },
+        ))
     }
 }
 
-// Route to serve the JWKS file
+// route to serve the welcome page after successful login
+#[get("/welcome")]
+fn welcome_page(jar: &CookieJar<'_>) -> Result<Template, Redirect> {
+    if let Some(cookie) = jar.get("username") {
+        let username = cookie.value().to_string();
+        Ok(Template::render(
+            "welcome",
+            context! {
+                username: &username
+            },
+        ))
+    } else {
+        // if there's no username cookie, redirect to the login page
+        Err(Redirect::to(uri!(login_page)))
+    }
+}
+
+// route to issue JWTs
+#[post("/issue")]
+fn issue_token(
+    jar: &CookieJar<'_>,
+    private_key: &State<PrivateKey>,
+    users: &State<Vec<User>>,
+) -> Result<RawHtml<String>, &'static str> {
+    if let Some(cookie) = jar.get("username") {
+        let username = cookie.value().to_string();
+
+        // find the user based on the username
+        if let Some(user) = users.iter().find(|user| user.username == username) {
+            // generate the JWT token
+            let current_time = Utc::now();
+            let claims = Claims {
+                user_claims: user.user_claims.clone(),
+                acct: 0,
+                aud: "relyingparty.example.com".to_string(),
+                auth_time: current_time.timestamp() as usize,
+                exp: (current_time + Duration::days(30)).timestamp() as usize,
+                iat: current_time.timestamp() as usize,
+                ipaddr: "203.0.113.0".to_string(),
+                iss: "https://localhost:8000".to_string(),
+                jti: "fGYCO1mK2dBWTAfCjGAoTQ".to_string(),
+                nbf: current_time.timestamp() as usize,
+                tenant_ctry: "US".to_string(),
+                tenant_region_scope: "WW".to_string(),
+                tid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
+                ver: "2.0".to_string(),
+                xms_pdl: "NAM".to_string(),
+                xms_tpl: "en".to_string(),
+            };
+
+            let header = Header::new(jsonwebtoken::Algorithm::RS256);
+
+            let token = encode(&header, &claims, &private_key.key)
+                .map_err(|_| "Failed to generate token")?;
+
+            // return the JWT embedded in an HTML page
+            let response_html = format!(
+                r#"
+                <html>
+                <body>
+                    <h1>Here is your JWT</h1>
+                    <textarea id="jwt" rows="10" cols="100">{}</textarea>
+                    <p>Copy and use this JWT, or let your browser extension access it.</p>
+                </body>
+                </html>
+                "#,
+                token
+            );
+
+            Ok(RawHtml(response_html))
+        } else {
+            Err("User not found.")
+        }
+    } else {
+        Err("User not authenticated.")
+    }
+}
+
+// route to serve the JWKS file
 #[get("/.well-known/jwks.json")]
 async fn serve_jwks() -> Option<NamedFile> {
     // serve the JWKS file from the specified path
@@ -154,29 +230,27 @@ fn rocket() -> _ {
     };
 
     // create a list of users with their personal claims
-    // NOTE: we currently assume a microsoft.com domain for all users
-    //       (assumed by the current ZK circuit)
     let users = vec![
         // Alice demo user
         User {
             username: "alice".to_string(),
             password: "password".to_string(),
             user_claims: UserClaims {
-                email: "alice@microsoft.com".to_string(),
+                email: "alice@example.com".to_string(),
                 family_name: "Example".to_string(),
                 given_name: "Alice".to_string(),
                 login_hint: "O.aaaaabbbbbbbbbcccccccdddddddeeeeeeeffffffgggggggghhhhhhiiiiiiijjjjjjjkkkkkkklllllllmmmmmmnnnnnnnnnnooooooopppppppqqqqrrrrrrsssssdddd".to_string(),
                 name: "Alice Example".to_string(),
                 oid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 onprem_sid: "S-1-2-34-5678901234-1234567890-1234567890-1234567".to_string(),
-                preferred_username: "alice@microsoft.com".to_string(),
+                preferred_username: "alice@example.com".to_string(),
                 rh: "0.aaaaabbbbbccccddddeeeffff12345gggg12345_124_aaaaaaa.".to_string(),
                 sid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 sub: "aaabbbbccccddddeeeeffffgggghhhh123456789012".to_string(),
-                upn: "alice@microsoft.com".to_string(),
+                upn: "alice@example.com".to_string(),
                 uti: "AAABBBBccccdddd1234567".to_string(),
-                verified_primary_email: vec!["alice@microsoft.com".to_string()],
-                verified_secondary_email: vec!["alice2@microsoft.com".to_string()],
+                verified_primary_email: vec!["alice@example.com".to_string()],
+                verified_secondary_email: vec!["alice2@example.com".to_string()],
             },
         },
         // Bob demo user
@@ -184,28 +258,38 @@ fn rocket() -> _ {
             username: "user2".to_string(),
             password: "password2".to_string(),
             user_claims: UserClaims {
-                email: "bob@microsoft.com".to_string(),
+                email: "bob@example.com".to_string(),
                 family_name: "Example".to_string(),
                 given_name: "Bob".to_string(),
                 login_hint: "O.aaaaabbbbbbbbbcccccccdddddddeeeeeeeffffffgggggggghhhhhhiiiiiiijjjjjjjkkkkkkklllllllmmmmmmnnnnnnnnnnooooooopppppppqqqqrrrrrrsssssdddd".to_string(),
                 name: "Bob Example".to_string(),
                 oid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 onprem_sid: "S-1-2-34-5678901234-1234567890-1234567890-1234567".to_string(),
-                preferred_username: "bob@microsoft.com".to_string(),
+                preferred_username: "bob@example.com".to_string(),
                 rh: "0.aaaaabbbbbccccddddeeeffff12345gggg12345_124_aaaaaaa.".to_string(),
                 sid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 sub: "aaabbbbccccddddeeeeffffgggghhhh123456789012".to_string(),
-                upn: "bob@microsoft.com".to_string(),
+                upn: "bob@example.com".to_string(),
                 uti: "AAABBBBccccdddd1234567".to_string(),
-                verified_primary_email: vec!["bob@microsoft.com".to_string()],
-                verified_secondary_email: vec!["bob2@microsoft.com".to_string()],          
+                verified_primary_email: vec!["bob@example.com".to_string()],
+                verified_secondary_email: vec!["bob2@example.com".to_string()],          
             },
         },
     ];
 
     // launch the Rocket server and manage the private key and user state
     rocket::build()
-        .mount("/", routes![issue, serve_jwks])
+        .mount(
+            "/",
+            routes![
+                login_page,
+                login,
+                welcome_page,
+                issue_token,
+                serve_jwks
+            ],
+        )
+        .attach(Template::fairing())
         .manage(private_key)
         .manage(users)
 }
