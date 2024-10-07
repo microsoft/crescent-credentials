@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-# pip install python_jwt
+# Depends on python-jwt:
+#   pip install python_jwt
 # https://pypi.org/project/python-jwt/
-
 
 # The registry of supported algorithms in JWS is found here:
 #    https://www.iana.org/assignments/jose/jose.xhtml

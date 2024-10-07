@@ -12,3 +12,9 @@ sample/issuer/keys/
 sample/client/.vscode/crescent-client-extension.code-workspace
 sample/client/node_modules
 sample/client/dist
+
+# sample credentials that are generated
+setup/inputs/*/issuer.prv
+setup/inputs/*/issuer.pub
+setup/inputs/*/token.jwt
+
