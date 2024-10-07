@@ -186,6 +186,8 @@ template RevealClaimValueBytes(msg_json_len, claim_byte_len, field_byte_len, is_
     match_substring.r <== r;
 }
 
+
+
 // Reveal the claim value as a single field element. 
 // The claim_byte_len must be less than 32 so that it fits in a 254-bit field element
 template RevealClaimValue(msg_json_len, claim_byte_len, field_byte_len, is_number) {
@@ -223,6 +225,18 @@ template RevealClaimValue(msg_json_len, claim_byte_len, field_byte_len, is_numbe
     }
 }
 
+// Replace double quote characters with zero
+template StripQuotes(input_len) {
+    signal input in[input_len];
+    signal output value[input_len];
+    component is_eq[input_len];
+    for (var i = 0; i < input_len; i++) {
+        is_eq[i] = IsEqual();
+        is_eq[i].in[0] <== in[i];
+        is_eq[i].in[1] <== 34; // 34 is the ASCII code of " (double quote)
+        value[i] <== is_eq[i].out * 0 + (1 - is_eq[i].out) * in[i];
+    }
+}
 
 // Reveal part of the claim value, following the @ symbol
 // E.g., reveals 'example.com' on input 'alice@example.com'
@@ -232,10 +246,13 @@ template RevealDomainOnly(msg_json_len, claim_byte_len, field_byte_len, is_numbe
     signal input l;
     signal input r;
     
-    component reveal_claim = RevealClaimValueBytes(msg_json_len, claim_byte_len, field_byte_len, is_number);
-    reveal_claim.json_bytes <== json_bytes;
-    reveal_claim.l <== l;
-    reveal_claim.r <== r;
+    component reveal_claim_q = RevealClaimValueBytes(msg_json_len, claim_byte_len, field_byte_len, is_number);
+    reveal_claim_q.json_bytes <== json_bytes;
+    reveal_claim_q.l <== l;
+    reveal_claim_q.r <== r;
+
+    component reveal_claim = StripQuotes(claim_byte_len);
+    reveal_claim.in <== reveal_claim_q.value;
     
     // Create an indicator vector for where the domain occurs
     // pow256 is a vector of powers of 256 we use to pack the string into a field elt.
@@ -262,12 +279,11 @@ template RevealDomainOnly(msg_json_len, claim_byte_len, field_byte_len, is_numbe
     }
 
     // Pack the indicated bytes to a field element
-    // We skip the final quote character included by RevealClaimBytes (decimal value 34)
     signal output value;
     signal intermediate_value[claim_byte_len];
     
     intermediate_value[0] <== 0;    
-    for(var i = 1; i < claim_byte_len - 1; i++) {
+    for(var i = 1; i < claim_byte_len; i++) {
         intermediate_value[i] <== intermediate_value[i-1] + reveal_claim.value[i] * pow256[i];
     }
     value <== intermediate_value[claim_byte_len-2];        
