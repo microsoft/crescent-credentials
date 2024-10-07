@@ -1,7 +1,6 @@
 use std::{fs, path::PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use ark_bn254::{Bn254 as ECPairing, Fr};
-//use ark_bls12_381::Bls12_381 as ECPairing;
 use ark_circom::{CircomBuilder, CircomConfig};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
@@ -10,16 +9,14 @@ use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
-use prep_inputs::{parse_config, unpack_int_to_string_unquoted};
-use utils::new_from_file;
+use prep_inputs::{parse_config, unpack_int_to_string_unquoted, prepare_prover_inputs};
+use utils::{read_from_file, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
 use crate::{
     groth16rand::ClientState,
     structs::{GenericInputsJSON, ProverInput},
 };
-use crate::utils::write_to_file;
-use crate::prep_inputs::prepare_prover_inputs;
 
 pub mod dlog;
 pub mod groth16rand;
@@ -149,6 +146,7 @@ pub fn run_prover(
     let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
          prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
     let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
+    
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
     let cfg = CircomConfig::<ECPairing>::new(
         &paths.wasm,
@@ -160,7 +158,7 @@ pub fn run_prover(
     end_timer!(circom_timer);
 
     let load_params_timer = start_timer!(||"Reading Groth16 params from file");
-    let params : ProvingKey<ECPairing> = new_from_file(&paths.groth16_params);
+    let params : ProvingKey<ECPairing> = read_from_file(&paths.groth16_params);
     end_timer!(load_params_timer);
     
     let build_timer = start_timer!(|| "Witness Generation");
@@ -173,7 +171,7 @@ pub fn run_prover(
     let proof = Groth16::<ECPairing>::prove(&params, circom, &mut rng).unwrap();    
     end_timer!(prove_timer);
 
-    let pvk : PreparedVerifyingKey<ECPairing> = new_from_file(&paths.groth16_pvk);
+    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk);
     let verify_timer = start_timer!(|| "Groth16 verify");
     let verified =
         Groth16::<ECPairing>::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap();
@@ -188,6 +186,7 @@ pub fn run_prover(
     );
 
     write_to_file(&client_state, &paths.client_state);
+
 }
 
 pub fn run_show(
@@ -195,8 +194,8 @@ pub fn run_show(
 ) {
     let paths = CachePaths::new(base_path);
     let io_locations = IOLocations::new(&paths.io_locations);    
-    let mut client_state: ClientState<ECPairing> = new_from_file(&paths.client_state);
-    let range_pk : RangeProofPK<ECPairing> = new_from_file(&paths.range_pk);
+    let mut client_state: ClientState<ECPairing> = read_from_file(&paths.client_state);
+    let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk);
     
     let proof_timer = std::time::Instant::now();
 
@@ -234,10 +233,10 @@ pub fn run_show(
 
 pub fn run_verifier(base_path: PathBuf) {
     let paths = CachePaths::new(base_path);
-    let show_proof : ShowProof<ECPairing> = new_from_file(&paths.show_proof);
-    let pvk : PreparedVerifyingKey<ECPairing> = new_from_file(&paths.groth16_pvk);
-    let vk : VerifyingKey<ECPairing> = new_from_file(&paths.groth16_vk);
-    let range_vk : RangeProofVK<ECPairing> = new_from_file(&paths.range_vk);
+    let show_proof : ShowProof<ECPairing> = read_from_file(&paths.show_proof);
+    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk);
+    let vk : VerifyingKey<ECPairing> = read_from_file(&paths.groth16_vk);
+    let range_vk : RangeProofVK<ECPairing> = read_from_file(&paths.range_vk);
     let io_locations = IOLocations::new(&paths.io_locations);    
     // TODO: load public_IOs file and take modulus from there.  
     // Or maybe the verifier should work directly from the issuer's public key?
