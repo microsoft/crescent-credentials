@@ -6,7 +6,7 @@ to keep some of the claims in the token private, while still providing the verif
 that the revealed claims are correct.
 
 This repository contains the Crescent library and a sample application consisting of a JWT issuer,
-a browser extension client, and a web server verifier.
+a setup service, a browser extension client and server helper, and a web server verifier.
 
 ## Setup and demo cheat sheet
 Once the dev dependencies are installed, to run the end-to-end demo use these commands.

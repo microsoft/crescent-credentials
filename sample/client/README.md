@@ -1,4 +1,4 @@
-# Crescent sample client
+# Crescent sample client browser extension
 
 This project contains a Edge/Chrome/Firefox browser extension implementing a Crescent prover. The browser extension can interact with the [sample issuer](../issuer/README.md) to retrieve JSON Web Tokens (JWT) and present a Crescent zero-knowledge proof to the [sample verifier](../verifier/README.md). 
 
