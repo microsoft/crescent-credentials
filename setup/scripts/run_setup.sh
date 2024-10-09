@@ -27,18 +27,36 @@ COPY_DEST=${ROOT_DIR}/../creds/test-vectors/$NAME
 
 LOG_FILE=${OUTPUTS_DIR}/${NAME}.log
 
+if [ ! -f ${INPUTS_DIR}/config.json ]; then
+    echo "${INPUTS_DIR}/config.json is not found, aborting"
+    exit -1 
+fi
+
+
 # Create the output directory if not there.
 mkdir $OUTPUTS_DIR 2>/dev/null || true
 mkdir $CIRCOM_DIR 2>/dev/null  || true
 
 touch ${LOG_FILE}
 
+# Create sample issuer keys and a token
+ALG_REGEX="\"alg\": \"([A-Z0-9]+)\""
+if [ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${INPUTS_DIR}/issuer.prv ] || [ ! -f ${INPUTS_DIR}/token.jwt ]; then
+    rm ${INPUTS_DIR}/issuer.pub ${INPUTS_DIR}/issuer.prv ${INPUTS_DIR}/token.jwt 2>/dev/null && true 
+
+    if [[ `cat ${INPUTS_DIR}/config.json` =~ $ALG_REGEX ]]; then
+        ALG="${BASH_REMATCH[1]}"
+        echo "Creating sample keys and token for algorithm $ALG"
+    fi
+    python3 scripts/jwk_gen.py ${ALG} ${INPUTS_DIR}/issuer.prv ${INPUTS_DIR}/issuer.pub
+    python3 scripts/jwt_sign.py ${INPUTS_DIR}/claims.json ${INPUTS_DIR}/issuer.prv  ${INPUTS_DIR}/token.jwt
+fi
+
 # Check that cicomlib is present
 if [ ! -f circom/circomlib/README.md ]; then
     echo "Circomlib not found.  Run 'git submodule update --init --recursive' to get it."
     exit -1 
 fi
-
 
 echo "- Generating ${NAME}_main.circom..."
 

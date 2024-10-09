@@ -1,0 +1,36 @@
+{
+  "acct": 0,
+  "aud": "12345678-1234-abcd-1234-abcdef124567",
+  "auth_time": 1725917899,
+  "email": "matthew@example.com",
+  "exp": 1759517346,
+  "family_name": "Matthew",
+  "given_name": "Matthewson",
+  "iat": 1728067746,
+  "ipaddr": "203.0.113.0",
+  "iss": "https://login.microsoftonline.com/12345678-1234-abcd-1234-abcdef124567/v2.0",
+  "jti": "AUJNzY3Cwon7pL_3k0-fdw",
+  "login_hint": "O.aaaaabbbbbbbbbcccccccdddddddeeeeeeeffffffgggggggghhhhhhiiiiiiijjjjjjjkkkkkkklllllllmmmmmmnnnnnnnnnnooooooopppppppqqqqrrrrrrsssssdddd",
+  "name": "Matthew Matthewson",
+  "nbf": 1728067746,
+  "oid": "12345678-1234-abcd-1234-abcdef124567",
+  "onprem_sid": "S-1-2-34-5678901234-1234567890-1234567890-1234567",
+  "preferred_username": "matthew@example.com",
+  "rh": "0.aaaaabbbbbccccddddeeeffff12345gggg12345_124_aaaaaaa.",
+  "sid": "12345678-1234-abcd-1234-abcdef124567",
+  "sub": "aaabbbbccccddddeeeeffffgggghhhh123456789012",
+  "tenant_ctry": "US",
+  "tenant_region_scope": "WW",
+  "tid": "12345678-1234-abcd-1234-abcdef124567",
+  "upn": "matthew@example.com",
+  "uti": "AAABBBBccccdddd1234567",
+  "ver": "2.0",
+  "verified_primary_email": [
+    "matthew@example.com"
+  ],
+  "verified_secondary_email": [
+    "matthew@service.example.com"
+  ],
+  "xms_pdl": "NAM",
+  "xms_tpl": "en"
+}

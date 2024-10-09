@@ -7,6 +7,7 @@ use num_bigint::BigUint;
 use sha2::{Digest, Sha512};
 use std::fs::OpenOptions;
 use ark_std::{io::BufWriter, io::BufReader, fs::File};
+use ark_serialize::Write;
 
 
 #[macro_export]
@@ -114,7 +115,29 @@ where
     obj.serialize_uncompressed(buf_writer).unwrap();
 }
 
-pub fn new_from_file<T>(path: &str) -> T 
+pub fn write_to_b64url<T>(obj : &T) -> String
+where 
+    T: CanonicalSerialize
+{
+    let buf = Vec::new();
+    let mut buf_writer = BufWriter::new(buf);
+    obj.serialize_uncompressed(buf_writer.by_ref()).unwrap();
+    let s = base64_url::encode(&buf_writer.into_inner().unwrap());
+
+    s
+}
+pub fn read_from_b64url<T>(s : String) -> T
+where 
+    T: CanonicalDeserialize
+{
+    let buf = s.as_bytes();
+
+    let buf_reader = BufReader::new(buf);
+    let state = T::deserialize_uncompressed_unchecked(buf_reader).unwrap();
+    state
+}
+
+pub fn read_from_file<T>(path: &str) -> T 
 where
     T: CanonicalDeserialize
 {

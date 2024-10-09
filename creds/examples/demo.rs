@@ -17,7 +17,7 @@ use crescent::{
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, env};
-use crescent::utils::{new_from_file, write_to_file};
+use crescent::utils::{read_from_file, write_to_file};
 use crescent::CachePaths;
 use crescent::prep_inputs::{parse_config, prepare_prover_inputs};
 
@@ -64,8 +64,8 @@ fn main() {
         vk = client_state.vk.clone();
         pvk = client_state.pvk.clone();
 
-        range_pk = new_from_file(&format!("{}range_pk.bin", &cache_path));
-        range_vk = new_from_file(&format!("{}range_vk.bin", &cache_path));
+        range_pk = read_from_file(&format!("{}range_pk.bin", &cache_path));
+        range_vk = read_from_file(&format!("{}range_vk.bin", &cache_path));
 
         // TODO: loading the groth16 params takes 12 seconds. We need logic to do this only if necessary
         // let load_timer = start_timer!(||"Loading Groth16 params");
