@@ -18,7 +18,7 @@ use merlin::Transcript;
 use rand::thread_rng;
 
 
-#[derive(Clone, Debug, CanonicalDeserialize, CanonicalSerialize)]
+#[derive(Clone, Debug, CanonicalDeserialize, CanonicalSerialize, PartialEq)]
 pub struct RangeProofPK<'b, E: Pairing> {
     pub powers: Powers<'b, E>,
 }

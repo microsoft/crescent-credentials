@@ -28,8 +28,27 @@ pub mod prep_inputs;
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 60;    // The verifier only accepts proofs fresher than this
 
+pub type CrescentPairing = ECPairing;
+
+/// Parameters required to verify show/presentation proofs
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
-struct ShowProof<E: Pairing> {
+pub struct VerifierParams<E: Pairing> {
+    vk : VerifyingKey<E>,
+    pvk : PreparedVerifyingKey<E>,
+    range_vk: RangeProofVK<E>
+}
+impl<E: Pairing> VerifierParams<E> {
+    pub fn new(paths : &CachePaths) -> Self {
+        let pvk : PreparedVerifyingKey<E> = read_from_file(&paths.groth16_pvk);
+        let vk : VerifyingKey<E> = read_from_file(&paths.groth16_vk);
+        let range_vk : RangeProofVK<E> = read_from_file(&paths.range_vk);
+        Self{vk, pvk, range_vk}        
+    }
+}
+
+/// Structure to hold all the parts of a show/presentation proof
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+pub struct ShowProof<E: Pairing> {
     pub show_groth16: ShowGroth16<E>,
     pub show_range: ShowRange<E>, 
     pub revealed_inputs: Vec<E::ScalarField>, 
@@ -59,7 +78,11 @@ pub struct CachePaths {
 impl CachePaths {
     pub fn new(base_path: PathBuf) -> Self{
         let base_path_str = base_path.into_os_string().into_string().unwrap();
-        let base_path_str = format!("{}/", base_path_str);
+        Self::new_from_str(&base_path_str)
+    }
+
+    pub fn new_from_str(base_path: &str) -> Self {
+        let base_path_str = format!("{}/", base_path);
         if fs::metadata(&base_path_str).is_err() {
             println!("base_path = {}", base_path_str);
             panic!("invalid path");
@@ -90,7 +113,7 @@ impl CachePaths {
             groth16_params: format!("{}groth16_params.bin", &cache_path),
             client_state: format!("{}client_state.bin", &cache_path),
             show_proof: format!("{}show_proof.bin", &cache_path),
-        }        
+        }             
     }
 }
 
