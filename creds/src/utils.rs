@@ -151,6 +151,14 @@ where
 
     state
 }
+pub fn read_from_bytes<T>(buf: Vec<u8>) -> Result<T , SerializationError>
+where
+    T: CanonicalDeserialize
+{
+    let buf_reader = BufReader::new(buf.as_slice());
+    let state = T::deserialize_uncompressed_unchecked(buf_reader)?;
+    Ok(state)
+}
 
 #[cfg(test)]
 mod tests {

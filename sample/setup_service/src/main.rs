@@ -5,9 +5,12 @@
 
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
-use crescent::{CachePaths, CrescentPairing};
+use rocket::fs::NamedFile;
+use crescent::{CachePaths, CrescentPairing, ShowParams};
 use crescent::VerifierParams;
-use crescent::utils::{write_to_b64url,read_from_b64url};
+use crescent::utils::{write_to_b64url,read_from_b64url, read_from_bytes};
+use std::path::PathBuf;
+use std::path::Path;
 
 const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
 
@@ -45,19 +48,35 @@ fn present(token_uid: String) -> Json<String> {
 
 
 ///// Routes for hosting parameters
+ 
+
+/// Ensure that both 
+/// 1) /setup/scripts/run_setup.sh and 
+/// 2) /creds/crescent zksetup
+/// have been run and CRESCENT_DATA_PATH points to the place where the generated
+/// parameters are stored
+/// TODO: create a function to check on start-up that all parameters we serve 
+/// in this server are actually generated
 
 // Get the parameters required to generate the one-time proofs (the Groth16 proofs)
-#[get("/prover_params")]
-fn prover_params() -> Json<String> {
-    let params = "placeholder prover parameters".to_string();
-    Json(params)
+// Since the params are so big, we just expose the binary file for download
+#[get("/<file..>")]
+async fn files(file: PathBuf) -> Option<NamedFile> {
+    let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
+    let path = Path::new(&paths._cache).join(file);
+    println!("Got request for file : {:?}", path);
+    NamedFile::open(path).await.ok()
 }
+
 
 // Get the parameters required to generate presentation/show proofs
 #[get("/show_params")]
-fn show_params() -> Json<String> {
-    let params = "placeholder show parameters".to_string();
-    Json(params)
+fn show_params() -> String {
+    let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
+    let show_params = ShowParams::<CrescentPairing>::new(&paths);
+    let show_params_b64 = write_to_b64url(&show_params);
+    
+    show_params_b64
 }
 
 // Get the parameters required to verify presentation proofs
@@ -75,7 +94,7 @@ fn verifier_params() -> String {
 #[launch]
 fn rocket() -> _ {
     //rocket::build().mount("/", routes![prepare, state, present])  // TODO: these routes go in client_helper
-    rocket::build().mount("/", routes![prover_params, show_params, verifier_params])
+    rocket::build().mount("/", routes![show_params, verifier_params, files])
 }
 
 
@@ -83,7 +102,7 @@ fn rocket() -> _ {
 mod test {
     use super::*;
     use crate::{test::rocket::local::blocking::Client, verifier_params};
-    use crescent::{utils::read_from_b64url, CrescentPairing, VerifierParams};
+    use crescent::{utils::read_from_b64url, CrescentPairing, ProverParams, VerifierParams};
     use rocket::http::Status;
 
     #[test]
@@ -97,4 +116,28 @@ mod test {
         assert!(vp.is_ok());
         
     }
+
+    #[test]
+    fn test_show_params() {
+        let client = Client::untracked(rocket()).expect("valid rocket instance");
+        let response = client.get("/show_params").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let s = response.into_string().unwrap();
+        let sp = read_from_b64url::<ShowParams<CrescentPairing>>(s);
+
+        assert!(sp.is_ok());
+    }
+
+    #[test]
+    fn test_prover_params() {
+        let client = Client::untracked(rocket()).expect("valid rocket instance");
+        let response = client.get("/prover_params.bin").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        println!("Downloading file...");
+        let s = response.into_bytes().unwrap();
+        let pp = read_from_bytes::<ProverParams<CrescentPairing>>(s);
+        assert!(pp.is_ok());
+        let pp = pp.unwrap();
+        println!("Got config file {}", pp.config_str);
+    }       
 }

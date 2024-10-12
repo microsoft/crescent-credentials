@@ -30,6 +30,36 @@ const SHOW_PROOF_VALIDITY_SECONDS: u64 = 60;    // The verifier only accepts pro
 
 pub type CrescentPairing = ECPairing;
 
+// TODO: error handling on all the new() functions for the Params structs
+
+/// Parameters required to create Groth16 proofs
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+pub struct ProverParams<E: Pairing> {
+    pub groth16_params : ProvingKey<E>,
+    pub groth16_pvk : PreparedVerifyingKey<E>,
+    pub config_str : String
+}
+impl<E: Pairing> ProverParams<E> {
+    pub fn new(paths : &CachePaths) -> Self {
+        let groth16_params : ProvingKey<E> = read_from_file(&paths.groth16_params);
+        let groth16_pvk : PreparedVerifyingKey<E> = read_from_file(&paths.groth16_pvk);
+        let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
+        Self{groth16_params, groth16_pvk, config_str}        
+    }
+}
+
+/// Parameters required to create show/presentation proofs
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+pub struct ShowParams<'b, E: Pairing> {
+    range_pk: RangeProofPK<'b, E>
+}
+impl<'b, E: Pairing> ShowParams<'b, E> {
+    pub fn new(paths : &CachePaths) -> Self {
+        let range_pk : RangeProofPK<'b, E> = read_from_file(&paths.range_pk);
+        Self{range_pk}        
+    }
+}
+
 /// Parameters required to verify show/presentation proofs
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct VerifierParams<E: Pairing> {
@@ -71,8 +101,9 @@ pub struct CachePaths {
    pub groth16_vk: String,
    pub groth16_pvk: String,
    pub groth16_params: String,
+   pub prover_params: String,   
    pub client_state: String, 
-   pub show_proof: String
+   pub show_proof: String, 
 }
 
 impl CachePaths {
@@ -111,6 +142,7 @@ impl CachePaths {
             groth16_vk: format!("{}groth16_vk.bin", &cache_path),
             groth16_pvk: format!("{}groth16_pvk.bin", &cache_path),
             groth16_params: format!("{}groth16_params.bin", &cache_path),
+            prover_params: format!("{}prover_params.bin", &cache_path),
             client_state: format!("{}client_state.bin", &cache_path),
             show_proof: format!("{}show_proof.bin", &cache_path),
         }             
@@ -144,14 +176,19 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     let range_setup_timer = start_timer!(|| "Generating parameters for range proofs");    
     let (range_pk, range_vk) = RangeProofPK::<ECPairing>::setup(RANGE_PROOF_INTERVAL_BITS);
     end_timer!(range_setup_timer);
-
-      
+    
+    
+     
     let serialize_timer = start_timer!(|| "Writing everything to files");
     write_to_file(&range_pk, &paths.range_pk);
     write_to_file(&range_vk, &paths.range_vk);    
     write_to_file(&params, &paths.groth16_params);
     write_to_file(&vk, &paths.groth16_vk);
     write_to_file(&pvk, &paths.groth16_pvk);
+
+    let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
+    let prover_params = ProverParams{groth16_params: params, groth16_pvk: pvk, config_str};
+    write_to_file(&prover_params, &paths.prover_params);    
     end_timer!(serialize_timer);
 
     return 0;
