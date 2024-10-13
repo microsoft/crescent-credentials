@@ -21,34 +21,9 @@ struct TokenInfo {
     issuer: String
 }
 
-// route to prepare JWT for ZK proof given a TokenInfo, return a token UID  
-// TODO: belongs in client helper
-#[post("/prepare", format = "json", data = "<token_info>")]
-fn prepare(token_info: Json<TokenInfo>) -> Json<String> {
-    let token_uid = "token_uid".to_string();
-    Json(token_uid)
-}
-
-// route to verify if a token UID is ready for presentation
-// TODO: belongs in client helper
-#[get("/state/<token_uid>")]
-fn state(token_uid: String) -> Json<String> {
-    let state = "ready".to_string();
-    Json(state)
-}
-
-// route to present a token UID and get a ZK proof
-// TODO: should that be a post? with what params?
-// TODO: belongs in client helper
-#[get("/present/<token_uid>")]
-fn present(token_uid: String) -> Json<String> {
-    let zk_proof = "zk_proof".to_string();
-    Json(zk_proof)
-}
-
-
 ///// Routes for hosting parameters
- 
+ // Small parameters are sent as b64_url encoded strings. 
+ // The large params required for one-time proof generation are hosted in a file
 
 /// Ensure that both 
 /// 1) /setup/scripts/run_setup.sh and 
@@ -63,7 +38,7 @@ fn present(token_uid: String) -> Json<String> {
 #[get("/<file..>")]
 async fn files(file: PathBuf) -> Option<NamedFile> {
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
-    let path = Path::new(&paths._cache).join(file);
+    let path = Path::new(&paths._base).join(file);
     println!("Got request for file : {:?}", path);
     NamedFile::open(path).await.ok()
 }
@@ -93,7 +68,6 @@ fn verifier_params() -> String {
 
 #[launch]
 fn rocket() -> _ {
-    //rocket::build().mount("/", routes![prepare, state, present])  // TODO: these routes go in client_helper
     rocket::build().mount("/", routes![show_params, verifier_params, files])
 }
 
@@ -114,7 +88,6 @@ mod test {
         let vp = read_from_b64url::<VerifierParams<CrescentPairing>>(s);
 
         assert!(vp.is_ok());
-        
     }
 
     #[test]
@@ -131,13 +104,14 @@ mod test {
     #[test]
     fn test_prover_params() {
         let client = Client::untracked(rocket()).expect("valid rocket instance");
-        let response = client.get("/prover_params.bin").dispatch();
+        let response = client.get("/cache/prover_params.bin").dispatch();
         assert_eq!(response.status(), Status::Ok);
-        println!("Downloading file...");
+        println!("Downloading large file...");
         let s = response.into_bytes().unwrap();
         let pp = read_from_bytes::<ProverParams<CrescentPairing>>(s);
         assert!(pp.is_ok());
         let pp = pp.unwrap();
         println!("Got config file {}", pp.config_str);
+        // Can also test with `wget localhost:8002/prover_params.bin`
     }       
 }

@@ -194,19 +194,9 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     return 0;
 }
 
-pub fn run_prover(
-    base_path: PathBuf,
-) {
-    let paths = CachePaths::new(base_path);
+pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON) -> ClientState<ECPairing>
+{
 
-    let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
-    let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));
-    let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
-    let config = parse_config(config_str).expect("Failed to parse config");
-    let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
-         prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
-    let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
-    
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
     let cfg = CircomConfig::<ECPairing>::new(
         &paths.wasm,
@@ -244,6 +234,24 @@ pub fn run_prover(
         params.vk.clone(),
         pvk.clone(),
     );
+
+    client_state
+}
+
+pub fn run_prover(
+    base_path: PathBuf,
+) {
+    let paths = CachePaths::new(base_path);
+
+    let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
+    let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));
+    let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
+    let config = parse_config(config_str).expect("Failed to parse config");
+    let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
+         prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
+    let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
+    
+    let client_state = create_client_state(&paths, &prover_inputs);
 
     write_to_file(&client_state, &paths.client_state);
 
