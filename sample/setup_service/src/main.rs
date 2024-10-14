@@ -85,7 +85,7 @@ mod test {
         let response = client.get("/verifier_params").dispatch();
         assert_eq!(response.status(), Status::Ok);
         let s = response.into_string().unwrap();
-        let vp = read_from_b64url::<VerifierParams<CrescentPairing>>(s);
+        let vp = read_from_b64url::<VerifierParams<CrescentPairing>>(&s);
 
         assert!(vp.is_ok());
     }
@@ -96,7 +96,7 @@ mod test {
         let response = client.get("/show_params").dispatch();
         assert_eq!(response.status(), Status::Ok);
         let s = response.into_string().unwrap();
-        let sp = read_from_b64url::<ShowParams<CrescentPairing>>(s);
+        let sp = read_from_b64url::<ShowParams<CrescentPairing>>(&s);
 
         assert!(sp.is_ok());
     }
