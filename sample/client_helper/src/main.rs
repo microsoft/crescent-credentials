@@ -5,14 +5,15 @@
 
 use crescent::groth16rand::ClientState;
 use crescent::prep_inputs::{parse_config, prepare_prover_inputs};
-use crescent::structs::GenericInputsJSON;
+use crescent::rangeproof::RangeProofPK;
+use crescent::structs::{GenericInputsJSON, IOLocations};
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
 use rocket::fs::NamedFile;
 use crescent::{create_client_state, CachePaths, CrescentPairing, ShowParams};
 use crescent::VerifierParams;
-use crescent::utils::{write_to_b64url,read_from_b64url, read_from_bytes};
-use std::fs::OpenOptions;
+use crescent::utils::{read_from_b64url, read_from_bytes, read_from_file, write_to_b64url};
+use std::fs::{self, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::path::Path;
@@ -32,9 +33,16 @@ struct TokenInfo {
     issuer_pem: String  // The issuer's public key, in PEM format
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+struct ShowData {
+    client_state_b64: String,
+    range_pk_b64: String,
+    io_locations_u8: Vec<u8>
+}
+
 // Create a ClientState that is ready for show proofs
 #[post("/prepare", format = "json", data = "<token_info>")]
-fn prepare(token_info: Json<TokenInfo>) -> String {
+fn prepare(token_info: Json<TokenInfo>) -> Json<ShowData> {
 
     let jwt = &token_info.jwt;
     let issuer_pem = &token_info.issuer_pem;
@@ -54,9 +62,18 @@ fn prepare(token_info: Json<TokenInfo>) -> String {
     let client_state = create_client_state(&paths, &prover_inputs);
     
     let client_state_b64 = write_to_b64url(&client_state);
-    println!("Done, returning client state as base64_url encoded string, {} chars long", client_state_b64.len());
+    println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
 
-    client_state_b64
+    let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk);
+    println!("Serializing range proof pk");
+    let range_pk_b64 = write_to_b64url(&range_pk);
+    println!("Reading IO locations file");
+    let io_locations_u8: Vec<u8> = fs::read(&paths.io_locations).unwrap();
+
+    let sd = ShowData {client_state_b64, range_pk_b64, io_locations_u8};
+    println!("Returning ShowData");
+
+    Json(sd)
 
 // TODO: This code doesn't work; something about async and blocking
     // // Fetch prover params from Crescent service
@@ -112,12 +129,20 @@ fn present(token_uid: String) -> Json<String> {
     Json(zk_proof)
 }
 
+// Takes a ClientState (as b64) and returns a Show proof
+#[post("/show", format = "json", data = "<show_data>")]
+fn show(show_data: Json<ShowData>) -> String {
 
+    let client_state = read_from_b64url::<ClientState<CrescentPairing>>(&show_data.client_state_b64).unwrap();
+    // TODO/WIP: deserialize the IOLocations and RangePK values, then generate show proof (first wrap some code in creds/src/lib.rs)
+
+    "Placeholder".to_string()
+}
 
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![prepare, state, present]) 
+    rocket::build().mount("/", routes![prepare, state, present, show]) 
 }
 
 
@@ -141,9 +166,8 @@ mod test {
         let response = client.post("/prepare").json(&token_info).dispatch();        
         assert_eq!(response.status(), Status::Ok);
 
-        let response_str = response.into_string().unwrap();
-        println!("Got client state response, {} characters long", response_str.len());
-        let client_state = read_from_b64url::<ClientState<CrescentPairing>>(response_str);
+        let show_data = response.into_json::<ShowData>().unwrap();
+        let client_state = read_from_b64url::<ClientState<CrescentPairing>>(&show_data.client_state_b64);
         assert!(client_state.is_ok());
                 
     }

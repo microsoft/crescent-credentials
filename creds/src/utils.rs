@@ -126,7 +126,7 @@ where
 
     s
 }
-pub fn read_from_b64url<T>(s : String) -> Result<T, SerializationError>
+pub fn read_from_b64url<T>(s : &String) -> Result<T, SerializationError>
 where 
     T: CanonicalDeserialize
 {
@@ -204,7 +204,7 @@ mod tests {
 
         let pk_str = write_to_b64url(&pk);
 
-        let pk2 = read_from_b64url::<RangeProofPK<CrescentPairing>>(pk_str);
+        let pk2 = read_from_b64url::<RangeProofPK<CrescentPairing>>(&pk_str);
         assert!(pk2.is_ok());
         let pk2 = pk2.unwrap();
 
