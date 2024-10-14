@@ -65,14 +65,16 @@ impl<'b, E: Pairing> ShowParams<'b, E> {
 pub struct VerifierParams<E: Pairing> {
     vk : VerifyingKey<E>,
     pvk : PreparedVerifyingKey<E>,
-    range_vk: RangeProofVK<E>
+    range_vk: RangeProofVK<E>,
+    io_locations_str: String // Stored as String since IOLocations does not implement CanonicalSerialize
 }
 impl<E: Pairing> VerifierParams<E> {
     pub fn new(paths : &CachePaths) -> Self {
         let pvk : PreparedVerifyingKey<E> = read_from_file(&paths.groth16_pvk);
         let vk : VerifyingKey<E> = read_from_file(&paths.groth16_vk);
         let range_vk : RangeProofVK<E> = read_from_file(&paths.range_vk);
-        Self{vk, pvk, range_vk}        
+        let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
+        Self{vk, pvk, range_vk, io_locations_str}
     }
 }
 
@@ -257,14 +259,9 @@ pub fn run_prover(
 
 }
 
-pub fn run_show(
-    base_path: PathBuf
-) {
-    let paths = CachePaths::new(base_path);
-    let io_locations = IOLocations::new(&paths.io_locations);    
-    let mut client_state: ClientState<ECPairing> = read_from_file(&paths.client_state);
-    let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk);
-    
+
+pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
+{
     let proof_timer = std::time::Instant::now();
 
     // Create Groth16 rerandomized proof for showing
@@ -279,7 +276,7 @@ pub fn run_show(
     io_types[email_value_pos -1] = PublicIOType::Revealed;
     let mut revealed_inputs = client_state.inputs.clone();
     revealed_inputs.remove(exp_value_pos - 1);  
-    let show_groth16 = client_state.show_groth16(&io_types);    
+    let show_groth16 = client_state.show_groth16(&io_types);
     
     // Create fresh range proof 
     let time_sec = SystemTime::now()
@@ -294,21 +291,28 @@ pub fn run_show(
     let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
     println!("Proving time: {:?}", proof_timer.elapsed());
 
-    // Asssemble proof and serialize
+    // Asssemble proof
     let show_proof = ShowProof{ show_groth16, show_range, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
+
+    show_proof
+
+}
+
+pub fn run_show(
+    base_path: PathBuf
+) {
+    let paths = CachePaths::new(base_path);
+    let io_locations = IOLocations::new(&paths.io_locations);    
+    let mut client_state: ClientState<ECPairing> = read_from_file(&paths.client_state);
+    let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk);
+    
+    let show_proof = create_show_proof(&mut client_state, &range_pk, &io_locations);
     write_to_file(&show_proof, &paths.show_proof);
 }
 
-pub fn run_verifier(base_path: PathBuf) {
-    let paths = CachePaths::new(base_path);
-    let show_proof : ShowProof<ECPairing> = read_from_file(&paths.show_proof);
-    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk);
-    let vk : VerifyingKey<ECPairing> = read_from_file(&paths.groth16_vk);
-    let range_vk : RangeProofVK<ECPairing> = read_from_file(&paths.range_vk);
-    let io_locations = IOLocations::new(&paths.io_locations);    
-    // TODO: load public_IOs file and take modulus from there.  
-    // Or maybe the verifier should work directly from the issuer's public key?
-
+pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>) -> (bool, String)
+{
+    let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
     let email_value_pos = io_locations.get_io_location("email_value").unwrap();
     let mut io_types = vec![PublicIOType::Revealed; show_proof.inputs_len];
@@ -321,7 +325,7 @@ pub fn run_verifier(base_path: PathBuf) {
     // }
 
     let verify_timer = std::time::Instant::now();
-    show_proof.show_groth16.verify(&vk, &pvk, &io_types, &show_proof.revealed_inputs);
+    show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &show_proof.revealed_inputs);
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     let delta = 
@@ -338,13 +342,13 @@ pub fn run_verifier(base_path: PathBuf) {
     }
 
     let mut ped_com_exp_value = show_proof.show_groth16.commited_inputs[0].clone();
-    ped_com_exp_value -= pvk.vk.gamma_abc_g1[exp_value_pos] * cur_time;
+    ped_com_exp_value -= vp.pvk.vk.gamma_abc_g1[exp_value_pos] * cur_time;
     show_proof.show_range.verify(
         &ped_com_exp_value,
         RANGE_PROOF_INTERVAL_BITS,
-        &range_vk,
+        &vp.range_vk,
         &io_locations,
-        &pvk,
+        &vp.pvk,
         "exp_value",
     );
     println!("Verification time: {:?}", verify_timer.elapsed());  
@@ -354,5 +358,23 @@ pub fn run_verifier(base_path: PathBuf) {
     // the committed attribute.  When we refactor revealed inputs and the modulus IOs we can address this.
     let domain = unpack_int_to_string_unquoted( &show_proof.revealed_inputs[email_value_pos - 2].into_bigint()).unwrap();
     println!("Token is valid, Prover revealed email domain: {}", domain);
+
+    // We return true here since groth16.verify and show_range.verify just assert and panic if there is a failure
+    // TODO: refactor verify functions to return booleans, so that we can return an error to the application, rather than bringing down the world.
+    (true, domain)
+}
+
+pub fn run_verifier(base_path: PathBuf) {
+    let paths = CachePaths::new(base_path);
+    let show_proof : ShowProof<ECPairing> = read_from_file(&paths.show_proof);
+    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk);
+    let vk : VerifyingKey<ECPairing> = read_from_file(&paths.groth16_vk);
+    let range_vk : RangeProofVK<ECPairing> = read_from_file(&paths.range_vk);
+    let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
+    // TODO: load public_IOs file and take modulus from there.  
+    // Or maybe the verifier should work directly from the issuer's public key?
+
+    let vp = VerifierParams{vk, pvk, range_vk, io_locations_str};
+    let _verify_result = verify_show(&vp, &show_proof);
 
 }
