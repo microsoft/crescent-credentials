@@ -1,19 +1,48 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" style="height: 400px; width: 400px; overflow: visible;">
 
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>Page Title</title>
+    <title>Crecent</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <link rel='stylesheet' type='text/css' media='screen' href='popup.css'>
+    <script type='module' src='toggle.js'></script>
+    <script type='module' src='walletItem.js'></script>
     <script type='module' src='popup.js'></script>
 </head>
 
 <body>
-    <h1>Popup</h1>
-    <div>
+    <div id="tab-buttons">
+        <button class="tab active" data-tab="wallet">Wallet</button>
+        <button class="tab" data-tab="about">About</button>
+        <button class="tab" data-tab="config">Config</button>
     </div>
+    <div>
+        <div id="wallet" class="tab-content active-content">
+            <h1>Wallet</h1>
+            <div id="wallet-info">
+            </div>
+        </div>
+
+        <div id="about" class="tab-content">
+            <h1>About</h1>
+            <p>Version <span id="version">0.1</span> (dev preview)</p>
+            <p>This is a prototype browser extension for ... </p>
+            <p>See the <a href="https://github.com/microsoft/crecent" target="_blank">project page</a>
+                for details.</p>
+        </div>
+
+        <div id="config" class="tab-content">
+            <h1>Config</h1>
+            <hr>
+            <div id="trust-list-option">
+            </div>
+            <toggle-switch label="Toggle 1" id="toggle1" title="Enable to do ..."></toggle-switch>
+            <toggle-switch label="Toggle 2" id="toggle2" title="Enable to do ..."></toggle-switch>
+        </div>
+    </div>
+
 </body>
 
 </html>

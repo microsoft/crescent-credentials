@@ -14,5 +14,34 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
-  "typescript.showUnused": false
+  "typescript.showUnused": false,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true
+  },
+  "hide-files.files": [],
+  "workbench.colorCustomizations": {
+    "activityBar.activeBackground": "#98bd81",
+    "activityBar.background": "#98bd81",
+    "activityBar.foreground": "#15202b",
+    "activityBar.inactiveForeground": "#15202b99",
+    "activityBarBadge.background": "#5876a7",
+    "activityBarBadge.foreground": "#e7e7e7",
+    "commandCenter.border": "#15202b99",
+    "sash.hoverBorder": "#98bd81",
+    "statusBar.background": "#7cac60",
+    "statusBar.foreground": "#15202b",
+    "statusBarItem.hoverBackground": "#648f4a",
+    "statusBarItem.remoteBackground": "#7cac60",
+    "statusBarItem.remoteForeground": "#15202b",
+    "titleBar.activeBackground": "#7cac60",
+    "titleBar.activeForeground": "#15202b",
+    "titleBar.inactiveBackground": "#7cac6099",
+    "titleBar.inactiveForeground": "#15202b99"
+  },
+  "peacock.color": "#7cac60"
 }
