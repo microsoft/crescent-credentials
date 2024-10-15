@@ -22,7 +22,7 @@ use rocket::http::Status;
 use crescent::ProverParams;
 
 
-// For now we assume that the Client Helper and Crescent Service live on the same machine and share disk acces.
+// For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
 // TODO: we could make web requests to get the data from the setup service, but this will take more effort.
 const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
 

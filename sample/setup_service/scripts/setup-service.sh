@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# TODO: we currently do not need this script anymore; delete if it's still the case
+
 # Default values
 JWT_PATH=""
 PARAMS_UID=""
