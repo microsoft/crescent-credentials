@@ -1,6 +1,6 @@
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::rand::thread_rng;
 use merlin::Transcript;
 use num_bigint::BigUint;
@@ -8,7 +8,6 @@ use sha2::{Digest, Sha512};
 use std::fs::OpenOptions;
 use ark_std::{io::BufWriter, io::BufReader, fs::File};
 use ark_serialize::Write;
-
 
 #[macro_export]
 macro_rules! return_error {
@@ -126,30 +125,45 @@ where
 
     s
 }
-pub fn read_from_b64url<T>(s : String) -> T
+pub fn read_from_b64url<T>(s : &String) -> Result<T, SerializationError>
 where 
     T: CanonicalDeserialize
 {
-    let buf = s.as_bytes();
+    let s1 = base64_url::decode(&s);
+    if s1.is_err() {
+        return Err(SerializationError::InvalidData);
+    }
+    let buf = s1.unwrap();
 
-    let buf_reader = BufReader::new(buf);
-    let state = T::deserialize_uncompressed_unchecked(buf_reader).unwrap();
-    state
+    let buf_reader = BufReader::new(buf.as_slice());
+    let state = T::deserialize_uncompressed_unchecked(buf_reader)?;
+    Ok(state)   
 }
 
-pub fn read_from_file<T>(path: &str) -> T 
+pub fn read_from_file<T>(path: &str) -> Result<T, SerializationError>
 where
     T: CanonicalDeserialize
 {
     let f = File::open(path).unwrap();
     let buf_reader = BufReader::new(f);
-    let state = T::deserialize_uncompressed_unchecked(buf_reader).unwrap();
+    let state = T::deserialize_uncompressed_unchecked(buf_reader)?;
 
-    state
+    Ok(state)
+}
+pub fn read_from_bytes<T>(buf: Vec<u8>) -> Result<T , SerializationError>
+where
+    T: CanonicalDeserialize
+{
+    let buf_reader = BufReader::new(buf.as_slice());
+    let state = T::deserialize_uncompressed_unchecked(buf_reader)?;
+    Ok(state)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rangeproof::RangeProofPK;
+    use crate::CrescentPairing;
+
     use super::*;
     use ark_bls12_381::Bls12_381;
     use ark_bn254::Bn254;
@@ -180,5 +194,19 @@ mod tests {
             ark_bls12_381::g1::Config,
             ark_bls12_381::g2::Config,
         >();
+    }
+
+
+    #[test]
+    fn test_b64_url_roundtrip() {
+        let (pk, _) = RangeProofPK::setup(32);
+
+        let pk_str = write_to_b64url(&pk);
+
+        let pk2 = read_from_b64url::<RangeProofPK<CrescentPairing>>(&pk_str);
+        assert!(pk2.is_ok());
+        let pk2 = pk2.unwrap();
+
+        assert!(pk == pk2);
     }
 }

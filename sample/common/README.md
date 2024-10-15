@@ -1,0 +1,1 @@
+This folder contains common components used by the sample participants. 
