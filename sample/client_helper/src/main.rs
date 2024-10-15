@@ -9,21 +9,19 @@ use crescent::rangeproof::RangeProofPK;
 use crescent::structs::{GenericInputsJSON, IOLocations};
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
-use rocket::fs::NamedFile;
-use crescent::{create_client_state, create_show_proof, verify_show, CachePaths, CrescentPairing, ShowParams, ShowProof};
+use crescent::{create_client_state, create_show_proof, verify_show, CachePaths, CrescentPairing, ShowProof};
 use crescent::VerifierParams;
-use crescent::utils::{read_from_b64url, read_from_bytes, read_from_file, write_to_b64url};
-use std::fs::{self, OpenOptions};
-use std::io::{BufWriter, Write};
-use std::path::PathBuf;
-use std::path::Path;
-use rocket::local::blocking::Client;
-use rocket::http::Status;
+use crescent::utils::{read_from_b64url, read_from_file, write_to_b64url};
+use std::fs::{self};
 use crescent::ProverParams;
 
 
 // For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
 // TODO: we could make web requests to get the data from the setup service, but this will take more effort.
+//       The code we use in unit tests to make web requests doesn't work from a route handler, we need to investigate.  It may 
+//       only be suitable for testing, there is probably a better way.
+//       Also we'll need some caching of the parameters to avoid fetching large files multiple times.
+//       For caching the client helper could re-use the CachePaths struct and approach.
 const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
 
 // struct for the JWT info
@@ -42,7 +40,7 @@ struct ShowData {
 
 #[cfg(test)]
 impl ShowData {
-    // In testing we mock up an instance from files: needs to have a show proof present
+    // In testing we mock up an instance from files: needs to have a show proof that we can use
     fn new(paths : &CachePaths) -> Self {
         let client_state : ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
         let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
@@ -101,44 +99,6 @@ fn prepare(token_info: Json<TokenInfo>) -> Json<ShowData> {
     println!("Returning ShowData");
 
     Json(sd)
-
-// TODO: This code doesn't work; something about async and blocking
-    // // Fetch prover params from Crescent service
-    // let client = Client::untracked(rocket()).expect("valid rocket instance");
-    // let response = client.get("localhost:8002/cache/prover_params.bin").dispatch();
-    // assert_eq!(response.status(), Status::Ok);
-    // print!("Downloading large prover parameters... ");
-    // let s = response.into_bytes().unwrap();
-    // let pp = read_from_bytes::<ProverParams<CrescentPairing>>(s);
-    // assert!(pp.is_ok());    
-    // println!(" done.");
-
-    // // Fetch R1CS instance and witness generator. 
-    // // TODO: These don't support serialization to allow them to be included in ProverParams
-    // let response = client.get("localhost:8002/main.wasm").dispatch();
-    // assert_eq!(response.status(), Status::Ok);
-    // print!("Downloading wasm for witness generation... ");
-    // let s = response.into_bytes().unwrap();
-    // let f = OpenOptions::new()
-    // .write(true)
-    // .create(true)
-    // .truncate(true)
-    // .open("main.wasm")
-    // .unwrap();
-    // assert!(BufWriter::new(f).write_all(&s).is_ok());
-
-    // let response = client.get("localhost:8002/main_c.r1cs").dispatch();
-    // assert_eq!(response.status(), Status::Ok);
-    // print!("Downloading R1CS instance... ");
-    // let s = response.into_bytes().unwrap();
-    // let f = OpenOptions::new()
-    // .write(true)
-    // .create(true)
-    // .truncate(true)
-    // .open("main_c.r1cs")
-    // .unwrap();
-    // assert!(BufWriter::new(f).write_all(&s).is_ok());    
-
 }
 
 // route to verify if a token UID is ready for presentation
@@ -192,9 +152,9 @@ mod test {
     use std::fs;
 
     use super::*;
-    use crate::{test::rocket::local::blocking::Client};
-    use crescent::{utils::read_from_b64url, CrescentPairing, ProverParams, VerifierParams};
-    use rocket::{http::Status, response};
+    use crate::test::rocket::local::blocking::Client;
+    use crescent::{utils::read_from_b64url, CrescentPairing, VerifierParams};
+    use rocket::http::Status;
 
     #[test]
     fn test_prepare_show() {
