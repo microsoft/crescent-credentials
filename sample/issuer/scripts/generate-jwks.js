@@ -3,6 +3,7 @@
 
 const crypto = require('crypto');
 const fs = require('fs');
+const path = require('path');
 
 // function to generate JWK Thumbprint 'kid' (Key ID) following RFC7638 
 function generateKid(buffer) {
@@ -48,6 +49,13 @@ function readPEMFile(filePath) {
 // write the JWKS to file
 function writeJWKSToFile(jwkSet, outputPath) {
     try {
+        // extract the directory path from outputPath
+        const dirPath = path.dirname(outputPath);
+
+        // create the directories if they don't exist
+        fs.mkdirSync(dirPath, { recursive: true });
+
+        // write the file
         fs.writeFileSync(outputPath, JSON.stringify(jwkSet, null, 2), 'utf8');
         console.log(`JWK set has been written to ${outputPath}`);
     } catch (err) {
