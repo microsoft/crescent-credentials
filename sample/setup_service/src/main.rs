@@ -4,11 +4,10 @@
 #[macro_use] extern crate rocket;
 
 use rocket::serde::{Serialize, Deserialize};
-use rocket::serde::json::Json;
 use rocket::fs::NamedFile;
 use crescent::{CachePaths, CrescentPairing, ShowParams};
 use crescent::VerifierParams;
-use crescent::utils::{write_to_b64url,read_from_b64url, read_from_bytes};
+use crescent::utils::write_to_b64url;
 use std::path::PathBuf;
 use std::path::Path;
 
@@ -17,7 +16,7 @@ const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone)]
 struct TokenInfo {
-    JWT: String,
+    jwt: String,
     issuer: String
 }
 
@@ -25,13 +24,32 @@ struct TokenInfo {
  // Small parameters are sent as b64_url encoded strings. 
  // The large params required for one-time proof generation are hosted in a file
 
-/// Ensure that both 
-/// 1) /setup/scripts/run_setup.sh and 
-/// 2) /creds/crescent zksetup
-/// have been run and CRESCENT_DATA_PATH points to the place where the generated
-/// parameters are stored
-/// TODO: create a function to check on start-up that all parameters we serve 
-/// in this server are actually generated
+// Ensure that both setup steps in README.md
+// 1) /setup/scripts/run_setup.sh and 
+// 2) /creds/crescent zksetup
+// have been run and CRESCENT_DATA_BASE_PATH points to the place where the generated
+// parameters are stored.
+
+fn check_for_stored_params(paths :&CachePaths) -> bool {
+
+    let files = vec![
+        &paths.groth16_pvk,
+        &paths.groth16_vk,
+        &paths.range_vk,
+        &paths.io_locations,
+        &paths.prover_params,
+        &paths.range_pk
+    ];
+
+    for f in files {
+        if !Path::new(&f).exists() {
+            println!("Error: required file not found ({})", f);
+            return false;
+        }        
+    }
+
+    return true;
+}
 
 // Get the parameters required to generate the one-time proofs (the Groth16 proofs)
 // Since the params are so big, we just expose the binary file for download
@@ -65,9 +83,13 @@ fn verifier_params() -> String {
 }
 
 
-
 #[launch]
 fn rocket() -> _ {
+    let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
+    if ! check_for_stored_params(&paths) {
+        println!("Error: parameters not present, not starting setup service");
+        std::process::exit(-1);
+    }
     rocket::build().mount("/", routes![show_params, verifier_params, files])
 }
 
@@ -75,8 +97,8 @@ fn rocket() -> _ {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{test::rocket::local::blocking::Client, verifier_params};
-    use crescent::{utils::read_from_b64url, CrescentPairing, ProverParams, VerifierParams};
+    use crate::test::rocket::local::blocking::Client;
+    use crescent::{utils::{read_from_b64url, read_from_bytes}, CrescentPairing, ProverParams, VerifierParams};
     use rocket::http::Status;
 
     #[test]
