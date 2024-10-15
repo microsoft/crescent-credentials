@@ -6,10 +6,11 @@ use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_ff::PrimeField;
 use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
 use prep_inputs::{parse_config, unpack_int_to_string_unquoted, prepare_prover_inputs};
+use serde::Serialize;
 use utils::{read_from_file, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
@@ -30,7 +31,6 @@ const SHOW_PROOF_VALIDITY_SECONDS: u64 = 60;    // The verifier only accepts pro
 
 pub type CrescentPairing = ECPairing;
 
-// TODO: error handling on all the new() functions for the Params structs
 
 /// Parameters required to create Groth16 proofs
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
@@ -40,11 +40,11 @@ pub struct ProverParams<E: Pairing> {
     pub config_str : String
 }
 impl<E: Pairing> ProverParams<E> {
-    pub fn new(paths : &CachePaths) -> Self {
-        let groth16_params : ProvingKey<E> = read_from_file(&paths.groth16_params);
-        let groth16_pvk : PreparedVerifyingKey<E> = read_from_file(&paths.groth16_pvk);
-        let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
-        Self{groth16_params, groth16_pvk, config_str}        
+    pub fn new(paths : &CachePaths) -> Result<Self, SerializationError> {
+        let groth16_params : ProvingKey<E> = read_from_file(&paths.groth16_params)?;
+        let groth16_pvk : PreparedVerifyingKey<E> = read_from_file(&paths.groth16_pvk)?;
+        let config_str = fs::read_to_string(&paths.config)?;
+        Ok(Self{groth16_params, groth16_pvk, config_str})
     }
 }
 
@@ -54,9 +54,9 @@ pub struct ShowParams<'b, E: Pairing> {
     range_pk: RangeProofPK<'b, E>
 }
 impl<'b, E: Pairing> ShowParams<'b, E> {
-    pub fn new(paths : &CachePaths) -> Self {
-        let range_pk : RangeProofPK<'b, E> = read_from_file(&paths.range_pk);
-        Self{range_pk}        
+    pub fn new(paths : &CachePaths) -> Result<Self, SerializationError> {
+        let range_pk : RangeProofPK<'b, E> = read_from_file(&paths.range_pk)?;
+        Ok(Self{range_pk})
     }
 }
 
@@ -69,12 +69,12 @@ pub struct VerifierParams<E: Pairing> {
     io_locations_str: String // Stored as String since IOLocations does not implement CanonicalSerialize
 }
 impl<E: Pairing> VerifierParams<E> {
-    pub fn new(paths : &CachePaths) -> Self {
-        let pvk : PreparedVerifyingKey<E> = read_from_file(&paths.groth16_pvk);
-        let vk : VerifyingKey<E> = read_from_file(&paths.groth16_vk);
-        let range_vk : RangeProofVK<E> = read_from_file(&paths.range_vk);
-        let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
-        Self{vk, pvk, range_vk, io_locations_str}
+    pub fn new(paths : &CachePaths) -> Result<Self, SerializationError> {
+        let pvk : PreparedVerifyingKey<E> = read_from_file(&paths.groth16_pvk)?;
+        let vk : VerifyingKey<E> = read_from_file(&paths.groth16_vk)?;
+        let range_vk : RangeProofVK<E> = read_from_file(&paths.range_vk)?;
+        let io_locations_str = std::fs::read_to_string(&paths.io_locations)?;
+        Ok(Self{vk, pvk, range_vk, io_locations_str})
     }
 }
 
@@ -196,7 +196,7 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     return 0;
 }
 
-pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON) -> ClientState<ECPairing>
+pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON) -> Result<ClientState<ECPairing>, SerializationError>
 {
 
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
@@ -210,7 +210,7 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     end_timer!(circom_timer);
 
     let load_params_timer = start_timer!(||"Reading Groth16 params from file");
-    let params : ProvingKey<ECPairing> = read_from_file(&paths.groth16_params);
+    let params : ProvingKey<ECPairing> = read_from_file(&paths.groth16_params)?;
     end_timer!(load_params_timer);
     
     let build_timer = start_timer!(|| "Witness Generation");
@@ -223,7 +223,7 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     let proof = Groth16::<ECPairing>::prove(&params, circom, &mut rng).unwrap();    
     end_timer!(prove_timer);
 
-    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk);
+    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk)?;
     let verify_timer = start_timer!(|| "Groth16 verify");
     let verified =
         Groth16::<ECPairing>::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap();
@@ -237,7 +237,7 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
         pvk.clone(),
     );
 
-    client_state
+    Ok(client_state)
 }
 
 pub fn run_prover(
@@ -253,7 +253,7 @@ pub fn run_prover(
          prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
     let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
     
-    let client_state = create_client_state(&paths, &prover_inputs);
+    let client_state = create_client_state(&paths, &prover_inputs).unwrap();
 
     write_to_file(&client_state, &paths.client_state);
 
@@ -303,8 +303,8 @@ pub fn run_show(
 ) {
     let paths = CachePaths::new(base_path);
     let io_locations = IOLocations::new(&paths.io_locations);    
-    let mut client_state: ClientState<ECPairing> = read_from_file(&paths.client_state);
-    let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk);
+    let mut client_state: ClientState<ECPairing> = read_from_file(&paths.client_state).unwrap();
+    let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk).unwrap();
     
     let show_proof = create_show_proof(&mut client_state, &range_pk, &io_locations);
     write_to_file(&show_proof, &paths.show_proof);
@@ -366,10 +366,10 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
 
 pub fn run_verifier(base_path: PathBuf) {
     let paths = CachePaths::new(base_path);
-    let show_proof : ShowProof<ECPairing> = read_from_file(&paths.show_proof);
-    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk);
-    let vk : VerifyingKey<ECPairing> = read_from_file(&paths.groth16_vk);
-    let range_vk : RangeProofVK<ECPairing> = read_from_file(&paths.range_vk);
+    let show_proof : ShowProof<ECPairing> = read_from_file(&paths.show_proof).unwrap();
+    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk).unwrap();
+    let vk : VerifyingKey<ECPairing> = read_from_file(&paths.groth16_vk).unwrap();
+    let range_vk : RangeProofVK<ECPairing> = read_from_file(&paths.range_vk).unwrap();
     let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
     // TODO: load public_IOs file and take modulus from there.  
     // Or maybe the verifier should work directly from the issuer's public key?

@@ -9,7 +9,6 @@ use std::fs::OpenOptions;
 use ark_std::{io::BufWriter, io::BufReader, fs::File};
 use ark_serialize::Write;
 
-
 #[macro_export]
 macro_rules! return_error {
     ($msg:expr) => {
@@ -141,15 +140,15 @@ where
     Ok(state)   
 }
 
-pub fn read_from_file<T>(path: &str) -> T 
+pub fn read_from_file<T>(path: &str) -> Result<T, SerializationError>
 where
     T: CanonicalDeserialize
 {
     let f = File::open(path).unwrap();
     let buf_reader = BufReader::new(f);
-    let state = T::deserialize_uncompressed_unchecked(buf_reader).unwrap();
+    let state = T::deserialize_uncompressed_unchecked(buf_reader)?;
 
-    state
+    Ok(state)
 }
 pub fn read_from_bytes<T>(buf: Vec<u8>) -> Result<T , SerializationError>
 where

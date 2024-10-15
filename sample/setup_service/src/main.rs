@@ -48,7 +48,7 @@ async fn files(file: PathBuf) -> Option<NamedFile> {
 #[get("/show_params")]
 fn show_params() -> String {
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
-    let show_params = ShowParams::<CrescentPairing>::new(&paths);
+    let show_params = ShowParams::<CrescentPairing>::new(&paths).expect("Failed to create ShowParams instance");
     let show_params_b64 = write_to_b64url(&show_params);
     
     show_params_b64
@@ -58,7 +58,7 @@ fn show_params() -> String {
 #[get("/verifier_params")]
 fn verifier_params() -> String {
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
-    let verifier_params = VerifierParams::<CrescentPairing>::new(&paths);
+    let verifier_params = VerifierParams::<CrescentPairing>::new(&paths).expect("Failed to create VerifierParams instance");
     let verifier_params_b64 = write_to_b64url(&verifier_params);
     
     verifier_params_b64

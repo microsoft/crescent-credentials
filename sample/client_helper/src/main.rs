@@ -44,8 +44,8 @@ struct ShowData {
 impl ShowData {
     // In testing we mock up an instance from files: needs to have a show proof present
     fn new(paths : &CachePaths) -> Self {
-        let client_state : ClientState<CrescentPairing> = read_from_file(&paths.client_state);
-        let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk);
+        let client_state : ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
+        let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
         let io_locations_str = fs::read_to_string(&paths.io_locations).unwrap();
 
         let client_state_b64 = write_to_b64url(&client_state);
@@ -77,7 +77,7 @@ fn prepare(token_info: Json<TokenInfo>) -> Json<ShowData> {
 
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
     println!("Loading prover params");
-    let prover_params = ProverParams::<CrescentPairing>::new(&paths);
+    let prover_params = ProverParams::<CrescentPairing>::new(&paths).expect("Failed to create prover params");
     println!("Parsing config");
     let config = parse_config(prover_params.config_str).expect("Failed to parse config");
     println!("Creating prover inputs");
@@ -86,12 +86,12 @@ fn prepare(token_info: Json<TokenInfo>) -> Json<ShowData> {
     let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
     
     println!("Creating client state... this is slow... ");
-    let client_state = create_client_state(&paths, &prover_inputs);
+    let client_state = create_client_state(&paths, &prover_inputs).expect("Failed to create client state");
     
     let client_state_b64 = write_to_b64url(&client_state);
     println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
 
-    let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk);
+    let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).expect("Failed to read range proof pk");
     println!("Serializing range proof pk");
     let range_pk_b64 = write_to_b64url(&range_pk);
     println!("Reading IO locations file");
@@ -227,7 +227,7 @@ mod test {
         assert_eq!(response.status(), Status::Ok);
         let show_proof_b64 = response.into_string().unwrap();
 
-        let vp = VerifierParams::<CrescentPairing>::new(&paths);
+        let vp = VerifierParams::<CrescentPairing>::new(&paths).unwrap();
         let verifier_params_b64 = write_to_b64url(&vp);
         let verify_data = VerifyData{show_proof_b64, verifier_params_b64};
         let client = Client::untracked(rocket()).expect("valid rocket instance");
