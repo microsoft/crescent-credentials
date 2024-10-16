@@ -38,6 +38,60 @@ the token to use. The Client then generates a showing by calling the `show` libr
 the Verifier downloads the validation parameters from the Setup Service (the first time it sees a presentation for the JWT schema) and the Issuer's public key
 (the first time it sees a token proof for this Issuer) and calls the `verify` library function. Upon successful proof validation, Alice is granted access. 
 
+# Sample details
+
+## JWT issuance
+
+```mermaid
+sequenceDiagram
+    participant I as Issuer
+    participant B as Browser (User)
+    participant E as Browser Extension
+    participant C as Client Helper
+    participant S as Setup Service
+    B->>I: visit login page, enters username/password
+    I-->>B: redirect to welcome page
+    B->>I: click "Issue JWT" button
+    I->>I: create, sign and return JWT
+    I->>E: read JWT from <meta> tag
+    E->>C: post {JWT, schema_UID, issuer_URL} to /prepare
+    C->>E: return token_UID
+    par Client Helper prepares the token for showing
+        C->>S: fetch Crescent prove params from /prove_params/<schema_UID>
+        C->>S: fetch Crescent show params from /show_params/<schema_UID>
+        C->>I: fetch JWK set from <issuer_URL>/.well-known/jwks.json
+        C->>C: prepare JWT for proof
+    and Browser Extension pings Client Helper until token is ready
+        loop Every 5 sec
+            E->>C: fetch token state from /state/<token_UID>
+            C->>E: return state
+            E->>E: mark JWT as presentatble when state = "ready"
+        end
+    end
+```
+
+## Proof presentation
+
+```mermaid
+sequenceDiagram
+    participant B as Browser (User)
+    participant E as Browser Extension
+    participant C as Client Helper
+    participant S as Setup Service
+    participant V as Verifier
+    participant I as Issuer
+    B->>V: visit login page
+    V->>E: read {DisclosureUID,VerifyURL} from <meta> tag
+    E->>E: filter JWT that support DisclosureUID
+    B->>E: user selects a JWT to present
+    E->>E: generate Crescent proof
+    E->>V: send {proof, schema_UID, issuer_UID} to VerifyURL
+    V->>S: fetch Crescent verify params from /verify_params/<schema_UID>
+    V->>I: fetch JWK set from <issuer_URL>/.well-known/jwks.json
+    V->>V: verify proof
+    V-->>B: redirect to resource page (on success)
+```
+
 
 TODO:
 * document how multiple JWT schemas could be distinguished in practice.
