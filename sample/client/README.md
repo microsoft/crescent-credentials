@@ -1,6 +1,6 @@
 # Crescent sample client browser extension
 
-This project contains a Edge/Chrome/Firefox browser extension implementing a Crescent prover. The browser extension can interact with the [sample issuer](../issuer/README.md) to retrieve JSON Web Tokens (JWT) and present a Crescent zero-knowledge proof to the [sample verifier](../verifier/README.md). 
+This project contains a Edge/Chrome/Firefox browser extension implementing a Crescent prover. The browser extension can interact with the [sample issuer](../issuer/README.md) to retrieve JSON Web Tokens (JWT) and present a Crescent zero-knowledge proof to the [sample verifier](../verifier/README.md), with the help of a [client helper](../client_helper/README.md) to offload expensive storage and computation.
 
 ## Setup
 
@@ -37,7 +37,7 @@ The Firefox `manifest.json` file is located at `samples/browser-extension/dist/f
 
 Firefox requires additional extension permissions to download manifests from external sites
 1) In the Firefox address bar go to `about:addons` to see the installed extensions
-2) Find **Cross-Platform Origin of Content Extension** and click the `...` button to the right
+2) Find **Crescent Browser Extension** and click the `...` button to the right
 3) Select **Manage** from the pop-up menu
 4) Click the **Permission** tab
 5) Enable **Access your data for all websites**

@@ -27,6 +27,7 @@
     "dotenv": "^16.4.5",
     "eslint": "8.57.1",
     "eslint-config-love": "71.0.0",
+    "lit": "^3.2.0",
     "rollup": "4.22.4",
     "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-dotenv": "^0.5.1",

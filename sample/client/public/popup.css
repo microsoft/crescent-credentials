@@ -1,0 +1,98 @@
+/* Tab button styles */
+* {
+    font-family: 'Roboto', Arial, Helvetica, sans-serif;
+}
+
+#tab-buttons {
+    margin-bottom: -1px;
+}
+
+.tab {
+    display: inline-block;
+    padding: 10px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    background-color: #f1f1f1;
+    margin-bottom: 0px;
+    margin-right: -2px;
+}
+
+.tab:first-child {
+    border-top-left-radius: 5px;
+    /* Round top left corner */
+}
+
+.tab:last-child {
+    border-top-right-radius: 5px;
+    /* Round top right corner */
+}
+
+.active {
+    background-color: #fff;
+    border-bottom: 1px solid #FFF;
+}
+
+/* Tab content styles */
+.tab-content {
+    display: none;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 0 5px 5px 5px;
+    height: 100%;
+}
+
+.active-content {
+    display: block;
+}
+
+/* Style for the tooltip container */
+.info-tooltip {
+    position: relative;
+    display: inline-block;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    background-color: #888;
+    color: #FFF;
+    text-align: center;
+    line-height: 20px;
+    cursor: help;
+    /* changes the mouse cursor when hovered over the tooltip */
+    margin-left: 5px;
+    /* space between the tooltip and the adjacent content */
+}
+
+/* Hide the tooltip text by default */
+.info-tooltip .tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    /* adjust as needed */
+    background-color: #555;
+    color: #FFF;
+    text-align: center;
+    padding: 5px;
+    border-radius: 6px;
+    position: absolute;
+    z-index: 9999;
+    /* Make sure tooltip is above everything */
+    top: -5px;
+    /* position above the tooltip */
+    left: 105%;
+    transform: translateX(-50%);
+    /* center the tooltip */
+    opacity: 0;
+    transition: opacity 0.3s;
+    /* smooth fade-in effect */
+    overflow: visible;
+    /* Ensure content is not clipped */
+}
+
+/* Show the tooltip text when hovering over the tooltip container */
+.info-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+toggle-switch {
+    margin-top: 5px;
+}

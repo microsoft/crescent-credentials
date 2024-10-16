@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>Issuer</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <meta name="crescent" content="issue-employment">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Roboto', sans-serif;
+            font-size: larger;
+        }
+
+        .centered-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            /* Ensure space between text and button */
+            align-items: center;
+            /* Center align text and button horizontally */
+            width: 400px;
+            height: 400px;
+            text-align: center;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        #crescent-issue {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            margin: 8px 0;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            width: 150px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="centered-container">
+        <div>
+            <p>Welcome to Issuer</p>
+            <p>Click here to get your employment token</p>
+        </div>
+        <input id="crescent-issue" type="button" value="Issue" disabled>
+    </div>
+</body>
+
+</html>

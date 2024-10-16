@@ -182,6 +182,9 @@ fn issue_token(
             let response_html = format!(
                 r#"
                 <html>
+                <head>
+                    <meta name="CRESCENT_JWT" content="{}">
+                </head>
                 <body>
                     <h1>Here is your JWT</h1>
                     <textarea id="jwt" rows="10" cols="100">{}</textarea>
@@ -189,6 +192,7 @@ fn issue_token(
                 </body>
                 </html>
                 "#,
+                token,
                 token
             );
 
