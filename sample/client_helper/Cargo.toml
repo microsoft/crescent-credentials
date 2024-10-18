@@ -8,8 +8,9 @@ default-run = "crescent-sample-client-helper"
 rocket = { version = "0.5.1", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
 crescent = {path="../../creds"}
-
 
 [profile.dev.package."*"]
 opt-level = 3               # optimize dependencies, even in dev builds

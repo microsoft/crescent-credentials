@@ -11,6 +11,7 @@ use crescent::utils::write_to_b64url;
 use std::path::PathBuf;
 use std::path::Path;
 
+// path where the parameters are stored. For now, we hardcode these; later, we'll generate them for each token scheme UID (TODO)
 const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
 
 // struct for the JWT info
@@ -53,7 +54,7 @@ fn check_for_stored_params(paths :&CachePaths) -> bool {
 
 // Get the parameters required to generate the one-time proofs (the Groth16 proofs)
 // Since the params are so big, we just expose the binary file for download
-#[get("/<file..>")]
+#[get("/prove_params/<file..>")]
 async fn files(file: PathBuf) -> Option<NamedFile> {
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
     let path = Path::new(&paths._base).join(file);
@@ -126,7 +127,7 @@ mod test {
     #[test]
     fn test_prover_params() {
         let client = Client::untracked(rocket()).expect("valid rocket instance");
-        let response = client.get("/cache/prover_params.bin").dispatch();
+        let response = client.get("/prove_params/cache/prover_params.bin").dispatch();
         assert_eq!(response.status(), Status::Ok);
         println!("Downloading large file...");
         let s = response.into_bytes().unwrap();

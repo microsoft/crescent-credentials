@@ -7,14 +7,30 @@ use crescent::groth16rand::ClientState;
 use crescent::prep_inputs::{parse_config, prepare_prover_inputs};
 use crescent::rangeproof::RangeProofPK;
 use crescent::structs::{GenericInputsJSON, IOLocations};
-use rocket::serde::{Serialize, Deserialize};
-use rocket::serde::json::Json;
 use crescent::{create_client_state, create_show_proof, verify_show, CachePaths, CrescentPairing, ShowProof};
 use crescent::VerifierParams;
 use crescent::utils::{read_from_b64url, read_from_file, write_to_b64url};
-use std::fs::{self};
 use crescent::ProverParams;
 
+use rocket::serde::{Serialize, Deserialize};
+use rocket::serde::json::Json;
+use rocket::tokio::net::TcpListener;
+use rocket::{get, post};
+use rocket::tokio::spawn;
+use rocket::State;
+use rocket::fs::FileServer;
+
+use uuid::Uuid;
+
+use tokio::sync::Mutex;
+
+use std::collections::HashMap;
+use std::fs::{self};
+use std::sync::Arc;
+use std::time::Duration; // TODO: delete after testing sockets
+
+// define the cred schema UID. This is an opaque string that identifies the setup parameters (TODO: share this value in a common config crate)
+const SCHEMA_UID : &str = "https://schemas.crescent.dev/jwt/012345";
 
 // For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
 // TODO: we could make web requests to get the data from the setup service, but this will take more effort.
@@ -26,12 +42,16 @@ const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
 
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone)]
-struct TokenInfo {
-    jwt: String,        // A JWT token
-    issuer_pem: String  // The issuer's public key, in PEM format
+struct CredInfo {
+    cred: String,        // The credential (a JWT)
+    schema_UID: String, // The schema UID for the crdential
+    issuer_URL: String  // The URL of the issuer
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+// holds the ShowData for ready credentials
+struct SharedState(Arc<Mutex<HashMap<String, Option<ShowData>>>>);
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct ShowData {
     client_state_b64: String,
     range_pk_b64: String,
@@ -65,68 +85,122 @@ struct VerifyResult {
     email_domain: String
 }
 
-// Create a ClientState that is ready for show proofs
-#[post("/prepare", format = "json", data = "<token_info>")]
-fn prepare(token_info: Json<TokenInfo>) -> Json<ShowData> {
 
-    let jwt = &token_info.jwt;
-    let issuer_pem = &token_info.issuer_pem;
-    println!("got issuer_pem = {}", issuer_pem);
+#[post("/prepare", format = "json", data = "<cred_info>")]
+async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> String {
+    println!("*** /prepare called");
+    println!("Schema UID: {}", cred_info.schema_UID);
+    println!("Issuer URL: {}", cred_info.issuer_URL);
+    println!("Credential: {}", cred_info.cred);
 
-    let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
-    println!("Loading prover params");
-    let prover_params = ProverParams::<CrescentPairing>::new(&paths).expect("Failed to create prover params");
-    println!("Parsing config");
-    let config = parse_config(prover_params.config_str).expect("Failed to parse config");
-    println!("Creating prover inputs");
-    let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
-         prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
-    let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
+    // create a unique identifier for the credential. For now, this is a UUID; we could use the hash
+    // of the credential to make sure we have a cred-dependent unique identifier (TODO).
+    let cred_uid = Uuid::new_v4().to_string();
+    println!("Generated credential UID: {}", cred_uid);
+
+    // Insert task with empty data (indicating "preparing")
+    {
+        let mut tasks = state.inner().0.lock().await;
+        tasks.insert(cred_uid.clone(), None);
+    }
+
+    let state = state.inner().0.clone();
+    let cred_uid_clone = cred_uid.clone();
+
+    rocket::tokio::spawn(async move {
+        // prepare the show data in a separate task
+
+        // TODO: catch errors, and set the task to an error state (to inform clients to stop waiting)
+        let jwt = &cred_info.cred;
+        let schema_UID = &cred_info.schema_UID;
+        println!("got schema_UID = {}", schema_UID);
+        let issuer_URL = &cred_info.issuer_URL;
+        println!("got issuer_URL = {}", issuer_URL);
+
+        let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
+        println!("Loading issuer public key");
+        let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {}", paths.issuer_pem));
+
+        println!("Loading prover params");
+        let prover_params = ProverParams::<CrescentPairing>::new(&paths).expect("Failed to create prover params");
+        println!("Parsing config");
+        let config = parse_config(prover_params.config_str).expect("Failed to parse config");
+
+        println!("Creating prover inputs");
+        let (prover_inputs_json, _prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");
+        let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
+
+        println!("Creating client state... this is slow... ");
+        let client_state = create_client_state(&paths, &prover_inputs).expect("Failed to create client state");
+
+        let client_state_b64 = write_to_b64url(&client_state);
+        println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
+
+        let range_pk: RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).expect("Failed to read range proof pk");
+        println!("Serializing range proof pk");
+        let range_pk_b64 = write_to_b64url(&range_pk);
+        println!("Reading IO locations file");
+        let io_locations_str: String = fs::read_to_string(&paths.io_locations).unwrap();
+
+        let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str };
+        println!("Task complete, storing ShowData: {:?}", show_data);
+
+        // Store the ShowData into the shared state (indicating "ready")
+        let mut tasks = state.lock().await;
+        tasks.insert(cred_uid_clone, Some(show_data));
+    });
+
+    cred_uid // Return the `cred_uid` to the client
+}
+
+#[get("/status?<cred_uid>")]
+async fn status(cred_uid: String, state: &State<SharedState>) -> String {
+    println!("*** /status called with credential UID: {}", cred_uid);
+    let tasks = state.inner().0.lock().await;
+    match tasks.get(&cred_uid) {
+        Some(Some(_)) => "ready".to_string(), // If ShowData exists, return "ready"
+        Some(None) => "preparing".to_string(), // If still preparing, return "preparing"
+        None => "unknown".to_string(), // If no entry exists, return "unknown"
+    }
+}
+
+
+#[get("/getshowdata?<cred_uid>")]
+async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<Json<ShowData>, String> {
+    println!("*** /getshowdata called with credential UID: {}", cred_uid);
+    let tasks = state.inner().0.lock().await;
+
+    match tasks.get(&cred_uid) {
+        Some(Some(show_data)) => Ok(Json(show_data.clone())), // Return the ShowData if found
+        Some(None) => Err("ShowData is still being prepared.".to_string()), // Still preparing
+        None => Err("No ShowData found for the given cred_uid.".to_string()), // Invalid cred_uid
+    }
+}
+
+#[get("/show?<cred_uid>&<disc_uid>")]
+async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>) -> Result<String, String> {
+    println!("*** /show called with credential UID {} and disc_uid {}", cred_uid, disc_uid);
+    let tasks = state.inner().0.lock().await;
     
-    println!("Creating client state... this is slow... ");
-    let client_state = create_client_state(&paths, &prover_inputs).expect("Failed to create client state");
-    
-    let client_state_b64 = write_to_b64url(&client_state);
-    println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
+    match tasks.get(&cred_uid) {
+        Some(Some(show_data)) => {
+            // Deserialize the ClientState and range proof public key from ShowData
+            let mut client_state = read_from_b64url::<ClientState<CrescentPairing>>(&show_data.client_state_b64)
+                .map_err(|_| "Failed to parse client state".to_string())?;
+            let io_locations = IOLocations::new_from_str(&show_data.io_locations_str);
+            let range_pk = read_from_b64url::<RangeProofPK<'a, CrescentPairing>>(&show_data.range_pk_b64)
+                .map_err(|_| "Failed to parse range proof public key".to_string())?;
 
-    let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).expect("Failed to read range proof pk");
-    println!("Serializing range proof pk");
-    let range_pk_b64 = write_to_b64url(&range_pk);
-    println!("Reading IO locations file");
-    let io_locations_str: String = fs::read_to_string(&paths.io_locations).unwrap();
+            // Create the show proof
+            let show_proof = create_show_proof(&mut client_state, &range_pk, &io_locations);
+            let show_proof_b64 = write_to_b64url(&show_proof);
 
-    let sd = ShowData {client_state_b64, range_pk_b64, io_locations_str};
-    println!("Returning ShowData");
-
-    Json(sd)
-}
-
-// route to verify if a token UID is ready for presentation
-#[get("/state/<token_uid>")]
-fn state(token_uid: String) -> Json<String> {
-    let state = "ready".to_string();
-    Json(state)
-}
-
-// route to present a token UID and get a ZK proof
-// TODO: should that be a post? with what params?
-#[get("/present/<token_uid>")]
-fn present(token_uid: String) -> Json<String> {
-    let zk_proof = "zk_proof".to_string();
-    Json(zk_proof)
-}
-
-// Takes a ClientState (as b64) and returns a Show proof
-#[post("/show", format = "json", data = "<show_data>")]
-fn show<'a>(show_data: Json<ShowData>) -> String {
-
-    let mut client_state = read_from_b64url::<ClientState<CrescentPairing>>(&show_data.client_state_b64).unwrap();
-    let io_locations = IOLocations::new_from_str(&show_data.io_locations_str);
-    let range_pk = read_from_b64url::<RangeProofPK<'a, CrescentPairing>>(&show_data.range_pk_b64).unwrap();
-    let show_proof = create_show_proof(&mut client_state, &range_pk, &io_locations);
-    let show_proof_b64 = write_to_b64url(&show_proof);
-
-    show_proof_b64
+            // Return the show proof as a base64-url encoded string
+            Ok(show_proof_b64)
+        }
+        Some(None) => Err("ShowData is still being prepared.".to_string()), // Data is still being prepared
+        None => Err("No ShowData found for the given cred_uid.".to_string()), // No data for this cred_uid
+    }
 }
 
 // Takes a show proof and verifier params and verifies the show proof
@@ -140,10 +214,14 @@ fn verify(verify_data: Json<VerifyData>) -> Json<VerifyResult> {
     Json(VerifyResult{is_valid, email_domain})
 }
 
-
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![prepare, state, present, show, verify]) 
+    let shared_state = SharedState(Arc::new(Mutex::new(HashMap::new())));
+
+    rocket::build()
+    .manage(shared_state)
+    .mount("/", routes![prepare, status, get_show_data, show, verify])
+    .mount("/", FileServer::from("static")) // Serve static files
 }
 
 
@@ -159,12 +237,13 @@ mod test {
     #[test]
     fn test_prepare_show() {
         let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
-        let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
-        let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));        
-        let token_info = TokenInfo{jwt, issuer_pem};
+        let cred = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
+        let issuer_URL = "https://issuer.example.com".to_string();
+        let schema_UID = SCHEMA_UID.to_string();
+        let cred_info = CredInfo{cred, schema_UID, issuer_URL};
 
         let client = Client::untracked(rocket()).expect("valid rocket instance");
-        let response = client.post("/prepare").json(&token_info).dispatch();        
+        let response = client.post("/prepare").json(&cred_info).dispatch();        
         assert_eq!(response.status(), Status::Ok);
 
         let show_data = response.into_json::<ShowData>().unwrap();
@@ -180,21 +259,30 @@ mod test {
     #[test]
     fn test_show_verify() {
         let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);        
-        
+        println!("1");
         let show_data = ShowData::new(&paths);
         let client = Client::untracked(rocket()).expect("valid rocket instance");
+        println!("2");
         let response = client.post("/show").json(&show_data).dispatch();
+        println!("3");
         assert_eq!(response.status(), Status::Ok);
+        println!("4");
         let show_proof_b64 = response.into_string().unwrap();
-
+        println!("5");
         let vp = VerifierParams::<CrescentPairing>::new(&paths).unwrap();
+        println!("6");
         let verifier_params_b64 = write_to_b64url(&vp);
+        println!("7");
         let verify_data = VerifyData{show_proof_b64, verifier_params_b64};
+        println!("8");
         let client = Client::untracked(rocket()).expect("valid rocket instance");
+        println!("9");
         let response = client.post("/verify").json(&verify_data).dispatch();
+        println!("10");
         assert_eq!(response.status(), Status::Ok);
 
         let verify_result = response.into_json::<VerifyResult>().unwrap();
+        println!("11");
         assert!(verify_result.is_valid);
         println!("Proof is valid, got email domain: {}", verify_result.email_domain);
     }

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Helper Test Page</title>
+    <script>
+        // URL of the Client Helper service
+        const clientHelperUrl = 'http://127.0.0.1:8003'
+        
+        // Credential UID to be used in the page
+        let cred_uid = null;
+
+        // Example of a credential info to be sent to the prepare/ endpoint
+        const credInfo = {
+            cred: "eyJhbGciOiJSUzI1NiIsImtpZCI6ImNQalM4d0RBU2haVWpKdkJ6SGlJTUJSdXh6YkhzZUV6TUFqa3JhQlI0VFUiLCJ0eXAiOiJKV1QifQ.eyJhY2N0IjowLCJhdWQiOiIxMjM0NTY3OC0xMjM0LWFiY2QtMTIzNC1hYmNkZWYxMjQ1NjciLCJhdXRoX3RpbWUiOjE3MjU5MTc4OTksImVtYWlsIjoibWF0dGhld0BleGFtcGxlLmNvbSIsImV4cCI6MTc2MDU1MzEyNywiZmFtaWx5X25hbWUiOiJNYXR0aGV3IiwiZ2l2ZW5fbmFtZSI6Ik1hdHRoZXdzb24iLCJpYXQiOjE3MjkxMDM1MjcsImlwYWRkciI6IjIwMy4wLjExMy4wIiwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5taWNyb3NvZnRvbmxpbmUuY29tLzEyMzQ1Njc4LTEyMzQtYWJjZC0xMjM0LWFiY2RlZjEyNDU2Ny92Mi4wIiwianRpIjoiYlRzVkdpVkNZUXJUVHBPVFMyZGFYUSIsImxvZ2luX2hpbnQiOiJPLmFhYWFhYmJiYmJiYmJiY2NjY2NjY2RkZGRkZGRlZWVlZWVlZmZmZmZmZ2dnZ2dnZ2doaGhoaGhpaWlpaWlpampqampqamtra2tra2tsbGxsbGxsbW1tbW1tbm5ubm5ubm5ubm9vb29vb29wcHBwcHBwcXFxcXJycnJycnNzc3NzZGRkZCIsIm5hbWUiOiJNYXR0aGV3IE1hdHRoZXdzb24iLCJuYmYiOjE3MjkxMDM1MjcsIm9pZCI6IjEyMzQ1Njc4LTEyMzQtYWJjZC0xMjM0LWFiY2RlZjEyNDU2NyIsIm9ucHJlbV9zaWQiOiJTLTEtMi0zNC01Njc4OTAxMjM0LTEyMzQ1Njc4OTAtMTIzNDU2Nzg5MC0xMjM0NTY3IiwicHJlZmVycmVkX3VzZXJuYW1lIjoibWF0dGhld0BleGFtcGxlLmNvbSIsInJoIjoiMC5hYWFhYWJiYmJiY2NjY2RkZGRlZWVmZmZmMTIzNDVnZ2dnMTIzNDVfMTI0X2FhYWFhYWEuIiwic2lkIjoiMTIzNDU2NzgtMTIzNC1hYmNkLTEyMzQtYWJjZGVmMTI0NTY3Iiwic3ViIjoiYWFhYmJiYmNjY2NkZGRkZWVlZWZmZmZnZ2dnaGhoaDEyMzQ1Njc4OTAxMiIsInRlbmFudF9jdHJ5IjoiVVMiLCJ0ZW5hbnRfcmVnaW9uX3Njb3BlIjoiV1ciLCJ0aWQiOiIxMjM0NTY3OC0xMjM0LWFiY2QtMTIzNC1hYmNkZWYxMjQ1NjciLCJ1cG4iOiJtYXR0aGV3QGV4YW1wbGUuY29tIiwidXRpIjoiQUFBQkJCQmNjY2NkZGRkMTIzNDU2NyIsInZlciI6IjIuMCIsInZlcmlmaWVkX3ByaW1hcnlfZW1haWwiOlsibWF0dGhld0BleGFtcGxlLmNvbSJdLCJ2ZXJpZmllZF9zZWNvbmRhcnlfZW1haWwiOlsibWF0dGhld0BzZXJ2aWNlLmV4YW1wbGUuY29tIl0sInhtc19wZGwiOiJOQU0iLCJ4bXNfdHBsIjoiZW4ifQ.K82uazYr4nTiI-wWuUXBXGvaCZFM7yOZdgr5uYuVF9-v1MC4KGfzS7qSOwOVCL9XKfpoHlFS9S3NKk46tQTG3l7qr6IfGiEJjOk7U6voimTYviX6cBmiEJXHzfsTQxVFp9p7IdqsYLy0bXQLSvFKTH-vyTJuQsLmxB93Db-iezx3Muy2HX7eC6S2LvAdTL-KCCmXCzZ6MhZY8om2Z3yBHNH2A2m-Fnb1zQgfz7Z4XwV9zuQz_Ma3JdYLIuOyzH5Syf5fmP7VjFf9qf37JrDeUzW-GeZIz2eW6GmdnB3YidliQnyf0MgFM1GNFF8WzqWNgSOVi7ARXP4hId_LUsyuKw",
+            schema_UID: "https://schemas.crescent.dev/jwt/012345",
+            issuer_URL: "https://issuer.example.com"
+        };
+
+        // the disclosure UID (set by the Setup Service) associated with the credential
+        const disclosure_UID = "cresent://email_domain";
+
+        async function prepareTask() {
+            try {
+
+                // Send POST request to /prepare
+                const response = await fetch(`${clientHelperUrl}/prepare`, { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(credInfo)
+                });
+                cred_uid = await response.text();
+                console.log('Prepare task started. Cred UID:', cred_uid);
+                document.getElementById('status').innerText = 'Preparing...';
+                
+                // Poll the status route every 5 second
+                const intervalId = setInterval(async function() {
+                    const statusResponse = await fetch(`${clientHelperUrl}/status?cred_uid=${cred_uid}`);
+                    const status = await statusResponse.text();
+                    console.log('Task status:', status);
+                    document.getElementById('status').innerText = `Task Status: ${status}`;
+                    
+                    if (status === 'ready' || status === 'error') {
+                        clearInterval(intervalId); // Stop polling once the task is done
+                        document.getElementById('getShowDataButton').disabled = false;
+                        document.getElementById('showCredentialButton').disabled = false;
+                    }
+                }, 5000);
+            } catch (error) {
+                console.error('Error starting prepare task:', error);
+            }
+        }
+    
+        async function getShowData() {
+            try {
+                const showDataResponse = await fetch(`${clientHelperUrl}/getshowdata?cred_uid=${cred_uid}`);
+                if (!showDataResponse.ok) {
+                    throw new Error('Failed to fetch ShowData');
+                }
+                const showData = await showDataResponse.json();
+                console.log('ShowData:', showData);
+                
+                // Display the ShowData in the textarea
+                document.getElementById('showDataTextarea').value = JSON.stringify(showData, null, 2);
+            } catch (error) {
+                console.error('Error fetching ShowData:', error);
+                document.getElementById('status').innerText = 'Error fetching ShowData: ' + error.message;
+            }
+        }
+
+        async function showCredential() {
+            try {
+                if (!cred_uid) {
+                    throw new Error("cred_uid is not available. Please start the task first.");
+                }
+
+                const showResponse = await fetch(`${clientHelperUrl}/show?cred_uid=${cred_uid}&disc_uid=${disclosure_UID}`);
+                if (!showResponse.ok) { 
+                    throw new Error('Failed to fetch Show Proof'); 
+                }
+                const show_proof_b64 = await showResponse.text(); console.log('Show Proof:', show_proof_b64);
+                // Display the Show Proof in the textarea
+                document.getElementById('showProofTextarea').value = show_proof_b64;
+            } catch (error) {
+                console.error('Error fetching Show Proof:', error);
+                document.getElementById('status').innerText = 'Error fetching Show Proof: ' + error.message;
+            }
+        }
+    </script>    
+</head>
+<body>
+    <h1>Client Helper Test Page</h1>
+    <p>This is a test page for the Client Helper service.</p>
+    <div>
+        <h2>Prepare Credential</h2>
+        <p id="status">Click the button to start preparing a credential for showing given a JWT (hardcoded in the page).</p>
+        <button onclick="prepareTask()">Start Task</button>
+    </div>
+    <hr>
+    <div>
+        <h2>ShowData (OPTIONAL)</h2>
+        <p>Click the "Get Show Data" to retrieve the data required to show a credential. Note: this step is not required for now;
+            the browser extension should directly "Show" the credential when ready (next button), but in the future, the Show Data could be
+            retrieved and stored by the extension who would then Show the credential locally. This button tests this future option.</p>
+        <button id="getShowDataButton" onclick="getShowData()" disabled>Get Show Data</button> <!-- Button disabled initially -->
+        <br>
+        <textarea id="showDataTextarea" rows="10" cols="80" readonly></textarea> <!-- Textarea to display ShowData -->
+    </div>
+    <hr>
+    <div>
+        <h2>Show Proof:</h2>
+        <p>Click "Show Credential" to fetch the proof for the credential.</p>
+        <button id="showCredentialButton" onclick="showCredential()" disabled>Show Credential</button> <!-- Button disabled initially -->
+        <br>
+        <textarea id="showProofTextarea" rows="10" cols="80" readonly></textarea> <!-- Textarea to display Show Proof -->
+    </div>
+
+
+
+</body>
+</html>
