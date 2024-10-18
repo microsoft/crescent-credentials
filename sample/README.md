@@ -40,7 +40,7 @@ the Verifier downloads the validation parameters from the Setup Service (the fir
 
 # Sample details
 
-## JWT issuance
+## Credential issuance
 
 ```mermaid
 sequenceDiagram
@@ -55,17 +55,17 @@ sequenceDiagram
     I->>I: create, sign and return JWT
     I->>E: read JWT from <meta> tag
     E->>C: post {JWT, schema_UID, issuer_URL} to /prepare
-    C->>E: return token_UID
-    par Client Helper prepares the token for showing
+    C->>E: return cred_UID
+    par Client Helper prepares the cred for showing
         C->>S: fetch Crescent prove params from /prove_params/<schema_UID>
         C->>S: fetch Crescent show params from /show_params/<schema_UID>
         C->>I: fetch JWK set from <issuer_URL>/.well-known/jwks.json
         C->>C: prepare JWT for proof
-    and Browser Extension pings Client Helper until token is ready
+    and Browser Extension pings Client Helper until credential is ready
         loop Every 5 sec
-            E->>C: fetch token state from /state/<token_UID>
+            E->>C: fetch credential status from /status?cred_uid=<cred_UID>
             C->>E: return state
-            E->>E: mark JWT as presentatble when state = "ready"
+            E->>E: mark JWT as presentable when state = "ready"
         end
     end
 ```
@@ -81,18 +81,16 @@ sequenceDiagram
     participant V as Verifier
     participant I as Issuer
     B->>V: visit login page
-    V->>E: read {DisclosureUID,VerifyURL} from <meta> tag
-    E->>E: filter JWT that support DisclosureUID
+    V->>E: read {disclosure_UID, verify_URL} from <meta> tag
+    E->>E: filter JWT that support disclosure_UID
     B->>E: user selects a JWT to present
-    E->>E: generate Crescent proof
-    E->>V: send {proof, schema_UID, issuer_UID} to VerifyURL
+    E->>C: fetch show proof from /show?cred_uid=<cred_UID>&disc_uid=<disclosure_UID>
+    C->>C: generate Crescent proof
+    C->>E: return proof
+    E->>V: post {proof, schema_UID, issuer_UID} to verify_URL
     V->>S: fetch Crescent verify params from /verify_params/<schema_UID>
     V->>I: fetch JWK set from <issuer_URL>/.well-known/jwks.json
     V->>V: verify proof
     V-->>B: redirect to resource page (on success)
 ```
 
-
-TODO:
-* document how multiple JWT schemas could be distinguished in practice.
-* add swimlane diagram of calls
