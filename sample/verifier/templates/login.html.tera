@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta crescent="CRESCENT_DISCLOSURE_URI">
+    <meta crescent_verify_url="{{ crescent_verify_url  | safe }}">
+    <meta crescent_disclosure_uid="{{ crescent_disclosure_uid  | safe }}">
     <title>Login</title>
 </head>
 <body>
