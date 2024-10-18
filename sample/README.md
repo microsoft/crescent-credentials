@@ -28,7 +28,7 @@ The *Setup Service* sets up the Crescent parameters. These can be shared by all 
 The Setup Service calls the `zksetup` library function using an existing JWT or by creating one using dummy claim and signature values (as is the case
 in our sample). The resulting parameters are made available at a public endpoint.
 
-Alice visits the Issuer welcome page using a browser with the *Client* and *Client Helper* installed. She logs in using her username and password,
+Alice visits the Issuer welcome page using a browser with the *Browser Extension* and *Client Helper* installed. She logs in using her username and password,
 and clicks "Issue token" to get issued a JWT. The browser extension reads the JWT from the HTML page and sends it to the Client Helper which 1) retrieves the
 corresponding Crescent parameters from the Setup Service, and 2) runs the `prove` library function preparing the JWT for later showing. The proving parameters
 are stored in the Client Helper and associated with the JWT.
@@ -39,6 +39,9 @@ the Verifier downloads the validation parameters from the Setup Service (the fir
 (the first time it sees a token proof for this Issuer) and calls the `verify` library function. Upon successful proof validation, Alice is granted access. 
 
 # Sample details
+
+The sample defines the following *disclosure UIDs* expressing proof capabilities. (TODO: the client helper should return these values to the browser extension when /prepare is called)
+*  `crescent://email_domain`: reveal the domain of an email claim
 
 ## Credential issuance
 
