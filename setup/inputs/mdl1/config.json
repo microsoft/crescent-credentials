@@ -1,0 +1,5 @@
+{
+    "credtype": "mdl",
+    "alg": "ES256",
+    "max_jwt_len": 1152
+}

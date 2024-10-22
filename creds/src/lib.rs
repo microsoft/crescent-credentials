@@ -105,7 +105,8 @@ pub struct CachePaths {
    pub groth16_params: String,
    pub prover_params: String,   
    pub client_state: String, 
-   pub show_proof: String, 
+   pub show_proof: String,
+   pub mdl_prover_inputs: String
 }
 
 impl CachePaths {
@@ -147,6 +148,7 @@ impl CachePaths {
             prover_params: format!("{}prover_params.bin", &cache_path),
             client_state: format!("{}client_state.bin", &cache_path),
             show_proof: format!("{}show_proof.bin", &cache_path),
+            mdl_prover_inputs: format!("{}prover_inputs.json", &base_path_str),
         }             
     }
 }
@@ -244,16 +246,26 @@ pub fn run_prover(
     base_path: PathBuf,
 ) {
     let paths = CachePaths::new(base_path);
-
-    let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
-    let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));
     let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
     let config = parse_config(config_str).expect("Failed to parse config");
-    let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
-         prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
-    let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
-    
-    let client_state = create_client_state(&paths, &prover_inputs).unwrap();
+
+    let prover_inputs = 
+    if config.contains_key("credtype") && config.get("credtype").unwrap() == "mdl" {
+        GenericInputsJSON::new(&paths.mdl_prover_inputs)
+    }
+    else {
+        let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
+        let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
+        let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
+            prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
+        GenericInputsJSON{prover_inputs: prover_inputs_json}
+    };
+        
+    let mut client_state = create_client_state(&paths, &prover_inputs).unwrap();
+
+    if config.contains_key("credtype)") && config.get("credtype").unwrap() == "mdl" {
+        client_state.credtype = "mdl".to_string();
+    }
 
     write_to_file(&client_state, &paths.client_state);
 
@@ -291,10 +303,48 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
     println!("Proving time: {:?}", proof_timer.elapsed());
 
-    // Asssemble proof
+    // Assemble proof
     let show_proof = ShowProof{ show_groth16, show_range, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
 
     show_proof
+}
+
+pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
+{
+    todo!();
+    // let proof_timer = std::time::Instant::now();
+
+    // // Create Groth16 rerandomized proof for showing
+    // let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
+    // let email_value_pos = io_locations.get_io_location("email_value").unwrap();
+    // // The IOs are exp, email_domain and the 17 limbs of the RSA modulus. We make them revealed
+    // // TODO: don't add the modulus to revealed inputs, the verifier should know it. Maybe just a key identifier    
+    // // TODO: seems error-prone to do this by hand; make a function to reveal 
+    // // by name e.g, set_revealed("modulus")
+    // let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
+    // io_types[exp_value_pos - 1] = PublicIOType::Committed;
+    // io_types[email_value_pos -1] = PublicIOType::Revealed;
+    // let mut revealed_inputs = client_state.inputs.clone();
+    // revealed_inputs.remove(exp_value_pos - 1);  
+    // let show_groth16 = client_state.show_groth16(&io_types);
+    
+    // // Create fresh range proof 
+    // let time_sec = SystemTime::now()
+    // .duration_since(UNIX_EPOCH)
+    // .unwrap()
+    // .as_secs();
+    // let cur_time = Fr::from( time_sec );
+
+    // let mut com_exp_value = client_state.committed_input_openings[0].clone();
+    // com_exp_value.m -= cur_time;
+    // com_exp_value.c -= com_exp_value.bases[0] * cur_time;
+    // let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
+    // println!("Proving time: {:?}", proof_timer.elapsed());
+
+    // // Assemble proof
+    // let show_proof = ShowProof{ show_groth16, show_range, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
+
+    // show_proof
 
 }
 
@@ -306,7 +356,12 @@ pub fn run_show(
     let mut client_state: ClientState<ECPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk).unwrap();
     
-    let show_proof = create_show_proof(&mut client_state, &range_pk, &io_locations);
+    let show_proof = if client_state.credtype == "mdl" {
+        create_show_proof_mdl(&mut client_state, &range_pk, &io_locations)  
+    } else {
+        create_show_proof(&mut client_state, &range_pk, &io_locations)
+    };
+
     write_to_file(&show_proof, &paths.show_proof);
 }
 
