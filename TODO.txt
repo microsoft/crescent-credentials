@@ -1,3 +1,6 @@
 Pre-release TO-DOs
 * Add Microsoft copyright to each source file
 * Delete this file
+
+Future work TO-DOs
+* Make proof validity time configurable. This will allow the creation of long-lived test proofs to speed up unit testing.
