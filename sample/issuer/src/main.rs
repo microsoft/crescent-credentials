@@ -8,12 +8,13 @@
 
 #[macro_use] extern crate rocket;
 
-use rocket::fs::NamedFile;
+use rocket::fs::{FileServer, NamedFile};
 use rocket::http::{Cookie, CookieJar};
 use rocket::response::Redirect;
 use rocket::serde::{Serialize};
 use rocket::response::content::RawHtml;
 use rocket::State;
+use rocket::fairing::AdHoc;
 use rocket_dyn_templates::{context, Template};
 use std::path::PathBuf;
 use chrono::{Duration, Utc};
@@ -89,10 +90,41 @@ struct LoginForm {
     password: String,
 }
 
+// A function to retrieve the issuer name from the Rocket.toml
+fn configure_issuer_name() -> AdHoc {
+    AdHoc::on_ignite("Configure Issuer Name", |rocket| async {
+        let figment = rocket.figment();
+        let issuer_name: String = figment.extract_inner("issuer_name").unwrap_or_else(|_| "Example Issuer".to_string());
+        println!("Configured Issuer Name: {}", issuer_name);
+
+        // Attach the issuer_name to manage it in the state if needed
+        rocket.manage(issuer_name)
+    })
+}
+
+// A function to retrieve the issuer domain from the Rocket.toml
+fn configure_issuer_domain() -> AdHoc {
+    AdHoc::on_ignite("Configure Issuer Domain", |rocket| async {
+        let figment = rocket.figment();
+        let issuer_domain: String = figment.extract_inner("issuer_domain").unwrap_or_else(|_| "example.com".to_string());
+        println!("Configured Issuer Domain: {}", issuer_domain);
+
+        // Attach the issuer_domain to manage it in the state if needed
+        rocket.manage(issuer_domain)
+    })
+}
+
+// redirect from `/` to `/login`
+#[get("/")]
+fn index_redirect() -> Redirect {
+    Redirect::to("/login")
+}
+
 // route to serve the login page
 #[get("/login")]
-fn login_page() -> Template {
-    Template::render("login", context! {})
+fn login_page(issuer_name: &State<String>) -> Template {
+    let issuer_name_str = issuer_name.as_str();
+    Template::render("login", context! { issuername: issuer_name_str })
 }
 
 // route to handle login form submission
@@ -125,13 +157,15 @@ fn login(
 
 // route to serve the welcome page after successful login
 #[get("/welcome")]
-fn welcome_page(jar: &CookieJar<'_>) -> Result<Template, Redirect> {
+fn welcome_page(jar: &CookieJar<'_>, issuer_name: &State<String>) -> Result<Template, Redirect> {
+    let issuer_name_str = issuer_name.as_str();
     if let Some(cookie) = jar.get("username") {
         let username = cookie.value().to_string();
         Ok(Template::render(
             "welcome",
             context! {
-                username: &username
+                username: &username,
+                issuername: issuer_name_str
             },
         ))
     } else {
@@ -146,9 +180,11 @@ fn issue_token(
     jar: &CookieJar<'_>,
     private_key: &State<PrivateKey>,
     users: &State<Vec<User>>,
+    issuer_name: &State<String>
 ) -> Result<RawHtml<String>, &'static str> {
     if let Some(cookie) = jar.get("username") {
         let username = cookie.value().to_string();
+        let issuer_name_str = issuer_name.as_str();
 
         // find the user based on the username
         if let Some(user) = users.iter().find(|user| user.username == username) {
@@ -162,7 +198,7 @@ fn issue_token(
                 exp: (current_time + Duration::days(30)).timestamp() as usize,
                 iat: current_time.timestamp() as usize,
                 ipaddr: "203.0.113.0".to_string(),
-                iss: "https://localhost:8000".to_string(),
+                iss: "https://localhost:8000".to_string(), // TODO: read from Rocket.toml
                 jti: "fGYCO1mK2dBWTAfCjGAoTQ".to_string(),
                 nbf: current_time.timestamp() as usize,
                 tenant_ctry: "US".to_string(),
@@ -183,16 +219,24 @@ fn issue_token(
                 r#"
                 <html>
                 <head>
+                    <link rel="stylesheet" href="css/style.css">
                     <meta name="CRESCENT_JWT" content="{}">
                 </head>
                 <body>
-                    <h1>Here is your JWT</h1>
-                    <textarea id="jwt" rows="10" cols="100">{}</textarea>
-                    <p>Copy and use this JWT, or let your browser extension access it.</p>
+                    <header class="header">
+                        <h1>{}</h1>
+                    </header>
+                    <div class="welcome-container">
+                        <h1>Here is your JWT, {}</h1>
+                        <textarea id="jwt" rows="10" cols="100">{}</textarea>
+                        <p>Copy and use this JWT, or let your browser extension access it.</p>
+                    </div>
                 </body>
                 </html>
                 "#,
                 token,
+                issuer_name_str,
+                username,
                 token
             );
 
@@ -234,6 +278,7 @@ fn rocket() -> _ {
     };
 
     // create a list of users with their personal claims
+    // TODO: read user domains from Rocket.toml (using configure_issuer_domain)
     let users = vec![
         // Alice demo user
         User {
@@ -259,8 +304,8 @@ fn rocket() -> _ {
         },
         // Bob demo user
         User {
-            username: "user2".to_string(),
-            password: "password2".to_string(),
+            username: "bob".to_string(),
+            password: "password".to_string(),
             user_claims: UserClaims {
                 email: "bob@example.com".to_string(),
                 family_name: "Example".to_string(),
@@ -280,12 +325,15 @@ fn rocket() -> _ {
             },
         },
     ];
-
+ 
     // launch the Rocket server and manage the private key and user state
     rocket::build()
+        .attach(configure_issuer_name())
+        .mount("/", FileServer::from("static")) // Serve static files
         .mount(
             "/",
             routes![
+                index_redirect,
                 login_page,
                 login,
                 welcome_page,

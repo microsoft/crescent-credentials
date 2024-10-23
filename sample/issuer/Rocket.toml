@@ -1,2 +1,4 @@
 [default]
+issuer_name = "Contoso"
+issuer_domain = "contoso.com"
 port = 8001
