@@ -9,3 +9,8 @@ rocket = { version = "0.5.1", features = ["json", "tls"] }
 rocket_dyn_templates = { version = "0.1.0", features = ["tera"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+crescent = {path="../../creds"}
+
+[profile.dev.package."*"]
+opt-level = 3               # optimize dependencies, even in dev builds
+debug-assertions = false    # We need this to work around a bug in Wasmer

@@ -11,8 +11,12 @@ use rocket::response::status::Custom;
 use rocket::http::Status;
 use std::collections::HashMap;
 
+use crescent::{utils::read_from_b64url, CachePaths, CrescentPairing, ShowProof, VerifierParams, verify_show};
+
+const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
+
 // struct for the JWT info
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct ProofInfo {
     proof: String,
     schema_UID: String,
@@ -58,7 +62,10 @@ fn verify(proof_info: Json<ProofInfo>) -> Result<Custom<Redirect>, Template> {
     println!("Issuer URL: {}", proof_info.issuer_URL);
     println!("Proof: {}", proof_info.proof);
 
-    let is_valid = true;  // Mock condition for validity: TODO: validate proof!
+    let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
+    let vp = VerifierParams::<CrescentPairing>::new(&paths).unwrap();
+    let show_proof = read_from_b64url::<ShowProof<CrescentPairing>>(&proof_info.proof).unwrap();
+    let (is_valid, email_domain) = verify_show(&vp, &show_proof);
 
     if is_valid {
         // redirect to the resource page (with status code 303 to ensure a GET request is made)
@@ -78,4 +85,56 @@ fn rocket() -> _ {
     rocket::build().mount("/", routes![login_page, verify, resource_page])
     .attach(Template::fairing())
 
+}
+
+#[cfg(test)]
+mod test {
+    use std::fs;
+
+    use super::*;
+    use crate::test::rocket::local::blocking::Client;
+    use crescent::{create_client_state, create_show_proof, verify_show, ProverParams};
+    use crescent::groth16rand::ClientState;
+    use crescent::prep_inputs::{parse_config, prepare_prover_inputs};
+    use crescent::rangeproof::RangeProofPK;
+    use crescent::structs::{GenericInputsJSON, IOLocations};
+    use crescent::utils::{read_from_file, write_to_b64url};
+
+    use rocket::http::Status;
+
+    #[test]
+    fn test_verify() {
+        // Step 1: generate the proof
+        let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
+        let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
+        let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {}", paths.issuer_pem));
+        let prover_params = ProverParams::<CrescentPairing>::new(&paths).expect("Failed to create prover params");
+        let config = parse_config(prover_params.config_str).expect("Failed to parse config");
+        let (prover_inputs_json, _prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");
+        let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
+        let mut client_state = create_client_state(&paths, &prover_inputs).expect("Failed to create client state");
+        let range_pk: RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).expect("Failed to read range proof pk");
+        let io_locations_str: String = fs::read_to_string(&paths.io_locations).unwrap();
+        let io_locations = IOLocations::new_from_str(&io_locations_str);
+
+        // Create the show proof
+        let show_proof = create_show_proof(&mut client_state, &range_pk, &io_locations);
+        let show_proof_b64 = write_to_b64url(&show_proof);
+        println!("Show proof: {}", show_proof_b64);
+
+        // Step 2: call /verify with the proof
+        let issuer_URL = "https://issuer.example.com".to_string();
+        let schema_UID = "https://schemas.crescent.dev/jwt/012345".to_string();
+        let proof_info = ProofInfo {
+            proof: show_proof_b64,
+            schema_UID: schema_UID,
+            issuer_URL: issuer_URL
+        };
+        let client = Client::untracked(rocket()).expect("valid rocket instance");
+        println!("Calling /verify with proof: {:?}", proof_info);
+        let response = client.post("/verify").json(&proof_info).dispatch();    
+            
+        // check that we get a 303 redirect to the resource page
+        assert_eq!(response.status(), Status::SeeOther, "Expected a 303 redirect");
+    }    
 }
