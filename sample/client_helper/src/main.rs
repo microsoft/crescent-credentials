@@ -200,6 +200,16 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
     }
 }
 
+#[get("/delete?<cred_uid>")]
+async fn delete(cred_uid: String, state: &State<SharedState>) -> String {
+    println!("*** /delete called with credential UID: {}", cred_uid);
+    // TODO: implement this properly. Need to delete the underlying data files as well (when implemented).
+    //       and perhaps return a different message depending if cred_UID exists or not.
+    let mut tasks = state.inner().0.lock().await;
+    tasks.remove(&cred_uid);
+    "Deleted".to_string()
+}
+
 #[launch]
 fn rocket() -> _ {
     let shared_state = SharedState(Arc::new(Mutex::new(HashMap::new())));
