@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta crescent_verify_url="{{ crescent_verify_url  | safe }}">
     <meta crescent_disclosure_uid="{{ crescent_disclosure_uid  | safe }}">
-    <title>Login</title>
+    <title>Login - {{ verifier_name }}</title>
 </head>
 <body>
-    <h1>Login</h1>
+    <h1>{{ verifier_name }} Login</h1>
     {% if error %}
         <p style="color: red;">{{ error }}</p>
     {% endif %}
-    <p>Present a ZK proof to get access</p>
+    <p>Present an employment credential disclosing the email domain. Nothing else will be learned by our service or its issuer.</p>
 </body>
 </html>

@@ -8,12 +8,21 @@ use rocket::serde::json::Json;
 use rocket_dyn_templates::{context, Template};
 use rocket::response::{Redirect};
 use rocket::response::status::Custom;
+use rocket::State;
 use rocket::http::Status;
 use std::collections::HashMap;
 
 use crescent::{utils::read_from_b64url, CachePaths, CrescentPairing, ShowProof, VerifierParams, verify_show};
 
 const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
+
+// verifer config from Rocket.toml
+struct VerifierConfig {
+    crescent_verify_url: String,
+    crescent_disclosure_uid: String,
+    verifier_name: String,
+    verifier_domain: String,
+}
 
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -24,22 +33,36 @@ struct ProofInfo {
 }
 
 // helper function to provide the base context for the login page
-fn base_login_context() -> HashMap<&'static str, &'static str> {
+fn base_login_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, String> {
+    let verifier_name_str = verifier_config.verifier_name.clone();
+    let crescent_verify_url_str = verifier_config.crescent_verify_url.clone();
+    let crescent_disclosure_uid_str = verifier_config.crescent_disclosure_uid.clone();
+
     let mut context = HashMap::new();
-    context.insert("crescent_verify_url", "http://127.0.0.1:8004/verify");
-    context.insert("crescent_disclosure_uid", "crescent://email_domain");
+    context.insert("verifier_name".to_string(), verifier_name_str);
+    context.insert("crescent_verify_url".to_string(), crescent_verify_url_str);
+    context.insert("crescent_disclosure_uid".to_string(), crescent_disclosure_uid_str);
+    
     context
+}
+
+// redirect from `/` to `/login`
+#[get("/")]
+fn index_redirect() -> Redirect {
+    Redirect::to("/login")
 }
 
 // route to serve the login page
 #[get("/login")]
-fn login_page() -> Template {
+fn login_page(verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving login page");
+    let verifier_name_str = verifier_config.verifier_name.as_str();
+
     // Generate the verify URL dynamically using the `uri!` macro
     let verify_url = uri!(verify);
 
     // set the template meta values
-    let context = base_login_context();
+    let context = base_login_context(verifier_config);
     
     // render the login page
     Template::render("login", context)
@@ -47,16 +70,21 @@ fn login_page() -> Template {
 
 // route to serve the protected resource page after successful verification
 #[get("/resource")]
-fn resource_page() -> Template {
+fn resource_page(verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving resource page");
-    
+    let verifier_name_str = verifier_config.verifier_name.as_str();
+
     // render the resource page
-    Template::render("resource", context! {})
+    Template::render("resource",
+        context! {
+            verifier_name: verifier_name_str,
+        }
+    )
 }
 
 // route to verify a ZK proof given a ProofInfo, return a status  
 #[post("/verify", format = "json", data = "<proof_info>")]
-fn verify(proof_info: Json<ProofInfo>) -> Result<Custom<Redirect>, Template> {
+fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierConfig>) -> Result<Custom<Redirect>, Template> {
     println!("*** /verify called");
     println!("Schema UID: {}", proof_info.schema_UID);
     println!("Issuer URL: {}", proof_info.issuer_URL);
@@ -74,17 +102,32 @@ fn verify(proof_info: Json<ProofInfo>) -> Result<Custom<Redirect>, Template> {
     } else {
         // return an error template if the proof is invalid
         println!("*** Proof is invalid. Returning error template");
-        let mut context = base_login_context();
-        context.insert("error", "Invalid proof provided. Access denied.");
+        let mut context = base_login_context(verifier_config);
+        context.insert("error".to_string(), "Invalid proof provided. Access denied.".to_string());
         Err(Template::render("login", context))
     }
 }
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![login_page, verify, resource_page])
-    .attach(Template::fairing())
+    // Load verifier configuration
+    let figment = rocket::Config::figment();
+    let verifier_name: String = figment.extract_inner("verifier_name").unwrap_or_else(|_| "Example Verifier".to_string());
+    let verifier_domain: String = figment.extract_inner("verifier_domain").unwrap_or_else(|_| "example.com".to_string());
+    let crescent_verify_url: String = figment.extract_inner("crescent_verify_url").unwrap_or_else(|_| "example.com/verify".to_string());
+    let crescent_disclosure_uid: String = figment.extract_inner("crescent_disclosure_uid").unwrap_or_else(|_| "crescent://email_domain".to_string());
 
+    let verifier_config = VerifierConfig {
+        verifier_name,
+        verifier_domain,
+        crescent_verify_url,
+        crescent_disclosure_uid
+    };
+    
+    rocket::build()
+        .manage(verifier_config)
+        .mount("/", routes![index_redirect, login_page, verify, resource_page])
+    .attach(Template::fairing())
 }
 
 #[cfg(test)]
