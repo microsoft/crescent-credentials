@@ -45,6 +45,7 @@
                     
                     if (status === 'ready' || status === 'error') {
                         clearInterval(intervalId); // Stop polling once the task is done
+                        document.getElementById('deleteButton').disabled = false;
                         document.getElementById('getShowDataButton').disabled = false;
                         document.getElementById('showCredentialButton').disabled = false;
                     }
@@ -54,6 +55,22 @@
             }
         }
     
+        async function deleteCredential() {
+            try {
+                if (!cred_uid) {
+                    throw new Error("cred_uid is not available. Please start the task first.");
+                }
+
+                const deleteResponse = await fetch(`${clientHelperUrl}/delete?cred_uid=${cred_uid}`);
+                if (!deleteResponse.ok) { 
+                    throw new Error('Failed to delete credential'); 
+                }
+            } catch (error) {
+                console.error('Error deleting the credential:', error);
+                document.getElementById('status').innerText = 'Error deleting the credential: ' + error.message;
+            }
+        }
+
         async function getShowData() {
             try {
                 const showDataResponse = await fetch(`${clientHelperUrl}/getshowdata?cred_uid=${cred_uid}`);
@@ -98,6 +115,12 @@
         <h2>Prepare Credential</h2>
         <p id="status">Click the button to start preparing a credential for showing given a JWT (hardcoded in the page).</p>
         <button onclick="prepareTask()">Start Task</button>
+    </div>
+    <hr>
+    <div>
+        <h2>Delete Credential (OPTIONAL)</h2>
+        <p>Click the button to delete the credential.</p>
+        <button id="deleteButton" onclick="deleteCredential()" disabled>Delete credential</button>
     </div>
     <hr>
     <div>
