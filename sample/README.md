@@ -45,6 +45,8 @@ The sample defines the following *disclosure UIDs* expressing proof capabilities
 
 ## Credential issuance
 
+The following diagram illustrates the credential issuance sequence.
+
 ```mermaid
 sequenceDiagram
     participant I as Issuer
@@ -73,7 +75,23 @@ sequenceDiagram
     end
 ```
 
+## Credential deletion
+
+The following diagram illustrates the the credential deletion sequence.
+
+```mermaid
+sequenceDiagram
+    participant E as Browser Extension
+    participant C as Client Helper
+    E->>E: user selects a credential to delete (identified by <cred_UID>)
+    E->>C: fetch /delete/?cred_uid=<cred_UID>
+```
+
+
 ## Proof presentation
+
+The following diagram illustrates the proof presentation sequence.
+
 
 ```mermaid
 sequenceDiagram
