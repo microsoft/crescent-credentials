@@ -16,7 +16,7 @@ To start the server, run `cargo run`. By default, the server will listen on `htt
 
 ## Testing the server
 
-To test the server, run
+To test the server, run (TODO: fix this; doesn't work anymore)
 
 ```
 wget --method=POST --body-data='{"schema_UID":"some_uid", "issuer_URL":"http://issuer.url", "proof":"valid_proof"}' \
