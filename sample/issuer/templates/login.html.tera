@@ -2,21 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - {{ issuer_name }}</title>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <h1>Login</h1>
-    {% if error %}
-        <p style="color: red;">{{ error }}</p>
-    {% endif %}
-    <form action="/login" method="post">
-        <label for="username">Username:</label>
-        <input type="text" name="username" id="username" required />
-        <br />
-        <label for="password">Password:</label>
-        <input type="password" name="password" id="password" required />
-        <br />
-        <button type="submit">Login</button>
-    </form>
+    <div class="login-container">
+        <h1>{{ issuer_name }} Login</h1>
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <button type="submit">Login</button>
+            </div>
+        </form>
+    </div>
 </body>
 </html>
