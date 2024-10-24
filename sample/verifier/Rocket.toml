@@ -1,5 +1,4 @@
 [default]
-crescent_verify_url = "http://127.0.0.1:8004/verify"
 crescent_disclosure_uid = "crescent://email_domain"
 verifier_name = "Fabrikam"
 verifier_domain = "fabrikam.com"

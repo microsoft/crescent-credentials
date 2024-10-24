@@ -9,6 +9,7 @@ use rocket_dyn_templates::{context, Template};
 use rocket::response::{Redirect};
 use rocket::response::status::Custom;
 use rocket::State;
+use rocket::fs::FileServer;
 use rocket::http::Status;
 use std::collections::HashMap;
 
@@ -35,8 +36,8 @@ struct ProofInfo {
 // helper function to provide the base context for the login page
 fn base_login_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, String> {
     let verifier_name_str = verifier_config.verifier_name.clone();
-    let crescent_verify_url_str = verifier_config.crescent_verify_url.clone();
     let crescent_disclosure_uid_str = verifier_config.crescent_disclosure_uid.clone();
+    let crescent_verify_url_str = uri!(verify).to_string();
 
     let mut context = HashMap::new();
     context.insert("verifier_name".to_string(), verifier_name_str);
@@ -56,10 +57,6 @@ fn index_redirect() -> Redirect {
 #[get("/login")]
 fn login_page(verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving login page");
-    let verifier_name_str = verifier_config.verifier_name.as_str();
-
-    // Generate the verify URL dynamically using the `uri!` macro
-    let verify_url = uri!(verify);
 
     // set the template meta values
     let context = base_login_context(verifier_config);
@@ -78,6 +75,7 @@ fn resource_page(verifier_config: &State<VerifierConfig>) -> Template {
     Template::render("resource",
         context! {
             verifier_name: verifier_name_str,
+            email_domain: "example.com" // TODO: get it from /verify (passing it as a query params is insecure, even for a demo, so perhaps we can use a cookie or session)
         }
     )
 }
@@ -126,6 +124,7 @@ fn rocket() -> _ {
     
     rocket::build()
         .manage(verifier_config)
+        .mount("/", FileServer::from("static"))
         .mount("/", routes![index_redirect, login_page, verify, resource_page])
     .attach(Template::fairing())
 }
