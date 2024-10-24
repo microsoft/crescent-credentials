@@ -13,9 +13,11 @@ from hashlib import sha256
 from cryptography.hazmat.primitives import serialization
 from pprint import pprint
 import binascii
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 
 from crescent_helper import *
+
+ISSUER_TIMEZONE = timezone(-timedelta(hours=7))
 
 ##### Helper functions #########
 def usage():
@@ -152,7 +154,8 @@ def ymd_to_timestamp(ymd, is_bytes=False, has_time=False):
         format_string = "%Y-%m-%dT%H:%M:%SZ"
     dt = datetime.strptime(ymd, format_string)
     # Our circuit ignores time of day so we set them to zero
-    dt = dt.replace(hour=0, minute=0, second=0, tzinfo=None)
+    dt = dt.replace(hour=0, minute=0, second=0)
+    dt = dt.astimezone(ISSUER_TIMEZONE)
     return(int(dt.timestamp()))
 
 def ymd_to_daystamp(ymd, is_bytes=False, has_time=False):
