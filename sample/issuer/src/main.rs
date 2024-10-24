@@ -105,7 +105,7 @@ fn index_redirect() -> Redirect {
 #[get("/login")]
 fn login_page(issuer_config: &State<IssuerConfig>) -> Template {
     let issuer_name_str = issuer_config.issuer_name.as_str();
-    Template::render("login", context! { issuername: issuer_name_str })
+    Template::render("login", context! { issuer_name: issuer_name_str })
 }
 
 // route to handle login form submission
@@ -145,8 +145,8 @@ fn welcome_page(jar: &CookieJar<'_>, issuer_config: &State<IssuerConfig>) -> Res
         Ok(Template::render(
             "welcome",
             context! {
-                username: &username,
-                issuername: issuer_name_str
+                user_name: &username,
+                issuer_name: issuer_name_str
             },
         ))
     } else {
