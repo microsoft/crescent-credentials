@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Resource</title>
+    <title>Resource - {{ verifier_name }}</title>
 </head>
 <body>
     <h1>Resource</h1>
