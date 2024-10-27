@@ -17,7 +17,7 @@ from datetime import date, datetime, timezone, timedelta
 
 from crescent_helper import *
 
-ISSUER_TIMEZONE = timezone(-timedelta(hours=7))
+ISSUER_TIMEZONE = timezone(-timedelta(hours=8)) # US west coast / PST
 
 ##### Helper functions #########
 def usage():
@@ -153,9 +153,8 @@ def ymd_to_timestamp(ymd, is_bytes=False, has_time=False):
     if has_time:
         format_string = "%Y-%m-%dT%H:%M:%SZ"
     dt = datetime.strptime(ymd, format_string)
-    # Our circuit ignores time of day so we set them to zero
-    dt = dt.replace(hour=0, minute=0, second=0)
-    dt = dt.astimezone(ISSUER_TIMEZONE)
+    # Our circuit ignores time of day so we set them to zero. And set the issuer's TZ
+    dt = dt.replace(hour=0, minute=0, second=0, tzinfo=ISSUER_TIMEZONE)
     return(int(dt.timestamp()))
 
 def ymd_to_daystamp(ymd, is_bytes=False, has_time=False):
@@ -229,6 +228,7 @@ tbs_data_text = str(binascii.hexlify(tbs_data))
 valid_until_pos = tbs_data_text.find(valid_until_prefix) + len(valid_until_prefix)
 valid_until_data = tbs_data_text[valid_until_pos: valid_until_pos + 40]
 valid_until_unix_timestamp = ymd_to_timestamp(valid_until_data, is_bytes=True, has_time=True)
+print("valid_until_unix_timestamp: {}".format(valid_until_unix_timestamp))
 
 ### Date of Birth ###
 dob_info = find_value_digest_info(mdoc, 'birth_date')
