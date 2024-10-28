@@ -8,6 +8,8 @@ The Crescent library must have been built and the ZK setup must have been run be
 * From `../../setup/scripts`, run `./run_setup.sh rs256`, and 
 * From `../../creds`, run `cargo run --bin crescent --release --features print-trace zksetup --name rs256`
 
+Then, call the setup script `./setup_client_helper.sh`.
+
 To build the server, run `cargo build`.
 
 ## Running the server
