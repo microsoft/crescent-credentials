@@ -27,6 +27,7 @@ use tokio::sync::Mutex;
 use std::collections::HashMap;
 use std::fs::{self};
 use std::sync::Arc;
+use std::path::Path;
 
 // define the cred schema UID. This is an opaque string that identifies the setup parameters (TODO: share this value in a common config crate)
 const SCHEMA_UID : &str = "https://schemas.crescent.dev/jwt/012345";
@@ -37,13 +38,13 @@ const SCHEMA_UID : &str = "https://schemas.crescent.dev/jwt/012345";
 //       only be suitable for testing, there is probably a better way.
 //       Also we'll need some caching of the parameters to avoid fetching large files multiple times.
 //       For caching the client helper could re-use the CachePaths struct and approach.
-const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
+const CRESCENT_DATA_BASE_PATH : &str = "./data/creds";
 
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone)]
 struct CredInfo {
     cred: String,        // The credential (a JWT)
-    schema_UID: String, // The schema UID for the crdential
+    schema_UID: String, // The schema UID for the credential
     issuer_URL: String  // The URL of the issuer
 }
 
@@ -96,6 +97,21 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let cred_uid = Uuid::new_v4().to_string();
     println!("Generated credential UID: {}", cred_uid);
 
+    // Define base folder path and credential-specific folder path
+    let base_folder = CRESCENT_DATA_BASE_PATH;
+    let cred_folder = format!("{}/{}", base_folder, cred_uid);
+
+    // Copy the base folder into the new credential-specific folder
+    // TODO: don't copy shared parameters, just the credential-specific data (need to modify CachePaths)
+    //       the params should be per-schema_uid too.
+    fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
+    fs_extra::dir::copy(
+        base_folder,
+        &cred_folder,
+        &fs_extra::dir::CopyOptions::new().content_only(true),
+    ).expect("Failed to copy base folder content");
+    println!("Copied base folder to credential-specific folder: {}", cred_folder);
+
     // Insert task with empty data (indicating "preparing")
     {
         let mut tasks = state.inner().0.lock().await;
@@ -106,8 +122,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let cred_uid_clone = cred_uid.clone();
 
     rocket::tokio::spawn(async move {
-        // prepare the show data in a separate task
-
+        // prepare the show data in a separate task using the per-credential folder
         // TODO: catch errors, and set the task to an error state (to inform clients to stop waiting)
         let jwt = &cred_info.cred;
         let schema_UID = &cred_info.schema_UID;
@@ -115,7 +130,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
         let issuer_URL = &cred_info.issuer_URL;
         println!("got issuer_URL = {}", issuer_URL);
 
-        let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
+        let paths = CachePaths::new_from_str(&cred_folder);
         println!("Loading issuer public key");
         let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {}", paths.issuer_pem));
 
@@ -200,15 +215,27 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
     }
 }
 
+
 #[get("/delete?<cred_uid>")]
 async fn delete(cred_uid: String, state: &State<SharedState>) -> String {
     println!("*** /delete called with credential UID: {}", cred_uid);
-    // TODO: implement this properly. Need to delete the underlying data files as well (when implemented).
-    //       and perhaps return a different message depending if cred_UID exists or not.
+
+    // Define the path to the credential-specific folder
+    let cred_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, cred_uid);
+
+    // Attempt to remove the credential folder and handle errors if the folder does not exist
+    match fs::remove_dir_all(&cred_folder) {
+        Ok(_) => println!("Successfully deleted folder for cred_uid: {}", cred_uid),
+        Err(e) => println!("Failed to delete folder for cred_uid: {}. Error: {}", cred_uid, e),
+    }
+
+    // Remove the entry from shared state
     let mut tasks = state.inner().0.lock().await;
     tasks.remove(&cred_uid);
+  
     "Deleted".to_string()
 }
+
 
 #[launch]
 fn rocket() -> _ {
@@ -216,7 +243,7 @@ fn rocket() -> _ {
 
     rocket::build()
     .manage(shared_state)
-    .mount("/", routes![prepare, status, get_show_data, show])
+    .mount("/", routes![prepare, status, get_show_data, show, delete])
     .mount("/", FileServer::from("static")) // Serve static files
 }
 
