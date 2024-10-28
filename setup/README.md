@@ -50,6 +50,10 @@ Either clone this repo with the option `--recurse-submodules`, or for existing r
 git submodule update --init --recursive
 ```
 
+7. For mDL credentials, the [pyMDOC-CBOR](https://github.com/IdentityPython/pyMDOC-CBOR) Python module must be installed, with the command
+```
+pip install git+https://github.com/peppelinux/pyMDOC-CBOR.git
+```
 
 ## Sample JWT
 To work with Crescent, the prover and verifier both need the issuer's public key, and the prover needs a JWT. 

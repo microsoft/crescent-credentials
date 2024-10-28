@@ -18,7 +18,6 @@ use rayon::ThreadPoolBuilder;
 use std::fs::OpenOptions;
 
 
-
 // The (mutatable) state of the client. This struct will have methods that generate showings
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ClientState<E: Pairing> {
@@ -28,6 +27,7 @@ pub struct ClientState<E: Pairing> {
     pub pvk: PreparedVerifyingKey<E>,
     input_com_randomness: Option<E::ScalarField>,
     pub committed_input_openings: Vec<PedersenOpening<E::G1>>, //TODO: make this into a hashmap
+    pub credtype : String,
 }
 
 /// An unlinkable showing of a valid groth16 proof satisfying a particular NP relation
@@ -65,6 +65,7 @@ impl<E: Pairing> ClientState<E> {
             pvk,
             input_com_randomness: None,
             committed_input_openings: Vec::new(),
+            credtype : "jwt".to_string()
         }
     }
 

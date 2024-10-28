@@ -20,6 +20,7 @@ lazy_static! {
     static ref CRESCENT_SUPPORTED_ALGS: HashSet<&'static str> = {
         let mut set = HashSet::new();
         set.insert("RS256");
+        set.insert("ES256");
         set
     };
 }
@@ -27,6 +28,7 @@ lazy_static! {
     static ref CRESCENT_CONFIG_KEYS: HashSet<&'static str> = {
         let mut set = HashSet::new();
         set.insert("alg");
+        set.insert("credtype");
         set.insert("reveal_all_claims");
         set.insert("defer_sig_ver");
         set.insert("max_jwt_len");

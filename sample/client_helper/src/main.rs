@@ -232,7 +232,7 @@ async fn delete(cred_uid: String, state: &State<SharedState>) -> String {
     // Remove the entry from shared state
     let mut tasks = state.inner().0.lock().await;
     tasks.remove(&cred_uid);
-
+  
     "Deleted".to_string()
 }
 

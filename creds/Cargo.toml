@@ -43,6 +43,7 @@ structopt = "0.3"
 lazy_static = "1.5"
 base64-url = "3.0"
 jwt-simple = "0.12.10"
+chrono = "0.4"
 
 # Local dependencies
 ark-circom = { path = "../forks/circom-compat" }

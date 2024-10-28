@@ -10,8 +10,9 @@ import json, math, string
 MAX_FIELD_BYTE_LEN = 31        # Maximum length for each field in AAD token.
 CIRCOM_RS256_LIMB_BITS = 121
 CIRCOM_ES256K_LIMB_BITS = 64 
-CRESCENT_CONFIG_KEYS = ['alg', 'reveal_all_claims', 'defer_sig_ver', 'max_jwt_len']     # fields in config.json that are for crescent configuration and do not refer to claims in the token
-CRESCENT_SUPPORTED_ALGS = ['RS256', 'ES256K']     # JWS Signature algorithms used to sign JWT
+CIRCOM_ES256_LIMB_BITS = 43     # Required by the ecdsa-p256 circuit we use
+CRESCENT_CONFIG_KEYS = ['alg', 'credtype', 'reveal_all_claims', 'defer_sig_ver', 'max_jwt_len']     # fields in config.json that are for crescent configuration and do not refer to claims in the token
+CRESCENT_SUPPORTED_ALGS = ['RS256', 'ES256', 'ES256K']     # Signature algorithms used to sign JWT/mDL
 
 
 ##### Module functions ######
@@ -55,6 +56,12 @@ def claim_type_as_int(type):
          return 4
      elif type == "object":
          return 5
+
+def bytes_to_ints(input_bytes):
+    ints = []
+    for c in input_bytes:
+        ints.append(c)
+    return ints
 
 def to_utf8_integers(input_bytes):
     utf8 = []
@@ -116,8 +123,7 @@ def unpack_int_to_string(s_int, n_bytes):
 
     return s_bytes.decode('utf-8')
 
-def b64_to_circom_limbs(n_b64, limb_size):
-    n_bytes = base64url_decode(n_b64)
+def bytes_to_circom_limbs(n_bytes, limb_size):
     n = int.from_bytes(n_bytes, byteorder='big', signed=False)
     num_limbs = math.ceil( (n.bit_length() + limb_size - 1) // limb_size)
     limbs = []
@@ -126,6 +132,10 @@ def b64_to_circom_limbs(n_b64, limb_size):
         limb = (n >> i*limb_size) & msk
         limbs.append(limb)
     return limbs
+
+def b64_to_circom_limbs(n_b64, limb_size):
+    n_bytes = base64url_decode(n_b64)
+    return bytes_to_circom_limbs(n_bytes, limb_size)
 
 def print_json_array(label, values, no_leading_comma=False):
     if no_leading_comma:
@@ -164,7 +174,10 @@ def check_config(config):
     else:
         if type(config['defer_sig_ver']) != bool:
             print_debug("Error: field 'defer_sig_ver' must be of type bool")
-            return False        
+            return False
+
+    if 'credtype' not in config:
+        config['credtype'] = 'jwt'
         
     if 'max_jwt_len' not in config:
         config['max_jwt_len'] = 2048  # Maximum length of JWT, excluding the

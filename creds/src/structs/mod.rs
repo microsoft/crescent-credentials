@@ -3,6 +3,7 @@ use ark_bn254::Bn254 as ECPairing;
 //use ark_bls12_381::Bls12_381 as ECPairing;
 use ark_circom::CircomBuilder;
 use num_bigint::BigUint;
+use num_traits::FromPrimitive;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, io::ErrorKind};
 pub mod demo;
@@ -97,7 +98,11 @@ impl ProverInput for GenericInputsJSON {
                     for v in arr.iter() {
                         if let serde_json::Value::String(s) = v {
                             builder.push_input(key, bigint_from_str(s));
-                        } else if let serde_json::Value::Array(nested_arr) = v {
+                        } 
+                        else if let serde_json::Value::Number(n) = v {
+                            builder.push_input(key, BigUint::from_u64(n.as_u64().unwrap()).unwrap());
+                        }                            
+                        else if let serde_json::Value::Array(nested_arr) = v {
                             for v2 in nested_arr.iter() {
                                 if let serde_json::Value::String(s) = v2 {
                                     builder.push_input(key, bigint_from_str(s));
@@ -110,6 +115,9 @@ impl ProverInput for GenericInputsJSON {
                         }
                     }
                 }
+                serde_json::Value::Number(n) => {
+                    builder.push_input(key, BigUint::from_u64(n.as_u64().unwrap()).unwrap());                    
+                }    
                 _ => panic!("invalid input (2)"),
             };
         }
