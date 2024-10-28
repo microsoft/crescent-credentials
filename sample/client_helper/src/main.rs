@@ -102,6 +102,8 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let cred_folder = format!("{}/{}", base_folder, cred_uid);
 
     // Copy the base folder into the new credential-specific folder
+    // TODO: don't copy shared parameters, just the credential-specific data (need to modify CachePaths)
+    //       the params should be per-schema_uid too.
     fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
     fs_extra::dir::copy(
         base_folder,
