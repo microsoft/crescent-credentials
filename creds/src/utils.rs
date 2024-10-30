@@ -144,6 +144,7 @@ pub fn read_from_file<T>(path: &str) -> Result<T, SerializationError>
 where
     T: CanonicalDeserialize
 {
+    println!("Reading from file: {}", path);
     let f = File::open(path).unwrap();
     let buf_reader = BufReader::new(f);
     let state = T::deserialize_uncompressed_unchecked(buf_reader)?;
