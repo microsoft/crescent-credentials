@@ -200,7 +200,8 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
             let io_locations_str: String = fs::read_to_string(&paths.io_locations).map_err(|_| "Failed to read IO locations file")?;
 
             let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str };
-            println!("Task complete, storing ShowData: {:?}", show_data);
+            println!("Task complete, storing ShowData (size: {:?} bytes)",
+                show_data.client_state_b64.len() + show_data.io_locations_str.len() + show_data.range_pk_b64.len());
 
             // Store the ShowData into the shared state (indicating "ready")
             let mut tasks = state.lock().await;
