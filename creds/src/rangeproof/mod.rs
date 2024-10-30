@@ -78,18 +78,14 @@ pub struct RangeProofVK<E: Pairing> {
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize, Default)]
 pub struct RangeProof<E: Pairing> {
     pub com_f: ark_poly_commit::kzg10::Commitment<E>,
-
     pub com_g: ark_poly_commit::kzg10::Commitment<E>,
     pub eval_g: E::ScalarField,
     pub proof_g: ark_poly_commit::kzg10::Proof<E>,
     pub eval_gw: E::ScalarField,
     pub proof_gw: ark_poly_commit::kzg10::Proof<E>,
-
     pub com_q: ark_poly_commit::kzg10::Commitment<E>,
-
     pub eval_w_hat: E::ScalarField,
     pub proof_w_hat: ark_poly_commit::kzg10::Proof<E>,
-
     pub dleq_proof: DLogPoK<E::G1>,
 }
 
