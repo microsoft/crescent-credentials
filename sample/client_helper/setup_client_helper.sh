@@ -7,7 +7,7 @@ TARGET_DIR="./data/creds/shared"
 # Make sure we're in the right directory
 CURRENT_DIR=${PWD##*/}
 if [ $CURRENT_DIR != 'client_helper' ]; then
-    echo "Run this script from client_helper"
+    echo "Run this script from the client_helper/ folder"
     exit -1
 fi
 

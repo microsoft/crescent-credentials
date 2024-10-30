@@ -4,15 +4,25 @@
 SOURCE_DIR="../../creds/test-vectors/rs256"
 TARGET_DIR="./data/issuers/shared"
 
-echo "Copying $SOURCE_DIR to $TARGET_DIR"
+# Make sure we're in the right directory
+CURRENT_DIR=${PWD##*/}
+if [ $CURRENT_DIR != 'verifier' ]; then
+    echo "Run this script from the verifier/ folder"
+    exit -1
+fi
 
-# Create the target directory if it doesn't exist
+# Remove and re-create the target directory 
+echo "Removing and re-creating data/issuers directory"
+rm -fr "data/issuers/"
 mkdir -p "$TARGET_DIR"
+mkdir -p "${TARGET_DIR}/cache"
 
-# Copy the contents from the source directory to the target directory
-cp -r "$SOURCE_DIR/"* "$TARGET_DIR"
-# Remove unnecessary files (TODO: any other?)
-rm "$TARGET_DIR/token.jwt"
-rm "$TARGET_DIR/issuer.pub"
+echo "Copying files $SOURCE_DIR to $TARGET_DIR"
+set -x 
+cp "${SOURCE_DIR}/io_locations.sym" "${TARGET_DIR}/"
+cp "${SOURCE_DIR}/cache/groth16_pvk.bin" "${TARGET_DIR}/cache/"
+cp "${SOURCE_DIR}/cache/groth16_vk.bin" "${TARGET_DIR}/cache/"
+cp "${SOURCE_DIR}/cache/range_vk.bin" "${TARGET_DIR}/cache/"
+set +x
 
 echo "Done"
