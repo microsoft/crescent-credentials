@@ -12,10 +12,15 @@ use rocket::State;
 use rocket::fs::FileServer;
 use rocket::http::Status;
 use std::collections::HashMap;
-
+use serde_json::Value;
+use jsonwebkey::JsonWebKey;
+use std::path::Path;
+use std::fs;
 use crescent::{utils::read_from_b64url, CachePaths, CrescentPairing, ShowProof, VerifierParams, verify_show};
 
-const CRESCENT_DATA_BASE_PATH : &str = "../../creds/test-vectors/rs256";
+// For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
+const CRESCENT_DATA_BASE_PATH : &str = "./data/issuers";
+const CRESCENT_SHARED_DATA_PATH : &str = "./data/issuers/shared";
 
 // verifer config from Rocket.toml
 struct VerifierConfig {
@@ -80,15 +85,77 @@ fn resource_page(verifier_config: &State<VerifierConfig>) -> Template {
     )
 }
 
+async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(), String> {
+    // Prepare the JWK URL
+    let jwk_url = format!("{}/.well-known/jwks.json", issuer_url);
+    println!("Fetching JWK set from: {}", jwk_url);
+
+    // Fetch the JWK
+    let response = ureq::get(&jwk_url)
+        .call()
+        .map_err(|e| format!("Request failed: {}", e))?;
+    let body = response.into_string()
+        .map_err(|e| format!("Failed to parse response body: {}", e))?;
+    let jwk_set: Value = serde_json::from_str(&body)
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+     // Extract the first key from the JWK set and parse it into `JsonWebKey`
+     let jwk_value = jwk_set.get("keys")
+        .and_then(|keys| keys.as_array())
+        .and_then(|keys| keys.first())
+        .ok_or_else(|| "No keys found in JWK set".to_string())?;
+
+    // Deserialize the JSON `Value` into a `JsonWebKey`
+    let jwk: JsonWebKey = serde_json::from_value(jwk_value.clone())
+        .map_err(|e| format!("Failed to parse JWK: {}", e))?;
+
+    // Convert the JWK to PEM format
+    let pem_key = jwk.key.to_pem();
+
+    // Save the PEM-encoded key to issuer.pub in the issuer_folder
+    let pub_key_path = Path::new(issuer_folder).join("issuer.pub");
+    fs::write(&pub_key_path, pem_key).map_err(|err| format!("Failed to save public key: {:?}", err))?;
+
+    println!("Saved issuer's public key to {:?}", pub_key_path);
+    Ok(())
+}
+
 // route to verify a ZK proof given a ProofInfo, return a status  
 #[post("/verify", format = "json", data = "<proof_info>")]
-fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierConfig>) -> Result<Custom<Redirect>, Template> {
+async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierConfig>) -> Result<Custom<Redirect>, Template> {
     println!("*** /verify called");
     println!("Schema UID: {}", proof_info.schema_UID);
     println!("Issuer URL: {}", proof_info.issuer_URL);
     println!("Proof: {}", proof_info.proof);
 
-    let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
+    // Define base folder path and credential-specific folder path
+    let base_folder = CRESCENT_DATA_BASE_PATH;
+    let shared_folder = CRESCENT_SHARED_DATA_PATH;
+    let issuer_UID = proof_info.issuer_URL.replace("https://", "").replace("http://", "").replace("/", "_").replace(":", "_");
+    let issuer_folder = format!("{}/{}", base_folder, issuer_UID);
+
+    // check if the issuer folder exists, if not create it
+    if fs::metadata(&issuer_folder).is_err() {
+        println!("Issuer folder does not exist. Creating it: {}", issuer_folder);
+
+        // Create credential-specific folder
+        fs::create_dir_all(&issuer_folder).expect("Failed to create credential folder");
+
+        // Copy the base folder content to the new credential-specific folder
+        // TODO: don't copy shared parameters, just the credential-specific data (need to modify CachePaths)
+        //       the params should be per-schema_uid too.
+        fs_extra::dir::copy(
+            shared_folder,
+            &issuer_folder,
+            &fs_extra::dir::CopyOptions::new().content_only(true),
+        ).expect("Failed to copy base folder content");
+        println!("Copied base folder to credential-specific folder: {}", issuer_folder);
+
+        // Fetch the issuer's public key and save it to issuer.pub
+        fetch_and_save_jwk(&proof_info.issuer_URL, &issuer_folder).await.expect("Failed to fetch and save issuer's public key");
+    }
+
+    let paths = CachePaths::new_from_str(&issuer_folder);
     let vp = VerifierParams::<CrescentPairing>::new(&paths).unwrap();
     let show_proof = read_from_b64url::<ShowProof<CrescentPairing>>(&proof_info.proof).unwrap();
     let (is_valid, email_domain) = verify_show(&vp, &show_proof);
