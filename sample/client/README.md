@@ -45,4 +45,9 @@ Firefox requires additional extension permissions to download manifests from ext
 
 ## Usage
 
-TODO
+The browser extension's pop-up menu contains three tabs:
+* Wallet: displays credentials that can be displayed to a verifier
+* About: displays information about the project
+* Config: contains settings to reset the extension, configure the client helper service, and import a credential
+
+Visiting an issuer website will trigger importation into the wallet.
