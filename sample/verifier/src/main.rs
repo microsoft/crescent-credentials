@@ -133,7 +133,10 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 
     // verify if the schema_UID is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&proof_info.schema_UID.as_str()) {
-        return "Unsupported schema UID".to_string();
+        println!("*** Unsupported schema UID. Returning error template");
+        let mut context = base_login_context(verifier_config);
+        context.insert("error".to_string(), "Invalid Unsupported schema UID.".to_string());
+        return Err(Template::render("login", context));
     }
     
     // Define base folder path and credential-specific folder path
