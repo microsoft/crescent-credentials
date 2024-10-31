@@ -18,9 +18,12 @@ use std::path::Path;
 use std::fs;
 use crescent::{utils::read_from_b64url, CachePaths, CrescentPairing, ShowProof, VerifierParams, verify_show};
 
-// For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
+// define the supported cred schema UIDs. These are an opaque strings that identifies the setup parameters (TODO: share this value in a common config crate)
+const SCHEMA_UIDS: [&str; 2] = ["jwt_corporate_1", "mdl_1"];
+
+// For now we assume that the verifier and Crescent Service live on the same machine and share disk access.
 const CRESCENT_DATA_BASE_PATH : &str = "./data/issuers";
-const CRESCENT_SHARED_DATA_PATH : &str = "./data/issuers/shared";
+const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
 
 // verifer config from Rocket.toml
 struct VerifierConfig {
@@ -128,9 +131,14 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     println!("Issuer URL: {}", proof_info.issuer_URL);
     println!("Proof: {}", proof_info.proof);
 
+    // verify if the schema_UID is one of our supported SCHEMA_UIDS
+    if !SCHEMA_UIDS.contains(&proof_info.schema_UID.as_str()) {
+        return "Unsupported schema UID".to_string();
+    }
+    
     // Define base folder path and credential-specific folder path
-    let base_folder = CRESCENT_DATA_BASE_PATH;
-    let shared_folder = CRESCENT_SHARED_DATA_PATH;
+    let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, proof_info.schema_UID);
+    let shared_folder = format!("{}/{}", base_folder, CRESCENT_SHARED_DATA_SUFFIX);
     let issuer_UID = proof_info.issuer_URL.replace("https://", "").replace("http://", "").replace("/", "_").replace(":", "_");
     let issuer_folder = format!("{}/{}", base_folder, issuer_UID);
 
@@ -151,7 +159,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         ).expect("Failed to copy base folder content");
         println!("Copied base folder to credential-specific folder: {}", issuer_folder);
 
-        // Fetch the issuer's public key and save it to issuer.pub
+        // Fetch the issuer's public key and save it to issuer.pub (TODO: only for jwt)
         fetch_and_save_jwk(&proof_info.issuer_URL, &issuer_folder).await.expect("Failed to fetch and save issuer's public key");
     }
 

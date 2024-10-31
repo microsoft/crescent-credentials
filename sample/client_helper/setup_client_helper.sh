@@ -3,6 +3,8 @@
 # Define the source and target directories as arrays
 SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/mdl1")
 TARGET_DIRS=("./data/creds/jwt_corporate_1/shared" "./data/creds/mdl_1/shared")
+# Directory to clean up before copying new files
+CLEANUP_DIR="./data/creds"
 
 # Make sure we're in the right directory
 CURRENT_DIR=${PWD##*/}
@@ -11,6 +13,11 @@ if [ "$CURRENT_DIR" != "client_helper" ]; then
     exit 1
 fi
 
+# Remove and re-create the cleanup directory (could contain old creds)
+echo "Removing and re-creating $CLEANUP_DIR directory"
+rm -fr "$CLEANUP_DIR"
+mkdir -p "$CLEANUP_DIR"
+
 # Loop through each source and target directory pair
 for i in "${!SOURCE_DIRS[@]}"; do
     SOURCE_DIR="${SOURCE_DIRS[i]}"
@@ -18,7 +25,6 @@ for i in "${!SOURCE_DIRS[@]}"; do
 
     # Remove and re-create the target directory
     echo "Removing and re-creating $TARGET_DIR directory"
-    rm -fr "$TARGET_DIR"
     mkdir -p "$TARGET_DIR"
     mkdir -p "${TARGET_DIR}/cache"
 
