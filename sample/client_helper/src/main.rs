@@ -30,17 +30,17 @@ use std::fs::{self};
 use std::sync::Arc;
 use std::path::Path;
 
-// define the cred schema UID. This is an opaque string that identifies the setup parameters (TODO: share this value in a common config crate)
-const SCHEMA_UID : &str = "https://schemas.crescent.dev/jwt/012345";
+// define the supported cred schema UIDs. These are an opaque strings that identifies the setup parameters (TODO: share this value in a common config crate)
+const SCHEMA_UIDS: [&str; 2] = ["jwt_corporate_1", "mdl_1"];
 
 // For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
-// TODO: we could make web requests to get the data from the setup service, but this will take more effort.
+// TODO: we could make web requests to get the data from the setup service, but this will take more effort (as documented in the sample README).
 //       The code we use in unit tests to make web requests doesn't work from a route handler, we need to investigate.  It may 
 //       only be suitable for testing, there is probably a better way.
 //       Also we'll need some caching of the parameters to avoid fetching large files multiple times.
 //       For caching the client helper could re-use the CachePaths struct and approach.
 const CRESCENT_DATA_BASE_PATH : &str = "./data/creds";
-const CRESCENT_SHARED_DATA_PATH : &str = "./data/creds/shared";
+const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
 
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone)]
@@ -134,17 +134,21 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let cred_uid = Uuid::new_v4().to_string();
     println!("Generated credential UID: {}", cred_uid);
 
-    // Define base folder path and credential-specific folder path
-    let base_folder = CRESCENT_DATA_BASE_PATH;
-    let shared_folder = CRESCENT_SHARED_DATA_PATH;
+    // verify if the schema_UID is one of our supported SCHEMA_UIDS
+    if !SCHEMA_UIDS.contains(&cred_info.schema_UID.as_str()) {
+        return "Unsupported schema UID".to_string();
+    }
+
+    // Define schemaUID-specific base folder path and a child credential-specific folder path
+    let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, cred_info.schema_UID);
+    let shared_folder = format!("{}/{}", base_folder, CRESCENT_SHARED_DATA_SUFFIX);
     let cred_folder = format!("{}/{}", base_folder, cred_uid);
 
     // Create credential-specific folder
     fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
 
     // Copy the base folder content to the new credential-specific folder
-    // TODO: don't copy shared parameters, just the credential-specific data (need to modify CachePaths)
-    //       the params should be per-schema_uid too.
+    // TODO: don't hard copy shared parameters, use symlinks or just the credential-specific data (need to modify CachePaths)
     fs_extra::dir::copy(
         shared_folder,
         &cred_folder,
