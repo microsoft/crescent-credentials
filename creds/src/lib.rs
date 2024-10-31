@@ -10,7 +10,6 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
 use prep_inputs::{parse_config, unpack_int_to_string_unquoted, prepare_prover_inputs};
-use serde::Serialize;
 use utils::{read_from_file, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
@@ -278,7 +277,6 @@ pub fn run_prover(
 
 pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
 {
-    let proof_timer = std::time::Instant::now();
 
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
@@ -305,7 +303,6 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     com_exp_value.m -= cur_time;
     com_exp_value.c -= com_exp_value.bases[0] * cur_time;
     let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
-    println!("Proving time: {:?}", proof_timer.elapsed());
 
     // Assemble proof
     let show_proof = ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
@@ -315,8 +312,6 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
 
 pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
 {
-    let proof_timer = std::time::Instant::now();
-
     // Create Groth16 rerandomized proof for showing
     let valid_until_value_pos = io_locations.get_io_location("valid_until_value").unwrap();
     let dob_value_pos = io_locations.get_io_location("dob_value").unwrap();
@@ -341,15 +336,12 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     com_valid_until_value.c -= com_valid_until_value.bases[0] * cur_time;
     let show_range = client_state.show_range(&com_valid_until_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
 
-
     // Create fresh range proof for birth_date; prove age is over 21
     let days_in_21y = Fr::from(days_to_be_age(21) as u64);
     let mut com_dob = client_state.committed_input_openings[1].clone();
     com_dob.m -= days_in_21y;
     com_dob.c -= com_dob.bases[0] * days_in_21y;
-    let show_range2 = client_state.show_range(&com_dob, RANGE_PROOF_INTERVAL_BITS, &range_pk);    
-
-    println!("Proving time: {:?}", proof_timer.elapsed());
+    let show_range2 = client_state.show_range(&com_dob, RANGE_PROOF_INTERVAL_BITS, &range_pk);       
 
     // Asssemble proof and return
     let show_proof = ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
@@ -358,9 +350,49 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
 
 }
 
+fn _show_groth16_proof_size(show_groth16: &ShowGroth16<ECPairing>) -> usize {
+    print!("Show_Groth16 proof size: ");
+    let rand_proof_size = show_groth16.rand_proof.compressed_size();
+    print!("{} (rand_proof) + ", rand_proof_size);
+    let com_hidden_inputs_size = show_groth16.com_hidden_inputs.compressed_size();
+    print!("{} (com_hidden_inputs) + ", com_hidden_inputs_size);
+    let pok_inputs_size = show_groth16.pok_inputs.compressed_size();
+    print!("{} (pok_inputs) + ", pok_inputs_size);
+    let committed_inputs_size = show_groth16.commited_inputs.compressed_size();
+    print!("{} (committed_inputs) ", committed_inputs_size);
+    let total = rand_proof_size + com_hidden_inputs_size + pok_inputs_size + committed_inputs_size;
+    println!(" = {} bytes total", total);
+    total
+}
+
+
+fn show_proof_size(show_proof: &ShowProof<ECPairing>) -> usize {
+
+    print!("Show proof size: ");
+    let groth16_size = show_proof.show_groth16.compressed_size();
+    print!("{} (Groth16 proof) + ", groth16_size);
+    let show_range_size = show_proof.show_range.compressed_size();
+    print!("{} (range proof) ", show_range_size);
+
+    let show_range2_size = 
+    if show_proof.show_range2.is_some() {
+        let tmp = show_proof.show_range2.compressed_size();
+        print!("{} + (range proof2) ", tmp);        
+        tmp
+    } else {
+        0
+    };
+
+    let total = groth16_size + show_range_size + show_range2_size;
+    println!(" = {} bytes total", total);
+
+    total
+}
+
 pub fn run_show(
     base_path: PathBuf
 ) {
+    let proof_timer = std::time::Instant::now();    
     let paths = CachePaths::new(base_path);
     let io_locations = IOLocations::new(&paths.io_locations);    
     let mut client_state: ClientState<ECPairing> = read_from_file(&paths.client_state).unwrap();
@@ -371,6 +403,10 @@ pub fn run_show(
     } else {
         create_show_proof(&mut client_state, &range_pk, &io_locations)
     };
+    println!("Proving time: {:?}", proof_timer.elapsed());
+
+    //let _ = show_groth16_proof_size(&show_proof.show_groth16);
+    let _ = show_proof_size(&show_proof);
 
     write_to_file(&show_proof, &paths.show_proof);
 }
