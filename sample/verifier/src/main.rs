@@ -233,7 +233,7 @@ mod test {
 
         // Step 2: call /verify with the proof
         let issuer_URL = "https://issuer.example.com".to_string();
-        let schema_UID = "https://schemas.crescent.dev/jwt/012345".to_string();
+        let schema_UID = "jwt_corporate_1".to_string();
         let proof_info = ProofInfo {
             proof: show_proof_b64,
             schema_UID: schema_UID,
