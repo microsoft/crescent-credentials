@@ -15,8 +15,8 @@ The server uses a JWT to generate the ZK parameters. An input JWT can be provide
 
 ## Running the server
 
-To start the server, run `cargo run`. By default, the server will listen on `http://localhost:8002`; this can be modified by changing the `port` variable in the [Rocket.toml](./Rocket.toml) file.
+To start the server, run `cargo run --release`. By default, the server will listen on `http://localhost:8002`; this can be modified by changing the `port` variable in the [Rocket.toml](./Rocket.toml) file.
 
 ## Testing the server
 
-To test the server, run `cargo test`.
+To test the server, run `cargo test --release`.
