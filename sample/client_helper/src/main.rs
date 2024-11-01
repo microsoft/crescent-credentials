@@ -7,13 +7,14 @@ use crescent::groth16rand::ClientState;
 use crescent::prep_inputs::{parse_config, prepare_prover_inputs};
 use crescent::rangeproof::RangeProofPK;
 use crescent::structs::{GenericInputsJSON, IOLocations};
-use crescent::{create_client_state, create_show_proof, verify_show, CachePaths, CrescentPairing, ShowProof};
+use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, verify_show, CachePaths, CrescentPairing, ShowProof};
 use crescent::VerifierParams;
 use crescent::utils::{read_from_b64url, read_from_file, write_to_b64url};
 use crescent::ProverParams;
 
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
+use rocket::time::macros::time;
 use rocket::tokio::net::TcpListener;
 use rocket::{get, post};
 use rocket::tokio::spawn;
@@ -180,6 +181,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
 
     rocket::tokio::spawn(async move {
         let task_result: Result<(), String> = (|| async {
+            let start_time = std::time::SystemTime::now();
             if cred_info.schema_UID != "mdl_1" {
                 // fetch the issuer's JWK
                 fetch_and_save_jwk(&issuer_url, &cred_folder).await?;
@@ -224,13 +226,13 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
             println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
             let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str };
 
-            println!("Task complete, storing ShowData (size: {:?} bytes)",
-                show_data.client_state_b64.len() + show_data.io_locations_str.len() + show_data.range_pk_b64.len());
+            println!("Task complete, storing ShowData (size: {:?} bytes, took {:?})",
+                show_data.client_state_b64.len() + show_data.io_locations_str.len() + show_data.range_pk_b64.len(), start_time.elapsed().unwrap());
 
             // Store the ShowData into the shared state (indicating "ready")
             let mut tasks = state.lock().await;
             tasks.insert(cred_uid_clone.clone(), Some(show_data));
-
+            
             Ok(())
         })().await;
 
@@ -289,6 +291,16 @@ pub fn is_disc_uid_supported(disc_uid : &String, cred_type: &String) -> bool {
     }
 }
 
+pub fn disc_uid_to_age(disc_uid : &String) -> Result<usize, &'static str> {
+
+    match disc_uid.as_str() {
+        "crescent://over_18" => Ok(18),
+        "crescent://over_21" => Ok(21),
+        "crescent://over_65" => Ok(65),
+        _ => Err("disc_uid_to_age: invalid disclosure uid"),
+    }
+}
+
 #[get("/show?<cred_uid>&<disc_uid>")]
 async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>) -> Result<String, String> {
     println!("*** /show called with credential UID {} and disc_uid {}", cred_uid, disc_uid);
@@ -314,18 +326,16 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
             // Create the show proof
             let show_proof =
             if &client_state.credtype == "mdl" {
-                todo!(" TODO: Call create_show_proof_mdl")
+                let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())?;
+                create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, age)
             }
             else {
-                create_show_proof(&mut client_state, &range_pk, &io_locations);                
+                create_show_proof(&mut client_state, &range_pk, &io_locations)            
             };
             
-             
-
-
-            let show_proof_b64 = write_to_b64url(&show_proof);
-
             // Return the show proof as a base64-url encoded string
+            let show_proof_b64 = write_to_b64url(&show_proof);     
+
             Ok(show_proof_b64)
         }
         Some(None) => Err("ShowData is still being prepared.".to_string()), // Data is still being prepared

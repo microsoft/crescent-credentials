@@ -118,11 +118,14 @@
     <p>This is a test page for the Client Helper service.</p>
     <div>
         <h2>Credential Information</h2>
-        <label for="credInput">Credential (JWT):</label><br>
+        <label for="credInput">Credential (JWT or mDL):</label><br>
         <textarea id="credInput" rows="3" cols="80"></textarea><br>
         
-        <label for="schemaUidInput">Schema UID:</label><br>
-        <input type="text" id="schemaUidInput" size="80" value="jwt_corporate_1"><br>
+        <label for="schemaUidInput">Schema UID:</label>
+        <select id="schemaUidInput">
+            <option value="jwt_corporate_1">jwt_corporate_1</option>
+            <option value="mdl_1">mdl_1</option>
+        </select><br>
         
         <label for="issuerUrlInput">Issuer URL:</label><br>
         <input type="text" id="issuerUrlInput" size="80" value="http://127.0.0.1:8001"><br>
@@ -153,7 +156,7 @@
     <div>
         <h2>Show Proof:</h2>
         <p>Click "Show Credential" to fetch the proof for the credential.</p>
-        <label for="disclosureUidSelect">Disclosure UID:</label><br>
+        <label for="disclosureUidSelect">Disclosure UID:</label>
         <select id="disclosureUidSelect">
             <option value="crescent://email_domain">crescent://email_domain</option>
             <option value="crescent://over_21">crescent://over_21</option>
