@@ -11,7 +11,11 @@ The sample is composed of the following components:
 * Client Helper: a Rocket server that assists the Client; see [client_helper/README.md](./client_helper/README.md).
 * Verifier: a web application that verifies ZK proofs; see [`verifier/README.md`](./verifier/README.md).
 
-Each component must be setup individually to run the sample; see their README for details. (TODO: write script to setup everything)
+Two scripts help with managing the sample projects:
+* `./setup-sample.sh`: runs the setup script for (using a default config) and builds the issuer, client_helper, and verifier projects; each must then be started in their own console with `cargo run --release`. The client must be setup and installed separately. 
+* `./clean-sample.sh [--data-and-build]`: cleans the data (if the build files too, if the `--data-and-build` flag is passed) for the issuer, client_helper, and verifier projects.
+
+Each component must be setup and modified individually; see their respective README for details. 
 
 # Sample Overview
 
