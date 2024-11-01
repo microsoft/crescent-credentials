@@ -10,20 +10,20 @@ fi
 # clean client_helper project
 rm -fr ./client_helper/data
 if ($DATA_AND_BUILD); then
-    rm -fr ./client_helper/target
+    cargo clean
 fi
 echo "Cleaned client_helper project"
 
 # clean issuer project
 rm -fr ./issuer/data
 if ($DATA_AND_BUILD); then
-    rm -fr ./issuer/target
+    cargo clean
 fi
 echo "Cleaned issuer project"
 
 # clean verifier project
 rm -fr ./verifier/data
 if ($DATA_AND_BUILD); then
-    rm -fr ./verifier/target
+    cargo clean
 fi
 echo "Cleaned verifier project"
