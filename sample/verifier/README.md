@@ -10,11 +10,11 @@ The Crescent library must have been built and the ZK setup must have been run be
 
 Then, call the setup script `./setup_verifier.sh`.
 
-To build the server, run `cargo build`.
+To build the server, run `cargo build --release`.
 
 ## Running the server
 
-To start the server, run `cargo run`. By default, the server will listen on `http://localhost:8004`; this can be modified by changing the `port` variable in the [Rocket.toml](./Rocket.toml) file.
+To start the server, run `cargo run --release`. By default, the server will listen on `http://localhost:8004`; this can be modified by changing the `port` variable in the [Rocket.toml](./Rocket.toml) file. Adding `127.0.0.1 fabrikam.com` to the platform's hosts file (located at `C:\Windows\System32\drivers\etc\hosts` on Windows `/etc/hosts` on *nix systems) allows assessing the server at `http://fabrikam.com:8001`.
 
 ## Testing the server
 
