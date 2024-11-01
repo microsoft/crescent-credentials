@@ -85,6 +85,20 @@ fn resource_page(verifier_config: &State<VerifierConfig>) -> Template {
     )
 }
 
+// route to serve the protected resource page after successful verification
+#[get("/resource_over18")]
+fn resource_page_over18(verifier_config: &State<VerifierConfig>) -> Template {
+    println!("*** Serving resource page (over 18)");
+    let verifier_name_str = verifier_config.verifier_name.as_str();
+
+    // render the resource page
+    Template::render("resource_over18",
+        context! {
+            verifier_name: verifier_name_str,
+        }
+    )
+}
+
 async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(), String> {
     // Prepare the JWK URL
     let jwk_url = format!("{}/.well-known/jwks.json", issuer_url);
@@ -120,6 +134,15 @@ async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(),
     Ok(())
 }
 
+macro_rules! error_template {
+    ($msg:expr, $verifier_config:expr) => {{
+        println!("*** {}", $msg);
+        let mut context = base_login_context($verifier_config);
+        context.insert("error".to_string(), $msg.to_string());
+        return Err(Template::render("login", context));
+    }};
+}
+
 // route to verify a ZK proof given a ProofInfo, return a status  
 #[post("/verify", format = "json", data = "<proof_info>")]
 async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierConfig>) -> Result<Custom<Redirect>, Template> {
@@ -131,22 +154,20 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 
     // verify if the schema_UID is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&proof_info.schema_UID.as_str()) {
-        println!("*** Unsupported schema UID. Returning error template");
-        let mut context = base_login_context(verifier_config);
-        context.insert("error".to_string(), "Invalid Unsupported schema UID.".to_string());
-        return Err(Template::render("login", context));
+        let msg = format!("Unsupported schema UID ({})", proof_info.schema_UID);
+        error_template!(msg, verifier_config);
     }
 
     // Check that the schema and disclosue are compatible
     if !is_disc_supported_by_schema(&proof_info.disclosure_uid, &proof_info.schema_UID) {
         let msg = format!("Disclosure UID {} is not supported by schema {}", proof_info.disclosure_uid, proof_info.schema_UID);
-        println!("{}",msg);
-        let mut context = base_login_context(verifier_config);
-        context.insert("error".to_string(), msg);
-        return Err(Template::render("login", context));
+        error_template!(msg, verifier_config);
     }
 
-    let cred_type = cred_type_from_disc_uid(&proof_info.disclosure_uid).map_err(|_| panic!("TODO: make a macro to render the error page adn call it here"))?;
+    let cred_type = match cred_type_from_disc_uid(&proof_info.disclosure_uid) {
+        Ok(cred_type) => cred_type,
+        Err(_) => error_template!("Credential type not found", verifier_config),
+    };
     
     // Define base folder path and credential-specific folder path
     let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, proof_info.schema_UID);
@@ -178,8 +199,12 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     }
 
     let paths = CachePaths::new_from_str(&issuer_folder);
-    let vp = VerifierParams::<CrescentPairing>::new(&paths).unwrap();   // TODO: use error macro
-    let show_proof = read_from_b64url::<ShowProof<CrescentPairing>>(&proof_info.proof).unwrap();    // TODO: use error macro
+    let vp = VerifierParams::<CrescentPairing>::new(&paths).unwrap();
+
+    let show_proof = match read_from_b64url::<ShowProof<CrescentPairing>>(&proof_info.proof) {
+        Ok(show_proof) => show_proof, 
+        Err(_) => error_template!("Invalid proof; deserialization error", verifier_config),
+    };
 
     if cred_type == "jwt" {
         let (is_valid, email_domain) = verify_show(&vp, &show_proof);
@@ -190,25 +215,20 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
             Ok(Custom(Status::SeeOther, Redirect::to(uri!(resource_page))))
         } else {
             // return an error template if the proof is invalid
-            println!("*** Proof is invalid. Returning error template");
-            let mut context = base_login_context(verifier_config);
-            context.insert("error".to_string(), "Invalid proof provided. Access denied.".to_string());
-            Err(Template::render("login", context))
+            error_template!("Proof is invalid.", verifier_config);
         }
-    } else {
+    } 
+    else {    // mdl
         let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap();
         let (is_valid, _) = verify_show_mdl(&vp, &show_proof, age);
 
         if is_valid {
             // redirect to the resource page (with status code 303 to ensure a GET request is made)
             println!("*** Proof is valid, user satisfies {}. Redirecting to resource page", proof_info.disclosure_uid);
-            Ok(Custom(Status::SeeOther, Redirect::to(uri!(resource_page))))
+            Ok(Custom(Status::SeeOther, Redirect::to(uri!(resource_page_over18))))
         } else {
             // return an error template if the proof is invalid
-            println!("*** Proof is invalid. Returning error template");
-            let mut context = base_login_context(verifier_config);
-            context.insert("error".to_string(), "Invalid proof provided. Access denied.".to_string());
-            Err(Template::render("login", context))
+            error_template!("Proof is invalid.", verifier_config);
         }        
     }
 }
@@ -230,7 +250,7 @@ fn rocket() -> _ {
     rocket::build()
         .manage(verifier_config)
         .mount("/", FileServer::from("static"))
-        .mount("/", routes![index_redirect, login_page, verify, resource_page])
+        .mount("/", routes![index_redirect, login_page, verify, resource_page, resource_page_over18])
     .attach(Template::fairing())
 }
 
