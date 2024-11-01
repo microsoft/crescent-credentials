@@ -17,12 +17,46 @@ use serde_json::Value;
 use jsonwebkey::JsonWebKey;
 use std::path::Path;
 use std::fs;
+use std::io;
 use crescent::{utils::read_from_b64url, CachePaths, CrescentPairing, ShowProof, VerifierParams, verify_show};
 use crescent_sample_setup_service::common::*;
 
 // For now we assume that the verifier and Crescent Service live on the same machine and share disk access.
 const CRESCENT_DATA_BASE_PATH : &str = "./data/issuers";
 const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
+
+// TODO: move this to common area
+#[cfg(unix)]
+use std::os::unix::fs::symlink as symlink_any;
+
+#[cfg(windows)]
+fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
+    if src.is_file() {
+        std::os::windows::fs::symlink_file(src, dst)
+    } else if src.is_dir() {
+        std::os::windows::fs::symlink_dir(src, dst)
+    } else {
+        Err(io::Error::new(io::ErrorKind::Other, "Source path is neither file nor directory"))
+    }
+}
+
+// copies the contents of the shared folder to the target folder using symlinks
+fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<()> {
+    // Ensure the target folder exists
+    fs::create_dir_all(target_folder)?;
+
+    for entry in fs::read_dir(shared_folder)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let abs_entry_path = entry_path.canonicalize()?;
+        let target_path = target_folder.join(entry.file_name());
+
+        // Create symlink from absolute source path to target path
+        symlink_any(&abs_entry_path, &target_path)?;
+    }
+
+    Ok(())
+}
 
 // verifer config from Rocket.toml
 struct VerifierConfig {
@@ -183,13 +217,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         fs::create_dir_all(&issuer_folder).expect("Failed to create credential folder");
 
         // Copy the base folder content to the new credential-specific folder
-        // TODO: don't copy shared parameters, just the credential-specific data (need to modify CachePaths)
-        //       the params should be per-schema_uid too.
-        fs_extra::dir::copy(
-            shared_folder,
-            &issuer_folder,
-            &fs_extra::dir::CopyOptions::new().content_only(true),
-        ).expect("Failed to copy base folder content");
+        copy_with_symlinks(&shared_folder.as_ref(), &issuer_folder.as_ref());
         println!("Copied base folder to credential-specific folder: {}", issuer_folder);
 
         if cred_type == "jwt" {
@@ -271,6 +299,9 @@ mod test {
 
     #[test]
     fn test_verify() {
+        // BROKEN TODO: fixing that would require creating a test issuer folder in /data and copy the issuer
+        // public key there so the verifier won't fail fetching it.
+
         // Step 1: generate the proof
         let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
         let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));

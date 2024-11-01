@@ -68,7 +68,6 @@ fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<
     for entry in fs::read_dir(shared_folder)? {
         let entry = entry?;
         let entry_path = entry.path();
-        // Convert entry path to an absolute path
         let abs_entry_path = entry_path.canonicalize()?;
         let target_path = target_folder.join(entry.file_name());
 
