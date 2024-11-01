@@ -304,16 +304,6 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
 }
 
 
-pub fn disc_uid_to_age(disc_uid : &String) -> Result<usize, &'static str> {
-
-    match disc_uid.as_str() {
-        "crescent://over_18" => Ok(18),
-        "crescent://over_21" => Ok(21),
-        "crescent://over_65" => Ok(65),
-        _ => Err("disc_uid_to_age: invalid disclosure uid"),
-    }
-}
-
 #[get("/show?<cred_uid>&<disc_uid>")]
 async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>) -> Result<String, String> {
     println!("*** /show called with credential UID {} and disc_uid {}", cred_uid, disc_uid);
