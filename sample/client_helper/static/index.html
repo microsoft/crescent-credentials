@@ -11,9 +11,6 @@
         // Credential UID to be used in the page
         let cred_uid = null;
 
-        // the disclosure UID (set by the Setup Service) associated with the credential
-        const disclosure_UID = "crescent://email_domain";
-
         async function prepareTask() {
             try {
                 const cred = document.getElementById("credInput").value;
@@ -100,6 +97,8 @@
                     throw new Error("cred_uid is not available. Please start the task first.");
                 }
 
+                // the disclosure UID associated with the credential
+                const disclosure_UID = document.getElementById("disclosureUidSelect").value;
                 const showResponse = await fetch(`${clientHelperUrl}/show?cred_uid=${cred_uid}&disc_uid=${disclosure_UID}`);
                 if (!showResponse.ok) { 
                     throw new Error('Failed to fetch Show Proof'); 
@@ -154,6 +153,13 @@
     <div>
         <h2>Show Proof:</h2>
         <p>Click "Show Credential" to fetch the proof for the credential.</p>
+        <label for="disclosureUidSelect">Disclosure UID:</label><br>
+        <select id="disclosureUidSelect">
+            <option value="crescent://email_domain">crescent://email_domain</option>
+            <option value="crescent://over_21">crescent://over_21</option>
+            <option value="crescent://over_18">crescent://over_18</option>
+            <option value="crescent://over_65">crescent://over_65</option>
+        </select><br>
         <button id="showCredentialButton" onclick="showCredential()" disabled>Show Credential</button> <!-- Button disabled initially -->
         <br>
         <textarea id="showProofTextarea" rows="10" cols="80" readonly></textarea> <!-- Textarea to display Show Proof -->

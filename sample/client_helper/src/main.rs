@@ -19,6 +19,8 @@ use rocket::{get, post};
 use rocket::tokio::spawn;
 use rocket::State;
 use rocket::fs::FileServer;
+use sha2::{Sha256, Digest};
+use base64_url::encode;
 
 use uuid::Uuid;
 use tokio::sync::Mutex;
@@ -122,6 +124,16 @@ async fn fetch_and_save_jwk(issuer_url: &str, cred_folder: &str) -> Result<(), S
     Ok(())
 }
 
+fn compute_cred_uid(cred : &String) -> String {
+    
+    //let digest = Sha256::digest(cred);
+    //let cred_uid = base64_url::encode(&digest[0..16]);
+
+    let cred_uid = Uuid::new_v4().to_string();
+
+    cred_uid
+}
+
 #[post("/prepare", format = "json", data = "<cred_info>")]
 async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> String {
     println!("*** /prepare called");
@@ -129,15 +141,13 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     println!("Issuer URL: {}", cred_info.issuer_URL);
     println!("Credential: {}", cred_info.cred);
 
-    // create a unique identifier for the credential. For now, this is a UUID; we could use the hash
-    // of the credential to make sure we have a cred-dependent unique identifier (TODO).
-    let cred_uid = Uuid::new_v4().to_string();
-    println!("Generated credential UID: {}", cred_uid);
-
     // verify if the schema_UID is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&cred_info.schema_UID.as_str()) {
         return "Unsupported schema UID".to_string();
     }
+
+    let cred_uid = compute_cred_uid(&cred_info.cred);
+    println!("Generated credential UID: {}", cred_uid);
 
     // Define schemaUID-specific base folder path and a child credential-specific folder path
     let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, cred_info.schema_UID);
@@ -145,6 +155,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let cred_folder = format!("{}/{}", base_folder, cred_uid);
 
     // Create credential-specific folder
+    // TODO: This fails if the directory already exists
     fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
 
     // Copy the base folder content to the new credential-specific folder
@@ -169,33 +180,21 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
 
     rocket::tokio::spawn(async move {
         let task_result: Result<(), String> = (|| async {
-            // fetch the issuer's JWK
-            fetch_and_save_jwk(&issuer_url, &cred_folder).await?;
+            if cred_info.schema_UID != "mdl_1" {
+                // fetch the issuer's JWK
+                fetch_and_save_jwk(&issuer_url, &cred_folder).await?;
 
-            // prepare the show data in a separate task using the per-credential folder
-            let jwt = &cred_info.cred;
-            let schema_UID = &cred_info.schema_UID;
-            println!("got schema_UID = {}", schema_UID);
-            let issuer_URL = &cred_info.issuer_URL;
-            println!("got issuer_URL = {}", issuer_URL);
+                // prepare the show data in a separate task using the per-credential folder
+                println!("got schema_UID = {}", &cred_info.schema_UID);
+                println!("got issuer_URL = {}", &cred_info.issuer_URL);
+            }
 
             let paths = CachePaths::new_from_str(&cred_folder);
-            println!("Loading issuer public key");
-            let issuer_pem = fs::read_to_string(&paths.issuer_pem).map_err(|_| "Unable to read issuer public key PEM")?;
 
             println!("Loading prover params");
             let prover_params = ProverParams::<CrescentPairing>::new(&paths).map_err(|_| "Failed to create prover params")?;
             println!("Parsing config");
             let config = parse_config(prover_params.config_str).map_err(|_| "Failed to parse config")?;
-
-            println!("Creating prover inputs");
-            let (prover_inputs_json, _prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &jwt, &issuer_pem).map_err(|_| "Failed to prepare prover inputs")?;
-            let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
-
-            println!("Creating client state... this is slow...");
-            let client_state = create_client_state(&paths, &prover_inputs).map_err(|_| "Failed to create client state")?;
-            let client_state_b64 = write_to_b64url(&client_state);
-            println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
 
             let range_pk: RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).map_err(|_| "Failed to read range proof pk")?;
             println!("Serializing range proof pk");
@@ -203,7 +202,28 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
             println!("Reading IO locations file");
             let io_locations_str: String = fs::read_to_string(&paths.io_locations).map_err(|_| "Failed to read IO locations file")?;
 
+            let client_state = 
+            if cred_info.schema_UID == "mdl_1" {        // TODO: add common function to get the cred_type from the schema_UID
+                let client_state : ClientState<CrescentPairing> = read_from_file(&paths.client_state).map_err(|_| "Failed to read client state")?;
+                client_state
+            }
+            else {
+                println!("Loading issuer public key");
+                let issuer_pem = fs::read_to_string(&paths.issuer_pem).map_err(|_| "Unable to read issuer public key PEM")?;                
+                println!("Creating prover inputs");
+                let (prover_inputs_json, _prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &cred_info.cred, &issuer_pem).map_err(|_| "Failed to prepare prover inputs")?;
+                let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
+
+                println!("Creating client state... this is slow...");
+                let client_state = create_client_state(&paths, &prover_inputs).map_err(|_| "Failed to create client state")?;
+                
+                client_state
+            };
+
+            let client_state_b64 = write_to_b64url(&client_state);
+            println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
             let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str };
+
             println!("Task complete, storing ShowData (size: {:?} bytes)",
                 show_data.client_state_b64.len() + show_data.io_locations_str.len() + show_data.range_pk_b64.len());
 
@@ -248,6 +268,27 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
     }
 }
 
+// TODO: this is not quite right; we need to also use the Schema ID. It assumes that all JWTs support the email_domain predicate
+pub fn is_disc_uid_supported(disc_uid : &String, cred_type: &String) -> bool {
+    match cred_type.as_str() {
+        "jwt" => {
+            match disc_uid.as_str() {
+                "crescent://email_domain" => true,
+                _ => false,
+            }
+        }
+        "mdl" => {
+            match disc_uid.as_str() {
+                "crescent://over_18" => true,
+                "crescent://over_21" => true,
+                "crescent://over_65" => true,
+                _ => false,
+            }
+        }
+        _ => false  // unknown cred type
+    }
+}
+
 #[get("/show?<cred_uid>&<disc_uid>")]
 async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>) -> Result<String, String> {
     println!("*** /show called with credential UID {} and disc_uid {}", cred_uid, disc_uid);
@@ -255,6 +296,7 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
     
     match tasks.get(&cred_uid) {
         Some(Some(show_data)) => {
+
             // Deserialize the ClientState and range proof public key from ShowData
             let mut client_state = read_from_b64url::<ClientState<CrescentPairing>>(&show_data.client_state_b64)
                 .map_err(|_| "Failed to parse client state".to_string())?;
@@ -262,8 +304,25 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
             let range_pk = read_from_b64url::<RangeProofPK<'a, CrescentPairing>>(&show_data.range_pk_b64)
                 .map_err(|_| "Failed to parse range proof public key".to_string())?;
 
+            // Check that the cred stored at cred_uid supports the disclosure type disc_uid
+            if !is_disc_uid_supported(&disc_uid, &client_state.credtype) {
+                let msg = format!("Disclosure UID {} is not supported with credential of type {}", disc_uid, client_state.credtype);
+                println!("{}",msg);
+                return Err(msg);
+            }
+
             // Create the show proof
-            let show_proof = create_show_proof(&mut client_state, &range_pk, &io_locations);
+            let show_proof =
+            if &client_state.credtype == "mdl" {
+                todo!(" TODO: Call create_show_proof_mdl")
+            }
+            else {
+                create_show_proof(&mut client_state, &range_pk, &io_locations);                
+            };
+            
+             
+
+
             let show_proof_b64 = write_to_b64url(&show_proof);
 
             // Return the show proof as a base64-url encoded string
@@ -322,7 +381,7 @@ mod test {
         let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
         let cred = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
         let issuer_URL = "https://issuer.example.com".to_string();
-        let schema_UID = SCHEMA_UID.to_string();
+        let schema_UID = SCHEMA_UIDS[0].to_string();
         let cred_info = CredInfo{cred, schema_UID, issuer_URL};
 
          // Step 1: Call /prepare and get the cred_uid
