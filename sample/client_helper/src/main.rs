@@ -33,6 +33,7 @@ use std::collections::HashMap;
 use std::fs::{self};
 use std::sync::Arc;
 use std::path::Path;
+use std::io;
 
 
 // For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
@@ -43,6 +44,41 @@ use std::path::Path;
 //       For caching the client helper could re-use the CachePaths struct and approach.
 const CRESCENT_DATA_BASE_PATH : &str = "./data/creds";
 const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
+
+// TODO: move this to common area
+#[cfg(unix)]
+use std::os::unix::fs::symlink as symlink_any;
+
+#[cfg(windows)]
+fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
+    if src.is_file() {
+        std::os::windows::fs::symlink_file(src, dst)
+    } else if src.is_dir() {
+        std::os::windows::fs::symlink_dir(src, dst)
+    } else {
+        Err(io::Error::new(io::ErrorKind::Other, "Source path is neither file nor directory"))
+    }
+}
+
+// copies the contents of the shared folder to the target folder using symlinks
+fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<()> {
+    // Ensure the target folder exists
+    fs::create_dir_all(target_folder)?;
+
+    for entry in fs::read_dir(shared_folder)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        // Convert entry path to an absolute path
+        let abs_entry_path = entry_path.canonicalize()?;
+        let target_path = target_folder.join(entry.file_name());
+
+        // Create symlink from absolute source path to target path
+        symlink_any(&abs_entry_path, &target_path)?;
+    }
+
+    Ok(())
+}
+
 
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone)]
@@ -160,12 +196,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
 
     // Copy the base folder content to the new credential-specific folder
-    // TODO: don't hard copy shared parameters, use symlinks or just the credential-specific data (need to modify CachePaths)
-    fs_extra::dir::copy(
-        shared_folder,
-        &cred_folder,
-        &fs_extra::dir::CopyOptions::new().content_only(true),
-    ).expect("Failed to copy base folder content");
+    copy_with_symlinks(&shared_folder.as_ref(), &cred_folder.as_ref());
     println!("Copied base folder to credential-specific folder: {}", cred_folder);
 
     // Insert task with empty data (indicating "preparing")

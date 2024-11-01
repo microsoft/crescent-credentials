@@ -31,7 +31,7 @@ cargo run --release --features print-trace --example demo rs256 -- --nocapture
 ```
 
 # Running the demo steps separately 
-There is a command line tool that can be used to run the individual parts of the demo separately.  This clearly separates the roles of prover and verifier, and shows what parameters are required by each.    The filesystem is used to store data between steps, and also to "communicate" show proofs from prover to verifier. 
+There is a command line tool that can be used to run the individual parts of the demo separately.  This clearly separates the roles of prover and verifier, and shows what parameters are required by each.  The filesystem is used to store data between steps, and also to "communicate" show proofs from prover to verifier. 
 
 The steps are
 * `zksetup` Generates the (circuit-specific) system parameters 
