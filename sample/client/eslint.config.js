@@ -11,7 +11,6 @@ import globals from 'globals'
 const stylisticRecommended = stylistic.configs['recommended-flat']
 
 const standardJsRules = {
-  'indent': ['error', 2],
   '@stylistic/comma-dangle': ['error', 'never'],
   '@stylistic/space-before-function-paren': ['error', 'always'],
   'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],

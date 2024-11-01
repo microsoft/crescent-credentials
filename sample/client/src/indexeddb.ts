@@ -36,7 +36,7 @@ async function openDatabase (dbName: string, store: string, version: number): Pr
   })
 }
 
-export async function addData<T> (store: string, key: string, data: T): Promise<string> {
+export async function addData<T> (store: string, key: string, data: T): Promise<boolean> {
   if (_db == null) {
     await openDatabase(_name, store, _version)
   }
@@ -48,10 +48,10 @@ export async function addData<T> (store: string, key: string, data: T): Promise<
     const request: IDBRequest<IDBValidKey> = objectStore.put({ id: key, data })
 
     request.onsuccess = () => {
-      resolve('Data added successfully')
+      resolve(true)
     }
 
-    request.onerror = (_event: Event) => {
+    request.onerror = (_err) => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       reject(domExceptionToError(request.error!))
     }

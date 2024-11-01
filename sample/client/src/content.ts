@@ -3,7 +3,9 @@
  *  Licensed under the MIT license.
  */
 
-import { MSG_NOTIFY_CRESCENT_DISCLOSURE_URI, MSG_NOTIFY_CRESCENT_META } from './constants.js'
+/* eslint-disable @typescript-eslint/no-magic-numbers */
+
+import { MSG_BACKGROUND_CONTENT_SEND_PROOF, MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, MSG_CONTENT_BACKGROUND_IMPORT_CARD } from './constants.js'
 
 console.debug('content.js: load')
 
@@ -11,28 +13,22 @@ const metaTagJwt = document.querySelector('meta[name="CRESCENT_JWT"]')
 if (metaTagJwt != null) {
   const metaValue = metaTagJwt.getAttribute('content')
   console.log('Detected meta value:', metaValue)
-  insertBanner(`Crescent CRESCENT_JWT detected: ${metaValue}`)
   const domain = new URL(window.location.href).hostname
-  /*
-    Store the JWT from this site in the background script
-  */
-  void chrome.runtime.sendMessage({ action: MSG_NOTIFY_CRESCENT_META, data: { jwt: metaValue, url: domain } })
+  void chrome.runtime.sendMessage({ action: MSG_CONTENT_BACKGROUND_IMPORT_CARD, data: { encoded: metaValue, domain } })
+  console.log(metaValue)
 }
 
-const metaTagDisclosure = document.querySelector('meta[crescent="CRESCENT_DISCLOSURE_URI"]')
-if (metaTagDisclosure != null) {
-  const metaValue = metaTagDisclosure.getAttribute('crescent')
-  console.log('Detected meta value:', metaValue)
-  insertBanner(`Crescent CRESCENT_DISCLOSURE_URI detected: ${metaValue}`)
-  const domain = new URL(window.location.href).hostname
-  /*
-    Store the JWT from this site in the background script
-  */
-  void chrome.runtime.sendMessage({ action: MSG_NOTIFY_CRESCENT_DISCLOSURE_URI, data: {} })
+const crescentVerifyUrlMeta = document.querySelector('meta[crescent_verify_url]')
+const crescentDisclosureUidMeta = document.querySelector('meta[crescent_disclosure_uid]')
+if (crescentVerifyUrlMeta != null && crescentDisclosureUidMeta != null) {
+  const verifierDomain = window.location.hostname
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const disclosureUid = crescentDisclosureUidMeta.getAttribute('crescent_disclosure_uid')!
+  void chrome.runtime.sendMessage({ action: MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, data: { url: verifierDomain, uid: disclosureUid } })
 }
 
 // Function to create and insert a banner at the top of the page
-function insertBanner (message: string): void {
+function _insertBanner (message: string): void {
   const banner = document.createElement('div')
 
   // Style the banner
@@ -66,3 +62,33 @@ function insertBanner (message: string): void {
   }
   banner.appendChild(closeButton)
 }
+
+// listen for meesgae from background
+chrome.runtime.onMessage.addListener((request, _sender, _sendResponse) => {
+  if (request.action === MSG_BACKGROUND_CONTENT_SEND_PROOF) {
+    console.log('Received proof:', request.data)
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const { url, ...data } = request.data
+
+    fetch(url as string, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data),
+      redirect: 'follow'
+    })
+      .then(async (response) => {
+        if (response.status === 200) {
+          window.location.href = response.url
+        }
+        else {
+          console.log('Received non-redirect response:', response)
+          return await response.json()
+        }
+      })
+      .catch((error) => {
+        console.error('Error sending proof:', error)
+      })
+  }
+})
