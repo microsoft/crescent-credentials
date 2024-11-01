@@ -28,7 +28,7 @@ pub mod prep_inputs;
 pub mod daystamp;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
-const SHOW_PROOF_VALIDITY_SECONDS: u64 = 60;    // The verifier only accepts proofs fresher than this
+const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
 
 pub type CrescentPairing = ECPairing;
 
