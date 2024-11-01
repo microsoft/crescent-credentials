@@ -5,3 +5,6 @@
 
 # call the JWKS generation script
 node scripts/generate-jwks.js
+
+# call the Rocket config update script
+node scripts/update-rocket-toml.js

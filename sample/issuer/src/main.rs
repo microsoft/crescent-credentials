@@ -93,6 +93,7 @@ struct LoginForm {
 struct IssuerConfig {
     issuer_name: String,
     issuer_domain: String,
+    issuer_kid: String
 }
 
 // redirect from `/` to `/login`
@@ -167,6 +168,7 @@ fn issue_token(
         let username = cookie.value().to_string();
         let issuer_name_str = issuer_config.issuer_name.as_str();
         let issuer_domain_str = issuer_config.issuer_domain.as_str();
+        let issuer_kid_str = issuer_config.issuer_kid.as_str();
 
         // find the user based on the username
         if let Some(user) = users.iter().find(|user| user.username == username) {
@@ -191,7 +193,8 @@ fn issue_token(
                 xms_tpl: "en".to_string(),
             };
 
-            let header = Header::new(jsonwebtoken::Algorithm::RS256);
+            let mut header = Header::new(jsonwebtoken::Algorithm::RS256);
+            header.kid = Some(issuer_kid_str.to_string());
 
             let token = encode(&header, &claims, &private_key.key)
                 .map_err(|_| "Failed to generate token")?;
@@ -313,10 +316,12 @@ fn rocket() -> _ {
      let figment = rocket::Config::figment();
      let issuer_name: String = figment.extract_inner("issuer_name").unwrap_or_else(|_| "Example Issuer".to_string());
      let issuer_domain: String = figment.extract_inner("issuer_domain").unwrap_or_else(|_| "example.com".to_string());
+     let issuer_kid: String = figment.extract_inner("issuer_kid").unwrap_or_else(|_| "12345".to_string());
  
      let issuer_config = IssuerConfig {
          issuer_name,
          issuer_domain,
+         issuer_kid
      };
  
      // Create demo users based on the issuer config

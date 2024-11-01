@@ -18,6 +18,7 @@ function pemToJWK(pem) {
     const pemContents = pem.replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\n/g, '');
     const buffer = Buffer.from(pemContents, 'base64');
     const kid = generateKid(buffer);
+    console.log(`Add the generated 'kid' to the issuer's 'Rocket.toml': ${kid}`);
 
     // use Node.js crypto module to decode the PEM
     const publicKey = crypto.createPublicKey({

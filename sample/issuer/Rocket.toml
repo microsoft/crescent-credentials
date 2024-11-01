@@ -1,4 +1,5 @@
 [default]
 issuer_name = "Contoso"
 issuer_domain = "contoso.com"
+kid = "REPLACE_WITH_ISSUER_KID"
 port = 8001
