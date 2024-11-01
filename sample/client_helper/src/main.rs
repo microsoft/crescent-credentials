@@ -185,6 +185,9 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let cred_uid = compute_cred_uid(&cred_info.cred);
     println!("Generated credential UID: {}", cred_uid);
 
+    let cred_uid = compute_cred_uid(&cred_info.cred);
+    println!("Generated credential UID: {}", cred_uid);
+
     // Define schemaUID-specific base folder path and a child credential-specific folder path
     let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, cred_info.schema_UID);
     let shared_folder = format!("{}/{}", base_folder, CRESCENT_SHARED_DATA_SUFFIX);
