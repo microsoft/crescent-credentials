@@ -21,24 +21,26 @@ use rocket::State;
 use rocket::fs::FileServer;
 
 use uuid::Uuid;
-
 use tokio::sync::Mutex;
+use serde_json::Value;
+use jsonwebkey::JsonWebKey;
 
 use std::collections::HashMap;
 use std::fs::{self};
 use std::sync::Arc;
 use std::path::Path;
 
-// define the cred schema UID. This is an opaque string that identifies the setup parameters (TODO: share this value in a common config crate)
-const SCHEMA_UID : &str = "https://schemas.crescent.dev/jwt/012345";
+// define the supported cred schema UIDs. These are an opaque strings that identifies the setup parameters (TODO: share this value in a common config crate)
+const SCHEMA_UIDS: [&str; 2] = ["jwt_corporate_1", "mdl_1"];
 
 // For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
-// TODO: we could make web requests to get the data from the setup service, but this will take more effort.
+// TODO: we could make web requests to get the data from the setup service, but this will take more effort (as documented in the sample README).
 //       The code we use in unit tests to make web requests doesn't work from a route handler, we need to investigate.  It may 
 //       only be suitable for testing, there is probably a better way.
 //       Also we'll need some caching of the parameters to avoid fetching large files multiple times.
 //       For caching the client helper could re-use the CachePaths struct and approach.
 const CRESCENT_DATA_BASE_PATH : &str = "./data/creds";
+const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
 
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone)]
@@ -85,6 +87,41 @@ struct VerifyResult {
     email_domain: String
 }
 
+async fn fetch_and_save_jwk(issuer_url: &str, cred_folder: &str) -> Result<(), String> {
+    // Prepare the JWK URL
+    let jwk_url = format!("{}/.well-known/jwks.json", issuer_url);
+    println!("Fetching JWK set from: {}", jwk_url);
+
+    // Fetch the JWK
+    let response = ureq::get(&jwk_url)
+        .call()
+        .map_err(|e| format!("Request failed: {}", e))?;
+    let body = response.into_string()
+        .map_err(|e| format!("Failed to parse response body: {}", e))?;
+    let jwk_set: Value = serde_json::from_str(&body)
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+     // Extract the first key from the JWK set and parse it into `JsonWebKey`
+     let jwk_value = jwk_set.get("keys")
+        .and_then(|keys| keys.as_array())
+        .and_then(|keys| keys.first())
+        .ok_or_else(|| "No keys found in JWK set".to_string())?;
+
+    // Deserialize the JSON `Value` into a `JsonWebKey`
+    let jwk: JsonWebKey = serde_json::from_value(jwk_value.clone())
+        .map_err(|e| format!("Failed to parse JWK: {}", e))?;
+
+    // Convert the JWK to PEM format
+    let pem_key = jwk.key.to_pem();
+
+    // Save the PEM-encoded key to issuer.pub in the cred_folder
+    let pub_key_path = Path::new(cred_folder).join("issuer.pub");
+    fs::write(&pub_key_path, pem_key).map_err(|err| format!("Failed to save public key: {:?}", err))?;
+
+    println!("Saved issuer's public key to {:?}", pub_key_path);
+    Ok(())
+}
+
 #[post("/prepare", format = "json", data = "<cred_info>")]
 async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> String {
     println!("*** /prepare called");
@@ -97,16 +134,23 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let cred_uid = Uuid::new_v4().to_string();
     println!("Generated credential UID: {}", cred_uid);
 
-    // Define base folder path and credential-specific folder path
-    let base_folder = CRESCENT_DATA_BASE_PATH;
+    // verify if the schema_UID is one of our supported SCHEMA_UIDS
+    if !SCHEMA_UIDS.contains(&cred_info.schema_UID.as_str()) {
+        return "Unsupported schema UID".to_string();
+    }
+
+    // Define schemaUID-specific base folder path and a child credential-specific folder path
+    let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, cred_info.schema_UID);
+    let shared_folder = format!("{}/{}", base_folder, CRESCENT_SHARED_DATA_SUFFIX);
     let cred_folder = format!("{}/{}", base_folder, cred_uid);
 
-    // Copy the base folder into the new credential-specific folder
-    // TODO: don't copy shared parameters, just the credential-specific data (need to modify CachePaths)
-    //       the params should be per-schema_uid too.
+    // Create credential-specific folder
     fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
+
+    // Copy the base folder content to the new credential-specific folder
+    // TODO: don't hard copy shared parameters, use symlinks or just the credential-specific data (need to modify CachePaths)
     fs_extra::dir::copy(
-        base_folder,
+        shared_folder,
         &cred_folder,
         &fs_extra::dir::CopyOptions::new().content_only(true),
     ).expect("Failed to copy base folder content");
@@ -118,49 +162,64 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
         tasks.insert(cred_uid.clone(), None);
     }
 
+    // Clone the state for async task
     let state = state.inner().0.clone();
     let cred_uid_clone = cred_uid.clone();
+    let issuer_url = cred_info.issuer_URL.clone();
 
     rocket::tokio::spawn(async move {
-        // prepare the show data in a separate task using the per-credential folder
-        // TODO: catch errors, and set the task to an error state (to inform clients to stop waiting)
-        let jwt = &cred_info.cred;
-        let schema_UID = &cred_info.schema_UID;
-        println!("got schema_UID = {}", schema_UID);
-        let issuer_URL = &cred_info.issuer_URL;
-        println!("got issuer_URL = {}", issuer_URL);
+        let task_result: Result<(), String> = (|| async {
+            // fetch the issuer's JWK
+            fetch_and_save_jwk(&issuer_url, &cred_folder).await?;
 
-        let paths = CachePaths::new_from_str(&cred_folder);
-        println!("Loading issuer public key");
-        let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {}", paths.issuer_pem));
+            // prepare the show data in a separate task using the per-credential folder
+            let jwt = &cred_info.cred;
+            let schema_UID = &cred_info.schema_UID;
+            println!("got schema_UID = {}", schema_UID);
+            let issuer_URL = &cred_info.issuer_URL;
+            println!("got issuer_URL = {}", issuer_URL);
 
-        println!("Loading prover params");
-        let prover_params = ProverParams::<CrescentPairing>::new(&paths).expect("Failed to create prover params");
-        println!("Parsing config");
-        let config = parse_config(prover_params.config_str).expect("Failed to parse config");
+            let paths = CachePaths::new_from_str(&cred_folder);
+            println!("Loading issuer public key");
+            let issuer_pem = fs::read_to_string(&paths.issuer_pem).map_err(|_| "Unable to read issuer public key PEM")?;
 
-        println!("Creating prover inputs");
-        let (prover_inputs_json, _prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");
-        let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
+            println!("Loading prover params");
+            let prover_params = ProverParams::<CrescentPairing>::new(&paths).map_err(|_| "Failed to create prover params")?;
+            println!("Parsing config");
+            let config = parse_config(prover_params.config_str).map_err(|_| "Failed to parse config")?;
 
-        println!("Creating client state... this is slow... ");
-        let client_state = create_client_state(&paths, &prover_inputs).expect("Failed to create client state");
+            println!("Creating prover inputs");
+            let (prover_inputs_json, _prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &jwt, &issuer_pem).map_err(|_| "Failed to prepare prover inputs")?;
+            let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
 
-        let client_state_b64 = write_to_b64url(&client_state);
-        println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
+            println!("Creating client state... this is slow...");
+            let client_state = create_client_state(&paths, &prover_inputs).map_err(|_| "Failed to create client state")?;
+            let client_state_b64 = write_to_b64url(&client_state);
+            println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
 
-        let range_pk: RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).expect("Failed to read range proof pk");
-        println!("Serializing range proof pk");
-        let range_pk_b64 = write_to_b64url(&range_pk);
-        println!("Reading IO locations file");
-        let io_locations_str: String = fs::read_to_string(&paths.io_locations).unwrap();
+            let range_pk: RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).map_err(|_| "Failed to read range proof pk")?;
+            println!("Serializing range proof pk");
+            let range_pk_b64 = write_to_b64url(&range_pk);
+            println!("Reading IO locations file");
+            let io_locations_str: String = fs::read_to_string(&paths.io_locations).map_err(|_| "Failed to read IO locations file")?;
 
-        let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str };
-        println!("Task complete, storing ShowData: {:?}", show_data);
+            let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str };
+            println!("Task complete, storing ShowData (size: {:?} bytes)",
+                show_data.client_state_b64.len() + show_data.io_locations_str.len() + show_data.range_pk_b64.len());
 
-        // Store the ShowData into the shared state (indicating "ready")
-        let mut tasks = state.lock().await;
-        tasks.insert(cred_uid_clone, Some(show_data));
+            // Store the ShowData into the shared state (indicating "ready")
+            let mut tasks = state.lock().await;
+            tasks.insert(cred_uid_clone.clone(), Some(show_data));
+
+            Ok(())
+        })().await;
+
+        // Handle any error by removing the `cred_uid` entry from the state
+        if task_result.is_err() {
+            let mut tasks = state.lock().await;
+            tasks.remove(&cred_uid_clone);
+            eprintln!("Error occurred, removing cred_uid from state: {:?}", task_result.err());
+        }
     });
 
     cred_uid

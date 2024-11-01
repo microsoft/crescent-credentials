@@ -2,14 +2,14 @@
 
 # Define the source and target directories as arrays
 SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/mdl1")
-TARGET_DIRS=("./data/creds/jwt_corporate_1/shared" "./data/creds/mdl_1/shared")
+TARGET_DIRS=("./data/issuers/jwt_corporate_1/shared" "./data/issuers/mdl_1/shared")
 # Directory to clean up before copying new files
-CLEANUP_DIR="./data/creds"
+CLEANUP_DIR="./data/issuers"
 
 # Make sure we're in the right directory
 CURRENT_DIR=${PWD##*/}
-if [ "$CURRENT_DIR" != "client_helper" ]; then
-    echo "Run this script from the client_helper/ folder"
+if [ "$CURRENT_DIR" != "verifier" ]; then
+    echo "Run this script from the verifier/ folder"
     exit 1
 fi
 
@@ -30,13 +30,10 @@ for i in "${!SOURCE_DIRS[@]}"; do
 
     echo "Copying files from $SOURCE_DIR to $TARGET_DIR"
     set -x
-    cp "${SOURCE_DIR}/config.json" "${TARGET_DIR}/"
-    cp "${SOURCE_DIR}/main.wasm" "${TARGET_DIR}/"
-    cp "${SOURCE_DIR}/main_c.r1cs" "${TARGET_DIR}/"
     cp "${SOURCE_DIR}/io_locations.sym" "${TARGET_DIR}/"
-    cp "${SOURCE_DIR}/cache/groth16_params.bin" "${TARGET_DIR}/cache/"
     cp "${SOURCE_DIR}/cache/groth16_pvk.bin" "${TARGET_DIR}/cache/"
-    cp "${SOURCE_DIR}/cache/range_pk.bin" "${TARGET_DIR}/cache/"
+    cp "${SOURCE_DIR}/cache/groth16_vk.bin" "${TARGET_DIR}/cache/"
+    cp "${SOURCE_DIR}/cache/range_vk.bin" "${TARGET_DIR}/cache/"
     set +x
 
     echo "Finished copying for $TARGET_DIR"
