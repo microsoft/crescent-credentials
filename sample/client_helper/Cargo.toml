@@ -17,6 +17,7 @@ crescent = {path="../../creds"}
 sha2 = "0.10.8"
 hex = "0.4.3"
 base64-url = "3.0"
+crescent-sample-setup-service = {path="../setup_service"}
 
 [profile.dev.package."*"]
 opt-level = 3               # optimize dependencies, even in dev builds

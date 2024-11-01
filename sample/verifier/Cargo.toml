@@ -13,6 +13,7 @@ fs_extra = "1.2"
 jsonwebkey = { version = "0.3.5", features = ["pkcs-convert"] }
 ureq = "2.5"
 crescent = {path="../../creds"}
+crescent-sample-setup-service = {path="../setup_service"}
 
 [profile.dev.package."*"]
 opt-level = 3               # optimize dependencies, even in dev builds

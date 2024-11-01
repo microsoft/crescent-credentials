@@ -12,6 +12,7 @@ use crescent::VerifierParams;
 use crescent::utils::{read_from_b64url, read_from_file, write_to_b64url};
 use crescent::ProverParams;
 
+use crescent_sample_setup_service::common::*;
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
 use rocket::time::macros::time;
@@ -33,8 +34,6 @@ use std::fs::{self};
 use std::sync::Arc;
 use std::path::Path;
 
-// define the supported cred schema UIDs. These are an opaque strings that identifies the setup parameters (TODO: share this value in a common config crate)
-const SCHEMA_UIDS: [&str; 2] = ["jwt_corporate_1", "mdl_1"];
 
 // For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
 // TODO: we could make web requests to get the data from the setup service, but this will take more effort (as documented in the sample README).
@@ -270,36 +269,6 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
     }
 }
 
-// TODO: this is not quite right; we need to also use the Schema ID. It assumes that all JWTs support the email_domain predicate
-pub fn is_disc_uid_supported(disc_uid : &String, cred_type: &String) -> bool {
-    match cred_type.as_str() {
-        "jwt" => {
-            match disc_uid.as_str() {
-                "crescent://email_domain" => true,
-                _ => false,
-            }
-        }
-        "mdl" => {
-            match disc_uid.as_str() {
-                "crescent://over_18" => true,
-                "crescent://over_21" => true,
-                "crescent://over_65" => true,
-                _ => false,
-            }
-        }
-        _ => false  // unknown cred type
-    }
-}
-
-pub fn disc_uid_to_age(disc_uid : &String) -> Result<usize, &'static str> {
-
-    match disc_uid.as_str() {
-        "crescent://over_18" => Ok(18),
-        "crescent://over_21" => Ok(21),
-        "crescent://over_65" => Ok(65),
-        _ => Err("disc_uid_to_age: invalid disclosure uid"),
-    }
-}
 
 #[get("/show?<cred_uid>&<disc_uid>")]
 async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>) -> Result<String, String> {
