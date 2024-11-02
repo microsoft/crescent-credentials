@@ -219,7 +219,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         }
     } 
     else {    // mdl
-        let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap();
+        let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap(); // disclosure UID already validated; should not fail
         let (is_valid, _) = verify_show_mdl(&vp, &show_proof, age);
 
         if is_valid {

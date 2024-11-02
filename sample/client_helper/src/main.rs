@@ -145,6 +145,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     if !SCHEMA_UIDS.contains(&cred_info.schema_UID.as_str()) {
         return "Unsupported schema UID".to_string();
     }
+    let cred_type = cred_type_from_schema(&cred_info.schema_UID).unwrap();
 
     let cred_uid = compute_cred_uid(&cred_info.cred);
     println!("Generated credential UID: {}", cred_uid);
@@ -181,7 +182,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     rocket::tokio::spawn(async move {
         let task_result: Result<(), String> = (|| async {
             let start_time = std::time::SystemTime::now();
-            if cred_info.schema_UID != "mdl_1" {
+            if cred_type == "jwt" {
                 // fetch the issuer's JWK
                 fetch_and_save_jwk(&issuer_url, &cred_folder).await?;
 
@@ -204,7 +205,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
             let io_locations_str: String = fs::read_to_string(&paths.io_locations).map_err(|_| "Failed to read IO locations file")?;
 
             let client_state = 
-            if cred_info.schema_UID == "mdl_1" {        // TODO: add common function to get the cred_type from the schema_UID
+            if cred_type == "mdl" {
                 let client_state : ClientState<CrescentPairing> = read_from_file(&paths.client_state).map_err(|_| "Failed to read client state")?;
                 client_state
             }
