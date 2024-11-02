@@ -10,12 +10,12 @@ The Crescent library must have been built and the ZK setup must have been run be
 
 Then, call the setup script `./setup_client_helper.sh`.
 
-To build the server, run `cargo build`.
+To build the server, run `cargo build --release`.
 
 ## Running the server
 
-To start the server, run `cargo run`. By default, the server will listen on `http://localhost:8003`; this can be modified by changing the `port` variable in the [Rocket.toml](./Rocket.toml) file.
+To start the server, run `cargo run --release`. By default, the server will listen on `http://localhost:8003`; this can be modified by changing the `port` variable in the [Rocket.toml](./Rocket.toml) file.
 
 ## Testing the server
 
-To test the server, run `cargo test` or visit the test page at the server's URL.  
+To test the server, run `cargo test --release` or visit the test page at the server's URL.  
