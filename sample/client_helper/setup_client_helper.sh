@@ -42,4 +42,15 @@ for i in "${!SOURCE_DIRS[@]}"; do
     echo "Finished copying for $TARGET_DIR"
 done
 
+# Copy the client_state for mDL credentials  
+# TODO: this is temporary, eventually we will generate the client state upon request, as we do for JWTs
+if [ ! -f "../../creds/test-vectors/mdl1/cache/client_state.bin" ]; then
+    echo "WARNING: client_state.json does not exist in ../../creds/test-vectors/mdl1/"
+    echo "WARNING: mDL demos will not work"
+else
+    echo "Copying client_state for mDL demo"
+    cp "../../creds/test-vectors/mdl1/cache/client_state.bin" "./data/creds/mdl_1/shared/cache/"
+fi
+
+
 echo "All copy operations complete."

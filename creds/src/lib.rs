@@ -10,7 +10,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
 use prep_inputs::{parse_config, unpack_int_to_string_unquoted, prepare_prover_inputs};
-use utils::{read_from_file, write_to_file};
+use utils::{read_from_file, write_to_b64url, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
 use crate::{
@@ -29,6 +29,7 @@ pub mod daystamp;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
+const MDL_EXAMPLE_AGE_GREATER_THAN : usize = 18;    // mDL show proofs will prove that the holder is older than this 
 
 pub type CrescentPairing = ECPairing;
 
@@ -310,7 +311,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     show_proof
 }
 
-pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
+pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations, age: usize) -> ShowProof<ECPairing>
 {
     // Create Groth16 rerandomized proof for showing
     let valid_until_value_pos = io_locations.get_io_location("valid_until_value").unwrap();
@@ -337,7 +338,7 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let show_range = client_state.show_range(&com_valid_until_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
 
     // Create fresh range proof for birth_date; prove age is over 21
-    let days_in_21y = Fr::from(days_to_be_age(21) as u64);
+    let days_in_21y = Fr::from(days_to_be_age(age) as u64);
     let mut com_dob = client_state.committed_input_openings[1].clone();
     com_dob.m -= days_in_21y;
     com_dob.c -= com_dob.bases[0] * days_in_21y;
@@ -347,7 +348,6 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let show_proof = ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
 
     show_proof
-
 }
 
 fn _show_groth16_proof_size(show_groth16: &ShowGroth16<ECPairing>) -> usize {
@@ -399,7 +399,7 @@ pub fn run_show(
     let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk).unwrap();
     
     let show_proof = if client_state.credtype == "mdl" {
-        create_show_proof_mdl(&mut client_state, &range_pk, &io_locations)  
+        create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, MDL_EXAMPLE_AGE_GREATER_THAN)  
     } else {
         create_show_proof(&mut client_state, &range_pk, &io_locations)
     };
@@ -465,7 +465,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     (true, domain)
 }
 
-pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>) -> (bool, String)
+pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, age: usize) -> (bool, String)
 {
     let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
     // TODO: load public_IOs file and take modulus from there.  
@@ -512,7 +512,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
     );
 
     assert!(show_proof.show_range2.is_some());
-    let days_in_21y = Fr::from(days_to_be_age(21) as u64);
+    let days_in_21y = Fr::from(days_to_be_age(age) as u64);
     let mut ped_com_dob = show_proof.show_groth16.commited_inputs[1].clone();
     ped_com_dob -= vp.pvk.vk.gamma_abc_g1[dob_value_pos] * days_in_21y;
     show_proof.show_range2.as_ref().unwrap().verify(
@@ -526,7 +526,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
-    println!("mDL is valid, holder is over 21 years old");
+    println!("mDL is valid, holder is over {} years old", age);
 
     // We return true here since groth16.verify and show_range.verify just assert and panic if there is a failure
     // TODO: refactor verify functions to return booleans, so that we can return an error to the application, rather than bringing down the world.
@@ -546,7 +546,7 @@ pub fn run_verifier(base_path: PathBuf) {
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str};
 
     let _verify_result = if show_proof.show_range2.is_some() {
-        verify_show_mdl(&vp, &show_proof)
+        verify_show_mdl(&vp, &show_proof, MDL_EXAMPLE_AGE_GREATER_THAN)
     } else {
         verify_show(&vp, &show_proof)
     };
