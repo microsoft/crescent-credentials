@@ -93,6 +93,7 @@ struct LoginForm {
 struct IssuerConfig {
     issuer_name: String,
     issuer_domain: String,
+    issuer_kid: String,
 }
 
 // redirect from `/` to `/login`
@@ -167,6 +168,7 @@ fn issue_token(
         let username = cookie.value().to_string();
         let issuer_name_str = issuer_config.issuer_name.as_str();
         let issuer_domain_str = issuer_config.issuer_domain.as_str();
+        let issuer_kid_str = issuer_config.issuer_kid.as_str();
 
         // find the user based on the username
         if let Some(user) = users.iter().find(|user| user.username == username) {
@@ -191,7 +193,8 @@ fn issue_token(
                 xms_tpl: "en".to_string(),
             };
 
-            let header = Header::new(jsonwebtoken::Algorithm::RS256);
+            let mut header = Header::new(jsonwebtoken::Algorithm::RS256);
+            header.kid = Some(issuer_kid_str.to_string());
 
             let token = encode(&header, &claims, &private_key.key)
                 .map_err(|_| "Failed to generate token")?;
@@ -301,8 +304,8 @@ fn rocket() -> _ {
         .expect("Failed to read JWKS file");
     let jwks: serde_json::Value = serde_json::from_slice(&jwks_data)
         .expect("Failed to parse JWKS file");
-    let kid = jwks["keys"][0]["kid"].as_str();
-    println!("Loaded JWKS with kid: {:?}", kid);
+    let issuer_kid = jwks["keys"][0]["kid"].as_str().expect("issuer_kid should exist").to_string();
+    println!("Loaded JWKS with kid: {:?}", issuer_kid);
 
     // create the private key struct
     let private_key = PrivateKey {
@@ -317,6 +320,7 @@ fn rocket() -> _ {
      let issuer_config = IssuerConfig {
          issuer_name,
          issuer_domain,
+         issuer_kid,
      };
  
      // Create demo users based on the issuer config
