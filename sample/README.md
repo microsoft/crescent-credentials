@@ -111,7 +111,7 @@ sequenceDiagram
     E->>C: fetch show proof from /show?cred_uid=<cred_UID>&disc_uid=<disclosure_UID>
     C->>C: generate Crescent proof
     C->>E: return proof
-    E->>V: post {proof, schema_UID, issuer_UID} to verify_URL
+    E->>V: post {proof, schema_UID, issuer_UID, disclosure_UID} to verify_URL
     V->>S: fetch Crescent verify params from /verify_params/<schema_UID>
     V->>I: fetch JWK set from <issuer_URL>/.well-known/jwks.json
     V->>V: verify proof
