@@ -30,6 +30,7 @@ pub mod daystamp;
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
 const MDL_EXAMPLE_AGE_GREATER_THAN : usize = 18;    // mDL show proofs will prove that the holder is older than this 
+
 pub type CrescentPairing = ECPairing;
 
 
