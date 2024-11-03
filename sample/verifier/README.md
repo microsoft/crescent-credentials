@@ -21,7 +21,7 @@ To start the server, run `cargo run --release`. By default, the server will list
 To test the server, start the [issuer](../issuer/README.md) and [client helper](../client_helper/README.md) servers, obtain a JWT from the issuer page and create a show proof using the client helper test page, and post it to the verifier using:
 
 ```
-wget --method=POST --body-data='{"schema_UID":"jwt_corporate_1", "issuer_URL":"http://127.0.0.1:8001", "proof":"<PROOF_FROM_TEST_PAGE>"}' \
+wget --method=POST --body-data='{"schema_UID":"jwt_corporate_1", "issuer_URL":"http://127.0.0.1:8001", "proof":"<PROOF_FROM_TEST_PAGE>", "dislcosure_uid":"<DISCLOSURE_UID_FROM_TEST_PAGE>"}' \
      --header='Content-Type: application/json' \
      --server-response \
      --max-redirect=3 \
