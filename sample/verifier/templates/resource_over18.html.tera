@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Resource - {{ verifier_name }}</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <h1>Resource</h1>
+    <p>Thank you for proving that your age is over 18. You can now access the resources on our site.</p>
+</body>
+</html>
