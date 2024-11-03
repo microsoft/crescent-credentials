@@ -106,6 +106,12 @@
                 const show_proof_b64 = await showResponse.text(); console.log('Show Proof:', show_proof_b64);
                 // Display the Show Proof in the textarea
                 document.getElementById('showProofTextarea').value = show_proof_b64;
+                
+                // Display the test command in the textarea                
+                const schema_UID = document.getElementById("schemaUidInput").value;
+                const test_command = `wget --method=POST --body-data='{"schema_UID":"${schema_UID}", "issuer_URL":"http://127.0.0.1:8001", "proof":"${show_proof_b64}", "disclosure_uid":"${disclosure_UID}"}' --header='Content-Type: application/json' --server-response --max-redirect=3 -d http://127.0.0.1:8004/verify`;
+                document.getElementById('testCommand').value = test_command;
+                console.log(test_command);
             } catch (error) {
                 console.error('Error fetching Show Proof:', error);
                 document.getElementById('status').innerText = 'Error fetching Show Proof: ' + error.message;
@@ -166,6 +172,8 @@
         <button id="showCredentialButton" onclick="showCredential()" disabled>Show Credential</button> <!-- Button disabled initially -->
         <br>
         <textarea id="showProofTextarea" rows="10" cols="80" readonly></textarea> <!-- Textarea to display Show Proof -->
+        <br> Use this command to test from the console:<br>
+        <textarea id="testCommand" rows="10" cols="80" readonly></textarea> <!-- Textarea to display Show Proof -->
     </div>
 
 
