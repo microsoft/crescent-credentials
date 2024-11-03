@@ -109,7 +109,7 @@
                 
                 // Display the test command in the textarea                
                 const schema_UID = document.getElementById("schemaUidInput").value;
-                const test_command = `wget --method=POST --body-data='{"schema_UID":"${schema_UID}", "issuer_URL":"http://127.0.0.1:8001", "proof":"${show_proof_b64}", "disclosure_uid":"${disclosure_UID}"}' --header='Content-Type: application/json' --server-response --max-redirect=3 -d http://127.0.0.1:8004/verify`;
+                const test_command = `wget --method=POST --body-data='{"schema_UID":"${schema_UID}", "issuer_URL":"http://127.0.0.1:8001", "proof":"${show_proof_b64}", "disclosure_uid":"${disclosure_UID}"}' --header='Content-Type: application/json' --server-response --max-redirect=3 -d http://127.0.0.1:8004/verify -O- --no-verbose`;
                 document.getElementById('testCommand').value = test_command;
                 console.log(test_command);
             } catch (error) {
