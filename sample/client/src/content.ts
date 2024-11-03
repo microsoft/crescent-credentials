@@ -13,15 +13,15 @@ const metaTagJwt = document.querySelector('meta[name="CRESCENT_JWT"]')
 if (metaTagJwt != null) {
   const metaValue = metaTagJwt.getAttribute('content')
   console.log('Detected meta value:', metaValue)
-  const domain = new URL(window.location.href).hostname
-  void chrome.runtime.sendMessage({ action: MSG_CONTENT_BACKGROUND_IMPORT_CARD, data: { encoded: metaValue, domain } })
+  const domain = new URL(window.location.href).origin
+  void chrome.runtime.sendMessage({ action: MSG_CONTENT_BACKGROUND_IMPORT_CARD, data: { encoded: metaValue, schema: 'jwt_corporate_1' /* TODO: get schema from issuer */, domain } })
   console.log(metaValue)
 }
 
 const crescentVerifyUrlMeta = document.querySelector('meta[crescent_verify_url]')
 const crescentDisclosureUidMeta = document.querySelector('meta[crescent_disclosure_uid]')
 if (crescentVerifyUrlMeta != null && crescentDisclosureUidMeta != null) {
-  const verifierDomain = window.location.hostname
+  const verifierDomain = window.location.origin
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const disclosureUid = crescentDisclosureUidMeta.getAttribute('crescent_disclosure_uid')!
   void chrome.runtime.sendMessage({ action: MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, data: { url: verifierDomain, uid: disclosureUid } })

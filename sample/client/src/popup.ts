@@ -15,13 +15,16 @@ import {
 } from './constants.js'
 import { listen } from './listen.js'
 import { getElementById } from './utils.js'
+import config from './config.js'
 
-console.debug('popup.js: load')
+const puid = Math.random().toString(36).substring(7)
+
+console.debug('popup.js: load', puid)
 
 const PREPARED_MESSAGE_DURATION = 2000
 
 document.addEventListener('DOMContentLoaded', function (): void {
-  void Wallet.init().then(() => {
+  void Wallet.init(puid).then(() => {
   // Add event listeners to switch tabs
     const tabs = document.querySelectorAll<HTMLButtonElement>('.tab')
     tabs.forEach((tab) => {
@@ -30,34 +33,32 @@ document.addEventListener('DOMContentLoaded', function (): void {
       })
     })
 
-    getElementById('button-import-card').addEventListener('click', () => {
-      getElementById('file-import-file').click()
+    getElementById<HTMLInputElement>('button-import-card').addEventListener('click', () => {
+      getElementById<HTMLInputElement>('file-import-file').click()
     })
 
-    getElementById('file-import-file').addEventListener('change', (event) => {
+    getElementById<HTMLInputElement>('file-import-file').addEventListener('change', (event) => {
       const file: File | undefined = (event.target as HTMLInputElement | undefined)?.files?.[0]
       if (file == null) {
         return
       }
-
       const reader = new FileReader()
-      reader.onload = async function (event) {
-        const encoded = event.target?.result as string
-        void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_IMPORT, data: { encoded, domain: importSettings.domain } })
-          .then(async (_result: RESULT<string, Error>) => {
-            await Wallet.reload()
-          })
-          .then(() => {
-            void initWallet ()
-          })
-      }
-
+      reader.onload = importFileSelected
       reader.readAsText(file)
     })
 
-    const clientHelperUrlInput = getElementById('client-helper-url') as HTMLInputElement
+    const schemaDropDown = getElementById<HTMLSelectElement>('dropdown-import-schema')
 
-    clientHelperUrlInput.value = process.env.CLIENT_HELPER_URL ?? '127.0.0.1:8003'
+    config.schemas.forEach((schema) => {
+      const option = document.createElement('option')
+      option.value = schema
+      option.text = schema
+      schemaDropDown.add(option)
+    })
+
+    const clientHelperUrlInput = getElementById<HTMLInputElement>('client-helper-url')
+
+    clientHelperUrlInput.value = config.client_helper_url
 
     clientHelperUrlInput.addEventListener('change', function () {
       const url = clientHelperUrlInput.value
@@ -66,8 +67,25 @@ document.addEventListener('DOMContentLoaded', function (): void {
         clientHelperUrlInput.style.background = connected ? 'lime' : 'red'
       })
     })
+
+    void initWallet ()
   })
 })
+
+async function importFileSelected (event: ProgressEvent<FileReader>): Promise<void> {
+  const encoded = event.target?.result as string
+  const schema = getElementById<HTMLSelectElement>('dropdown-import-schema').value
+  void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_IMPORT, data: { encoded, domain: importSettings.domain, schema } })
+    .then(async (_result: RESULT<string, Error>) => {
+      await Wallet.reload()
+    })
+    .then(async () => {
+      await initWallet ()
+    })
+    .then(async () => {
+      _showTab('wallet')
+    })
+}
 
 function activateTab (tab: HTMLElement): void {
   const tabContents = document.querySelectorAll<HTMLDivElement>('.tab-content')
@@ -88,7 +106,7 @@ function activateTab (tab: HTMLElement): void {
   if (tabContentId === '') {
     throw new Error('Tab does not have a data-tab attribute')
   }
-  getElementById(tabContentId).classList.add('active-content')
+  getElementById<HTMLDivElement>(tabContentId).classList.add('active-content')
 }
 
 async function sendBackgroundMessage<T> (action: string, data: Record<string, unknown>): Promise<T> {
@@ -104,7 +122,7 @@ function _showTab (name: string): void {
 }
 
 async function initWallet (): Promise<void> {
-  const walletDiv = getElementById('wallet-info')
+  const walletDiv = getElementById<HTMLDivElement>('wallet-info')
   walletDiv.replaceChildren()
   Wallet.cards.forEach((card) => {
     console.debug(card)
@@ -113,7 +131,7 @@ async function initWallet (): Promise<void> {
 }
 
 function addWalletEntry (_card: Card): void {
-  const walletDiv = getElementById('wallet-info')
+  const walletDiv = getElementById<HTMLDivElement>('wallet-info')
   const cardComponent = document.createElement('card-element') as CardElement
   cardComponent.card = _card
   walletDiv.appendChild(cardComponent)
@@ -146,7 +164,7 @@ function _lookupCard (id: number): Card | undefined {
 }
 
 function lookupCardElement (id: number): CardElement | undefined {
-  const walletDiv = getElementById('wallet-info')
+  const walletDiv = getElementById<HTMLDivElement>('wallet-info')
   return Array.from(walletDiv.children).find((child) => {
     const cardElement = child as CardElement
     if (cardElement.card == null) return false
@@ -154,18 +172,20 @@ function lookupCardElement (id: number): CardElement | undefined {
   }) as CardElement | undefined
 }
 
-const importSettings: { domain: string | null, schema: string, file: string | null } = {
+const importSettings: { domain: string | null, schema: string | null } = {
   domain: null,
-  schema: 'https://schemas.crescent.dev/jwt/012345',
-  file: null
+  schema: null
 }
 
-getElementById('text-import-domain').addEventListener('input', function (event) {
+getElementById<HTMLInputElement>('text-import-domain').addEventListener('input', function (event) {
   const value = (event.target as HTMLInputElement).value
-  const buttonImportFile = getElementById('button-import-card') as HTMLInputElement
-  const domainPattern = /^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/
+  const buttonImportFile = getElementById<HTMLInputElement>('button-import-card')
+  const domainPattern = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/
+
   const validDomain = domainPattern.test(value)
-  if (validDomain)importSettings.domain = value
+  if (validDomain) {
+    importSettings.domain = value
+  }
   buttonImportFile.disabled = !validDomain
   validDomain ? buttonImportFile.classList.remove('config-button-disabled') : buttonImportFile.classList.add('config-button-disabled')
 })

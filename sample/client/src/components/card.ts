@@ -168,7 +168,7 @@ export class CardElement extends LitElement {
         <c2pa-collapsible>
           <span slot="header">&nbsp;</span>
           <div slot="content">
-            ${unsafeHTML(this.jsonToTable(card.token.type === 'JWT' ? (card.token.value).payload : fields(card.token.value)))}
+            ${unsafeHTML(this.jsonToTable(card.token.type === 'JWT' ? (card.token.value as JWT_TOKEN).payload : fields(card.token.value as MDOC)))}
           </div>
         </c2pa-collapsible>
 
@@ -238,7 +238,7 @@ export class CardElement extends LitElement {
     this.progress.hide()
     this.buttons.hide()
     errorElement.style.display = 'block';
-    (getElementById('errorMessage') as HTMLParagraphElement).innerText = message
+    (getElementById<HTMLDivElement>('errorMessage')).innerText = message
   }
 
   discloseRequest (verifierUrl: string, disclosureValue: string, disclosureUid: string): void {

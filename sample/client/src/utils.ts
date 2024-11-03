@@ -11,12 +11,12 @@
  * @param id {string} Id of the element to get
  * @returns {HTMLElement} The element with the given id
  */
-export function getElementById (id: string): HTMLElement {
+export function getElementById<T> (id: string): T {
   const element = document.getElementById(id)
   if (element == null) {
     throw new Error(`Element with id ${id} not found`)
   }
-  return element
+  return element as T
 }
 
 async function _fetch (url: string, params?: Record<string, unknown>, method: 'GET' | 'POST' = 'POST'): Promise<RESULT<Response, Error>> {

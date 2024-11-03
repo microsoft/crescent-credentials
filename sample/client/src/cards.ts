@@ -7,17 +7,19 @@
 
 import { MSG_WALLET_UPDATED } from './constants.js'
 import { addData, getData } from './indexeddb.js'
-import { decodeJwt } from './jwt.js'
 import { listen } from './listen.js'
-import { fields, decode as mdocDecode } from './mdoc.js'
+import { fields } from './mdoc.js'
+import schemas from './schema.js'
 
 export type Card_status = 'PENDING' | 'PREPARING' | 'PREPARED' | 'ERROR' | 'DISCLOSABLE' | 'DISCLOSING'
 
-type Token =
-  | { type: 'MDOC', value: MDOC }
-  | { type: 'JWT', value: JWT_TOKEN }
+interface Token {
+  type: 'MDOC' | 'JWT'
+  schema: string
+  value: MDOC | JWT_TOKEN
+}
 
-export interface Card {
+export interface ICard {
   data: string
   token: Token
   issuer: {
@@ -30,23 +32,24 @@ export interface Card {
   id: number
 }
 
-export class Card implements Card {
+export class Card implements ICard {
   // eslint-disable-next-line @typescript-eslint/max-params
-  private constructor (issuerUrl: string, issuerName: string, data: string, token: MDOC | JWT_TOKEN) {
-    this.issuer = {
-      url: issuerUrl,
-      name: issuerName
-    }
-    this.token = Card.type(token)
+  constructor (card: ICard) {
+    this.data = card.data
+    this.token = card.token
+    this.issuer = card.issuer
+    this.status = card.status
+    this.progress = card.progress
+    this.credUid = card.credUid
+    this.id = card.id
   }
 
+  public readonly data: string
   issuer: { url: string, name: string }
   token: Token
   status: Card_status = 'PENDING'
-
   progress = 0
   credUid = ''
-
   id = 0
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
@@ -54,7 +57,7 @@ export class Card implements Card {
     return await Wallet.save()
   }
 
-  public static async import (domain: string, encoded: string): Promise<RESULT<Card, Error>> {
+  public static async import (domain: string, schemaName: string, encoded: string): Promise<RESULT<Card, Error>> {
     if (typeof encoded !== 'string') {
       return { ok: false, error: new Error('encoded is not a string') }
     }
@@ -63,33 +66,43 @@ export class Card implements Card {
       return { ok: false, error: new Error('domain is not a string') }
     }
 
-    let type: 'JWT' | 'MDOC' = 'JWT'
+    // let type: 'JWT' | 'MDOC' = 'JWT'
 
-    let token: RESULT<JWT_TOKEN | MDOC, Error> = decodeJwt(encoded)
-    if (!token.ok) {
-      type = 'MDOC'
-      token = mdocDecode(encoded)
+    const schema = schemas[schemaName]
+    const decoded = schema.decode(encoded)
+
+    if (!decoded.ok) {
+      return { ok: false, error: new Error(`Cannot decode data into ${schema.type}`) }
     }
 
-    if (!token.ok) {
-      return { ok: false, error: new Error('Cannot decode data into JWT or MDOC') }
+    const cardObj: ICard = {
+      data: encoded,
+      token: {
+        type: schema.type,
+        schema: schema.name,
+        value: decoded.value
+      },
+      issuer: {
+        url: domain.startsWith('http') ? domain : `http://${domain}`,
+        name: domain.replace(/^https?:\/\//, '').replace(/:\d+$/, '')
+      },
+      status: 'PENDING',
+      progress: 0,
+      credUid: '',
+      id: 0
     }
 
-    if (type === 'MDOC') {
-      console.log('MDOC:', fields(token.value as MDOC))
-    }
-
-    const card = new Card(domain, domain, encoded, token.value)
+    const card = new Card(cardObj)
 
     return { ok: true, value: card }
   }
 
   public static type (card: MDOC | JWT_TOKEN): Token {
     if ('documents' in card) {
-      return { type: 'MDOC', value: card }
+      return { type: 'MDOC', schema: 'mdl_1', value: card }
     }
 
-    return { type: 'JWT', value: card }
+    return { type: 'JWT', schema: 'jwt_corporate_1', value: card }
   }
 }
 
@@ -106,19 +119,32 @@ export class Wallet {
 
   private static readonly _cards: Card[] = []
 
+  public static get initialized (): boolean {
+    return Wallet._instance !== null
+  }
+
   public static get cards (): Card[] {
     return Wallet._cards
   }
 
-  public static async init (): Promise<Wallet> {
+  private static _id = ''
+
+  public static async init (id: string): Promise<Wallet> {
+    console.debug('Wallet: init', id)
+    Wallet._id = id
+
     if (Wallet._instance != null) {
       throw new Error('Wallet already initialized')
     }
+
     Wallet._instance = new Wallet()
+
     const cards = await getData<Card[]>('crescent', 'jwts') ?? []
 
     Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => a.id - b.id)[0].id + 1 : 0
-    Wallet._cards.push(...cards)
+    Wallet._cards.push(...cards.map(card => new Card(card)))
+
+    console.debug('Wallet.cards:', Wallet._cards)
 
     listen(MSG_WALLET_UPDATED, async () => {
       await Wallet.reload()
@@ -130,39 +156,34 @@ export class Wallet {
     return Wallet._instance
   }
 
-  public static async reload (): Promise<Wallet> {
-    if (Wallet._instance === null) {
-      throw new Error('Wallet not initialized')
-    }
+  public static async reload (): Promise<Wallet | null> {
+    Wallet.checkWalletInitialized()
     const cards = await getData<Card[]>('crescent', 'jwts') ?? []
 
     Wallet._cards.length = 0
 
     Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => a.id - b.id)[0].id + 1 : 0
-    Wallet._cards.push(...cards)
+    Wallet._cards.push(...cards.map(card => new Card(card)))
+
     return Wallet._instance
   }
 
   public static async add (card: Card): Promise<void> {
-    if (Wallet._instance === null) {
-      throw new Error('Wallet not initialized')
-    }
+    Wallet.checkWalletInitialized()
     card.id = Wallet._nextCardId++
     Wallet._cards.push(card)
     await Wallet.save()
-    void chrome.runtime.sendMessage({ action: MSG_WALLET_UPDATED, data: null })
+    void chrome.runtime.sendMessage({ action: MSG_WALLET_UPDATED, data: {} })
   }
 
   public static async remove (id: number): Promise<void> {
-    if (Wallet._instance === null) {
-      throw new Error('Wallet not initialized')
-    }
+    Wallet.checkWalletInitialized()
     const index = Wallet._cards.findIndex(c => c.id === id)
 
     if (index !== -1) {
       Wallet._cards.splice(index, 1)
       await Wallet.save()
-      void chrome.runtime.sendMessage({ action: MSG_WALLET_UPDATED, data: null })
+      void chrome.runtime.sendMessage({ action: MSG_WALLET_UPDATED, data: {} })
     }
   }
 
@@ -171,9 +192,7 @@ export class Wallet {
   }
 
   public static async save (): Promise<boolean> {
-    if (Wallet._instance === null) {
-      throw new Error('Wallet not initialized')
-    }
+    Wallet.checkWalletInitialized()
     return await addData<Card[]>('crescent', 'jwts', Wallet._cards).catch((_error) => {
       throw new Error('Failed to store cards')
     })
@@ -190,13 +209,19 @@ export class Wallet {
   public static filter (property: string): Card[] {
     return Wallet._cards.filter((card) => {
       if (card.token.type === 'JWT') {
-        return card.token.value.payload[property] !== undefined
+        return (card.token.value as JWT_TOKEN).payload[property] !== undefined
       }
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       else if (card.token.type === 'MDOC') {
-        return fields(card.token.value)[property] !== undefined
+        return fields(card.token.value as MDOC)[property] !== undefined
       }
       return false
     })
+  }
+
+  private static checkWalletInitialized (): void {
+    if (Wallet._instance === null) {
+      throw new Error(`Wallet not initialized ${Wallet._id}`)
+    }
   }
 }
