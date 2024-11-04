@@ -23,54 +23,64 @@ console.debug('popup.js: load', puid)
 
 const PREPARED_MESSAGE_DURATION = 2000
 
-document.addEventListener('DOMContentLoaded', function (): void {
-  void Wallet.init(puid).then(() => {
-  // Add event listeners to switch tabs
-    const tabs = document.querySelectorAll<HTMLButtonElement>('.tab')
-    tabs.forEach((tab) => {
-      tab.addEventListener('click', () => {
-        activateTab(tab)
+async function init (): Promise<void> {
+  console.debug('init start')
+
+  await new Promise((resolve) => {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    document.addEventListener('DOMContentLoaded', async function (): Promise<void> {
+      await Wallet.init(puid)
+
+      const tabs = document.querySelectorAll<HTMLButtonElement>('.tab')
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          activateTab(tab)
+        })
       })
-    })
 
-    getElementById<HTMLInputElement>('button-import-card').addEventListener('click', () => {
-      getElementById<HTMLInputElement>('file-import-file').click()
-    })
-
-    getElementById<HTMLInputElement>('file-import-file').addEventListener('change', (event) => {
-      const file: File | undefined = (event.target as HTMLInputElement | undefined)?.files?.[0]
-      if (file == null) {
-        return
-      }
-      const reader = new FileReader()
-      reader.onload = importFileSelected
-      reader.readAsText(file)
-    })
-
-    const schemaDropDown = getElementById<HTMLSelectElement>('dropdown-import-schema')
-
-    config.schemas.forEach((schema) => {
-      const option = document.createElement('option')
-      option.value = schema
-      option.text = schema
-      schemaDropDown.add(option)
-    })
-
-    const clientHelperUrlInput = getElementById<HTMLInputElement>('client-helper-url')
-
-    clientHelperUrlInput.value = config.client_helper_url
-
-    clientHelperUrlInput.addEventListener('change', function () {
-      const url = clientHelperUrlInput.value
-
-      void ping(url).then((connected: boolean) => {
-        clientHelperUrlInput.style.background = connected ? 'lime' : 'red'
+      getElementById<HTMLInputElement>('button-import-card').addEventListener('click', () => {
+        getElementById<HTMLInputElement>('file-import-file').click()
       })
-    })
 
-    void initWallet ()
+      getElementById<HTMLInputElement>('file-import-file').addEventListener('change', (event) => {
+        const file: File | undefined = (event.target as HTMLInputElement | undefined)?.files?.[0]
+        if (file == null) {
+          return
+        }
+        const reader = new FileReader()
+        reader.onload = importFileSelected
+        reader.readAsText(file)
+      })
+
+      const schemaDropDown = getElementById<HTMLSelectElement>('dropdown-import-schema')
+
+      config.schemas.forEach((schema) => {
+        const option = document.createElement('option')
+        option.value = schema
+        option.text = schema
+        schemaDropDown.add(option)
+      })
+
+      const clientHelperUrlInput = getElementById<HTMLInputElement>('client-helper-url')
+
+      clientHelperUrlInput.value = config.client_helper_url
+
+      clientHelperUrlInput.addEventListener('change', function () {
+        const url = clientHelperUrlInput.value
+
+        void ping(url).then((connected: boolean) => {
+          clientHelperUrlInput.style.background = connected ? 'lime' : 'red'
+        })
+      })
+
+      await initWallet ()
+
+      resolve(true)
+    })
   })
-})
+
+  console.debug('init done')
+}
 
 async function importFileSelected (event: ProgressEvent<FileReader>): Promise<void> {
   const encoded = event.target?.result as string
@@ -122,12 +132,14 @@ function _showTab (name: string): void {
 }
 
 async function initWallet (): Promise<void> {
+  console.debug('initWallet start')
   const walletDiv = getElementById<HTMLDivElement>('wallet-info')
   walletDiv.replaceChildren()
   Wallet.cards.forEach((card) => {
     console.debug(card)
     addWalletEntry(card)
   })
+  console.debug('initWallet done')
 }
 
 function addWalletEntry (_card: Card): void {
@@ -190,40 +202,43 @@ getElementById<HTMLInputElement>('text-import-domain').addEventListener('input',
   validDomain ? buttonImportFile.classList.remove('config-button-disabled') : buttonImportFile.classList.add('config-button-disabled')
 })
 
+void init().then(() => {
 // MSG_BACKGROUND_POPUP_PREPARE_STATUS
-listen<{ id: number, progress: number }>(MSG_BACKGROUND_POPUP_PREPARE_STATUS, (data) => {
-  const { id, progress } = data
-  const entry = lookupCardElement(id)
-  if (entry?.card == null) {
-    throw new Error('Card is null')
-  }
-  entry.progress.value = progress
-})
-
-// MSG_BACKGROUND_POPUP_PREPARED
-listen<{ id: number }>(MSG_BACKGROUND_POPUP_PREPARED, (data) => {
-  const { id } = data
-  const entry = lookupCardElement(id)
-  if (entry?.card == null) {
-    throw new Error('Card is null')
-  }
-
-  entry.progress.value = 100
-  entry.progress.label = 'Prepared'
-  setTimeout(() => {
-    entry.progress.hide()
-  }, PREPARED_MESSAGE_DURATION)
-})
-
-// MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST
-listen<{ issuerTokensIds: Array<{ id: number, property: string }>, url: string, uid: string }>(MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, (data) => {
-  const { url: pageUrl, uid } = data
-  data.issuerTokensIds.forEach((id) => {
-    const entry = lookupCardElement(id.id)
-    if (entry === undefined) {
-      throw new Error('Entry not found')
+  listen<{ id: number, progress: number }>(MSG_BACKGROUND_POPUP_PREPARE_STATUS, (data) => {
+    const { id, progress } = data
+    const entry = lookupCardElement(id)
+    if (entry?.card == null) {
+      throw new Error('Card is null')
     }
-    entry.status = 'DISCLOSABLE'
-    entry.discloseRequest(pageUrl, id.property, uid)
+    entry.progress.value = progress
+  })
+
+  // MSG_BACKGROUND_POPUP_PREPARED
+  listen<{ id: number }>(MSG_BACKGROUND_POPUP_PREPARED, (data) => {
+    const { id } = data
+    const entry = lookupCardElement(id)
+    if (entry?.card == null) {
+      throw new Error('Card is null')
+    }
+
+    entry.progress.value = 100
+    entry.progress.label = 'Prepared'
+    setTimeout(() => {
+      entry.progress.hide()
+    }, PREPARED_MESSAGE_DURATION)
+  })
+
+  // MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST
+  listen<{ issuerTokensIds: Array<{ id: number, property: string }>, url: string, uid: string }>(MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, (data) => {
+    console.debug('MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST', data)
+    const { url: pageUrl, uid } = data
+    data.issuerTokensIds.forEach((id) => {
+      const entry = lookupCardElement(id.id)
+      if (entry === undefined) {
+        throw new Error('Entry not found')
+      }
+      entry.status = 'DISCLOSABLE'
+      entry.discloseRequest(pageUrl, id.property, uid)
+    })
   })
 })
