@@ -8,10 +8,12 @@
     <link rel="stylesheet" href="css/site1_style.css">
 </head>
 <body>
-    <h1>{{ site1_verifier_name }} Login</h1>
+    <h1>{{ site1_verifier_name }} Mental Health Clinic - Login</h1>
     {% if error %}
         <p style="color: red;">{{ error }}</p>
     {% endif %}
-    <p>Present an employment credential disclosing the email domain. Nothing else will be learned by our service or its issuer.</p>
+    <p>Welcome to our mental health virtual clinic.</p>
+
+    <p>This service is provided for free by your employer. Please present an employment credential disclosing the email domain to access the site. Nothing else will be learned by our service or its issuer.</p>
 </body>
 </html>

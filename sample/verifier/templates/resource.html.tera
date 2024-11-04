@@ -6,7 +6,14 @@
     <link rel="stylesheet" href="css/site1_style.css">
 </head>
 <body>
-    <h1>Resource</h1>
+    <h1>{{ site1_verifier_name }} Mental Health Clinic</h1>
+
     <p>Your email from {{ email_domain }} was successfully validated. You can now access the resources on our site.</p>
+
+    <ul>
+        <li><a href="">Book an appointment</a></li>
+        <li><a href="">Browse the specialists directory</a></li>
+        <li><a href="">Chat with our AI therapist</a></li>
+    </ul>
 </body>
 </html>
