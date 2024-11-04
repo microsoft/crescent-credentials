@@ -26,5 +26,6 @@ wget --method=POST --body-data='{"schema_UID":"<SCHEMA_FROM_TEST_PAGE>", "issuer
      --server-response \
      --max-redirect=3 \
      -d \
-     http://127.0.0.1:8004/verify
+     http://127.0.0.1:8004/verify \
+     -O- --no-verbose
 ```

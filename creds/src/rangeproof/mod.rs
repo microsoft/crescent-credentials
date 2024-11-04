@@ -344,7 +344,7 @@ impl<E: Pairing> RangeProof<E> {
         bases: &[E::G1; 2],
         n: usize,
         vk: &RangeProofVK<E>,
-    ) {
+    ) -> bool {
         let domain = Radix2EvaluationDomain::<E::ScalarField>::new(n).unwrap();
 
         // rederive the challenges
@@ -372,15 +372,24 @@ impl<E: Pairing> RangeProof<E> {
         };
 
         let rng = &mut thread_rng();
-        assert!(KZG10::<E, DensePolynomial<E::ScalarField>>::batch_check(
+        let ret = KZG10::<E, DensePolynomial<E::ScalarField>>::batch_check(
             &vk.kzg_vk,
             &[self.com_g, self.com_g, com_w_hat],
             &[rho, rho * domain.element(1), rho],
             &[self.eval_g, self.eval_gw, self.eval_w_hat],
             &[self.proof_g, self.proof_gw, self.proof_w_hat],
             rng,
-        )
-        .unwrap());
+        );
+        match ret{
+            Ok(ret) => if !ret {
+                println!("Error verifying range proof, batch_check failed ");
+                return false;
+            },
+            Err(ret) => {
+                println!("Error verifying range proof, batch_check failed with error: {:?} ", ret);
+                return false;
+            }
+        }
 
         // check that w1 + tau*w2 + t^2 * w3 - q * (X^n - 1) = 0
         // note: we don't have an opening of com_q. This will be accounted for in eval_w_hat
@@ -398,15 +407,19 @@ impl<E: Pairing> RangeProof<E> {
 
         let eval_w = partial_eval_w1 + c * eval_w2 + c * c * eval_w3 - self.eval_w_hat;
 
-        assert!(eval_w.is_zero());
+        if !eval_w.is_zero() {
+            println!("Range proof failed to verify, eval_w is not zero");
+            return false;
+        }
 
-        assert!(self
+        let ret = self
             .dleq_proof
             .verify(
                 &vec![bases.to_vec(), vk.com_f_basis.to_vec(),],
                 &vec![*ped_com, self.com_f.0.into()],
                 Some(vec![(0, 0), (1, 3)]),
-            )
-            .unwrap());
+            );
+        
+        return ret;
     }
 }
