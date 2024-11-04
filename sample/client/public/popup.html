@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" style="height: 400px; width: 400px; overflow: visible;">
+<html lang="en">
 
 <head>
     <meta charset='utf-8'>
@@ -8,8 +8,9 @@
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <link rel='stylesheet' type='text/css' media='screen' href='popup.css'>
     <script type='module' src='toggle.js'></script>
-    <script type='module' src='walletItem.js'></script>
+    <script type='module' src='card.js'></script>
     <script type='module' src='popup.js'></script>
+    <script type='module' src='collapsible.js'></script>
 </head>
 
 <body>
@@ -18,7 +19,7 @@
         <button class="tab" data-tab="about">About</button>
         <button class="tab" data-tab="config">Config</button>
     </div>
-    <div>
+    <div id="tab-container">
         <div id="wallet" class="tab-content active-content">
             <h1>Wallet</h1>
             <div id="wallet-info">
@@ -36,10 +37,32 @@
         <div id="config" class="tab-content">
             <h1>Config</h1>
             <hr>
-            <div id="trust-list-option">
+            <span class="config-section-header">Client Helper</span>
+            <div class="config-setting">
+                <span class="config-label">URL</span>
+                <input type="text" id="client-helper-url" placeholder="Client Helper URL">
             </div>
-            <toggle-switch label="Toggle 1" id="toggle1" title="Enable to do ..."></toggle-switch>
-            <toggle-switch label="Toggle 2" id="toggle2" title="Enable to do ..."></toggle-switch>
+            <br>
+            <hr>
+            <span class="config-section-header">Import Credential</span>
+            <div class="config-setting">
+                <span class="config-label">Domain</span>
+                <input type="text" id="text-import-domain" placeholder="Credential domain  (e.g., example.com)"
+                    placeholder="example.com" pattern="^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$"
+                    title="Please enter a valid domain (e.g., example.com)">
+            </div>
+            <div class="config-setting">
+                <span class="config-label">Schema</span>
+                <select class="config-dropdown" id="dropdown-import-schema" name="dropdown">
+                </select>
+            </div>
+            <div class="config-setting">
+                <span class="config-label">Select file</span>
+                <input type="button" class="config-button config-button-disabled" id="button-import-card"
+                    value="File ..." title="Enter Domain URL before picking file" disabled>
+            </div>
+            <input type="file" id="file-import-file" style="display: none;">
+
         </div>
     </div>
 

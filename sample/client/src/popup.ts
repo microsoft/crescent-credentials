@@ -3,37 +3,99 @@
  *  Licensed under the MIT license.
  */
 
-import type { ToggleSwitch } from './components/toggle.js'
-import type { WalletItem } from './components/walletItem.js'
-import { MSG_POPUP_DISPLAY_JWTS } from './constants.js'
-import { getData } from './indexeddb.js'
+/* eslint-disable @typescript-eslint/no-magic-numbers */
+
+import { type Card, Wallet } from './cards.js'
+import { ping } from './clientHelper.js'
+import type { CardElement } from './components/card.js'
+import {
+  MSG_POPUP_BACKGROUND_DISCLOSE, MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, MSG_BACKGROUND_POPUP_PREPARED,
+  MSG_BACKGROUND_POPUP_PREPARE_STATUS, MSG_POPUP_BACKGROUND_PREPARE, MSG_POPUP_BACKGROUND_IMPORT,
+  MSG_POPUP_BACKGROUND_DELETE
+} from './constants.js'
+import { listen } from './listen.js'
 import { getElementById } from './utils.js'
+import config from './config.js'
 
-console.debug('popup.js: load')
+const puid = Math.random().toString(36).substring(7)
 
-document.addEventListener('DOMContentLoaded', function (): void {
-  // Add event listeners to switch tabs
-  const tabs = document.querySelectorAll<HTMLButtonElement>('.tab')
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      activateTab(tab)
+console.debug('popup.js: load', puid)
+
+const PREPARED_MESSAGE_DURATION = 2000
+
+async function init (): Promise<void> {
+  console.debug('init start')
+
+  await new Promise((resolve) => {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    document.addEventListener('DOMContentLoaded', async function (): Promise<void> {
+      await Wallet.init(puid)
+
+      const tabs = document.querySelectorAll<HTMLButtonElement>('.tab')
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          activateTab(tab)
+        })
+      })
+
+      getElementById<HTMLInputElement>('button-import-card').addEventListener('click', () => {
+        getElementById<HTMLInputElement>('file-import-file').click()
+      })
+
+      getElementById<HTMLInputElement>('file-import-file').addEventListener('change', (event) => {
+        const file: File | undefined = (event.target as HTMLInputElement | undefined)?.files?.[0]
+        if (file == null) {
+          return
+        }
+        const reader = new FileReader()
+        reader.onload = importFileSelected
+        reader.readAsText(file)
+      })
+
+      const schemaDropDown = getElementById<HTMLSelectElement>('dropdown-import-schema')
+
+      config.schemas.forEach((schema) => {
+        const option = document.createElement('option')
+        option.value = schema
+        option.text = schema
+        schemaDropDown.add(option)
+      })
+
+      const clientHelperUrlInput = getElementById<HTMLInputElement>('client-helper-url')
+
+      clientHelperUrlInput.value = config.client_helper_url
+
+      clientHelperUrlInput.addEventListener('change', function () {
+        const url = clientHelperUrlInput.value
+
+        void ping(url).then((connected: boolean) => {
+          clientHelperUrlInput.style.background = connected ? 'lime' : 'red'
+        })
+      })
+
+      await initWallet ()
+
+      resolve(true)
     })
   })
 
-  const toggle1 = document.getElementById('toggle1') as ToggleSwitch
-  toggle1.addEventListener('change', (event) => {
-    const _checked = (event as CustomEvent).detail.checked as boolean
-    // do stuff
-  })
+  console.debug('init done')
+}
 
-  const toggle2 = document.getElementById('toggle2') as ToggleSwitch
-  toggle2.addEventListener('change', (event) => {
-    const _checked = (event as CustomEvent).detail.checked as boolean
-    // do stuff
-  })
-
-  void displayJwts ()
-})
+async function importFileSelected (event: ProgressEvent<FileReader>): Promise<void> {
+  const encoded = event.target?.result as string
+  const schema = getElementById<HTMLSelectElement>('dropdown-import-schema').value
+  void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_IMPORT, data: { encoded, domain: importSettings.domain, schema } })
+    .then(async (_result: RESULT<string, Error>) => {
+      await Wallet.reload()
+    })
+    .then(async () => {
+      await initWallet ()
+    })
+    .then(async () => {
+      _showTab('wallet')
+    })
+}
 
 function activateTab (tab: HTMLElement): void {
   const tabContents = document.querySelectorAll<HTMLDivElement>('.tab-content')
@@ -54,21 +116,14 @@ function activateTab (tab: HTMLElement): void {
   if (tabContentId === '') {
     throw new Error('Tab does not have a data-tab attribute')
   }
-  getElementById(tabContentId).classList.add('active-content')
+  getElementById<HTMLDivElement>(tabContentId).classList.add('active-content')
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function _sendBackgroundMessage<T> (type: string, data: unknown): Promise<T> {
-  return await chrome.runtime.sendMessage({ type, data })
+async function sendBackgroundMessage<T> (action: string, data: Record<string, unknown>): Promise<T> {
+  return await chrome.runtime.sendMessage({ action, data })
 }
 
-chrome.runtime.onMessage.addListener((request: MESSAGE_PAYLOAD, _sender, _sendResponse) => {
-  if (request.action === MSG_POPUP_DISPLAY_JWTS) {
-    showTab('wallet')
-  }
-})
-
-function showTab (name: string): void {
+function _showTab (name: string): void {
   const tab = document.querySelector<HTMLButtonElement>(`button[data-tab="${name}"`)
   if (tab === null) {
     throw new Error(`Tab ${name} not found`)
@@ -76,39 +131,114 @@ function showTab (name: string): void {
   activateTab(tab)
 }
 
-async function displayJwts (): Promise<void> {
-  const jwts = await getData<JWT_RECORDS>('crescent', 'jwts')
-  if (jwts === undefined) {
-    // no records
-    return
+async function initWallet (): Promise<void> {
+  console.debug('initWallet start')
+  const walletDiv = getElementById<HTMLDivElement>('wallet-info')
+  walletDiv.replaceChildren()
+  Wallet.cards.forEach((card) => {
+    console.debug(card)
+    addWalletEntry(card)
+  })
+  console.debug('initWallet done')
+}
+
+function addWalletEntry (_card: Card): void {
+  const walletDiv = getElementById<HTMLDivElement>('wallet-info')
+  const cardComponent = document.createElement('card-element') as CardElement
+  cardComponent.card = _card
+  walletDiv.appendChild(cardComponent)
+
+  cardComponent.status = _card.status
+
+  cardComponent.accept = (card: Card) => {
+    void sendBackgroundMessage(MSG_POPUP_BACKGROUND_PREPARE, { id: card.id })
   }
-  const walletContent = document.getElementById('wallet-info')
-  jwts.forEach((jwt) => {
-    console.log('jwt:', jwt)
-    const jwtElement = document.createElement('domain-email') as WalletItem
-    jwtElement.domain = jwt.url
-    jwtElement.email = (jwt.jwt.payload.email as string | undefined) ?? '<undefined>'
-    jwtElement.onclick = disclose
-    walletContent?.appendChild(jwtElement)
-  })
+
+  cardComponent.reject = (_card: Card) => {
+    walletDiv.removeChild(cardComponent)
+  }
+
+  cardComponent.disclose = (card: Card) => {
+    void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_DISCLOSE, data: { id: card.id } })
+  }
+
+  cardComponent.delete = function (card: Card) {
+    walletDiv.removeChild(cardComponent)
+    void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_DELETE, data: { id: card.id } }).then(() => {
+      // void loadCards()
+      void Wallet.reload()
+    })
+  }
 }
 
-async function disclose (evt: Event): Promise<void> {
-  const target = evt.target as WalletItem
-  console.log('disclose:', target.domain)
-
-  const response = await fetch('http://127.0.0.1:8004/verify', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ proof: 'proof', issuer: target.domain })
-  }).catch((error) => {
-    console.error('Error:', error)
-    return { json: () => {
-      console.log('')
-    } }
-  })
-  const data = await response.json()
-  console.log('response:', data)
+function _lookupCard (id: number): Card | undefined {
+  return Wallet.find(id)
 }
+
+function lookupCardElement (id: number): CardElement | undefined {
+  const walletDiv = getElementById<HTMLDivElement>('wallet-info')
+  return Array.from(walletDiv.children).find((child) => {
+    const cardElement = child as CardElement
+    if (cardElement.card == null) return false
+    return cardElement.card.id === id
+  }) as CardElement | undefined
+}
+
+const importSettings: { domain: string | null, schema: string | null } = {
+  domain: null,
+  schema: null
+}
+
+getElementById<HTMLInputElement>('text-import-domain').addEventListener('input', function (event) {
+  const value = (event.target as HTMLInputElement).value
+  const buttonImportFile = getElementById<HTMLInputElement>('button-import-card')
+  const domainPattern = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/
+
+  const validDomain = domainPattern.test(value)
+  if (validDomain) {
+    importSettings.domain = value
+  }
+  buttonImportFile.disabled = !validDomain
+  validDomain ? buttonImportFile.classList.remove('config-button-disabled') : buttonImportFile.classList.add('config-button-disabled')
+})
+
+void init().then(() => {
+// MSG_BACKGROUND_POPUP_PREPARE_STATUS
+  listen<{ id: number, progress: number }>(MSG_BACKGROUND_POPUP_PREPARE_STATUS, (data) => {
+    const { id, progress } = data
+    const entry = lookupCardElement(id)
+    if (entry?.card == null) {
+      throw new Error('Card is null')
+    }
+    entry.progress.value = progress
+  })
+
+  // MSG_BACKGROUND_POPUP_PREPARED
+  listen<{ id: number }>(MSG_BACKGROUND_POPUP_PREPARED, (data) => {
+    const { id } = data
+    const entry = lookupCardElement(id)
+    if (entry?.card == null) {
+      throw new Error('Card is null')
+    }
+
+    entry.progress.value = 100
+    entry.progress.label = 'Prepared'
+    setTimeout(() => {
+      entry.progress.hide()
+    }, PREPARED_MESSAGE_DURATION)
+  })
+
+  // MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST
+  listen<{ issuerTokensIds: Array<{ id: number, property: string }>, url: string, uid: string }>(MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, (data) => {
+    console.debug('MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST', data)
+    const { url: pageUrl, uid } = data
+    data.issuerTokensIds.forEach((id) => {
+      const entry = lookupCardElement(id.id)
+      if (entry === undefined) {
+        throw new Error('Entry not found')
+      }
+      entry.status = 'DISCLOSABLE'
+      entry.discloseRequest(pageUrl, id.property, uid)
+    })
+  })
+})

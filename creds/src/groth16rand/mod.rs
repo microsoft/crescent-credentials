@@ -221,7 +221,7 @@ impl<E: Pairing> ShowGroth16<E> {
         pvk: &PreparedVerifyingKey<E>,
         io_types: &Vec<PublicIOType>,
         public_inputs: &Vec<E::ScalarField>,
-    ) 
+    ) -> bool
     where
         E: Pairing,
         E::G1 : CurveGroup + VariableBaseMSM,      
@@ -267,19 +267,30 @@ impl<E: Pairing> ShowGroth16<E> {
         y.push(self.com_hidden_inputs);
 
         let t = start_timer!(||"Groth16 verify proof with prepared inputs");
-        assert!(Groth16::<E>::verify_proof_with_prepared_inputs(
+        let groth16_result = Groth16::<E>::verify_proof_with_prepared_inputs(
             pvk,
             &self.rand_proof,
             &com_inputs
-        )
-        .unwrap());
+        );
+        let groth16_valid = match groth16_result {
+            Ok(b) => b, 
+            Err(e) => {
+                println!("Failed to verify Groth16 proof with error: {:?}", e);
+                false
+            }
+        };
         end_timer!(t);
 
-        let is_valid = self.pok_inputs.verify(&bases, &y, None).unwrap();
+        let dlog_pok_valid = self.pok_inputs.verify(&bases, &y, None);
         
         end_timer!(groth16_timer);
 
-        assert!(is_valid);
+        if groth16_valid && dlog_pok_valid {
+            return true;
+        } else {
+            return false;
+        }
+
     }
 }
 
@@ -292,12 +303,13 @@ impl<E: Pairing> ShowRange<E> {
         io_locations: &IOLocations,
         pvk: &PreparedVerifyingKey<E>,
         input_label: &str,
-    ) {
+    ) -> bool {
         let input_pos = io_locations.get_io_location(input_label).unwrap();
         let bases = [
             pvk.vk.gamma_abc_g1[input_pos].into(),
             pvk.vk.delta_g1.into(),
         ];
-        self.range_proof.verify_n_bits(ped_com, &bases, n, range_vk);
+        
+        self.range_proof.verify_n_bits(ped_com, &bases, n, range_vk)
     }
 }

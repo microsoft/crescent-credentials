@@ -4,7 +4,6 @@ use ark_ec::CurveGroup;
 use ark_ec::Group;
 use ark_ec::VariableBaseMSM;
 use ark_ff::Field;
-use ark_relations::r1cs::Result as R1CSResult;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{end_timer, rand::thread_rng, start_timer, UniformRand};
 use merlin::Transcript;
@@ -113,7 +112,7 @@ impl<G: Group> DLogPoK<G> {
         bases: &Vec<Vec<G>>,
         y: &Vec<G>,
         eq_pos: Option<Vec<(usize, usize)>>,
-    ) -> R1CSResult<bool> 
+    ) -> bool
     where
         G: CurveGroup + VariableBaseMSM,    
     {
@@ -145,9 +144,15 @@ impl<G: Group> DLogPoK<G> {
 
         if eq_pos.is_some() {
             let eq_pos = eq_pos.unwrap();
+            let mut mismatch = false;
             eq_pos.iter().for_each(|(i, j)| {
-                assert_eq!(self.s[*i][*j], self.s[eq_pos[0].0][eq_pos[0].1]);
+                if self.s[*i][*j] != self.s[eq_pos[0].0][eq_pos[0].1] {
+                    mismatch = true;
+                }
             });
+            if mismatch {
+                return false;
+            }
         }
 
         // get the challenge
@@ -158,7 +163,7 @@ impl<G: Group> DLogPoK<G> {
         end_timer!(dl_verify_timer);
 
         // check the challenge matches
-        Ok(c == self.c)
+        c == self.c
     }
 
     // Computes Pedersen commitments
@@ -231,8 +236,8 @@ mod tests {
             &vec![y.clone(), y.clone()],
             Some(vec![(0, 1), (1, 1)]),
         );
-        assert!(result.is_ok());
-        assert!(result.unwrap() == true);
+
+        assert!(result == true);
     }
 
 }

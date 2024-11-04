@@ -9,13 +9,18 @@
   put global types here
   if you using build:watch, you may need to restart it after adding new types here or it may not recognize them
   TODO: add this to rollup watch files
+  We use all-caps for global types to distinguish them from imported and local types
 */
 
 interface MESSAGE_PAYLOAD {
   action: string
-  data: unknown
+  data: Record<string, unknown>
 }
 
-interface JWT { header: Record<string, unknown>, payload: Record<string, unknown>, signature: string }
+interface JWT_TOKEN { header: Record<string, unknown>, payload: Record<string, unknown>, signature: string }
 
-type JWT_RECORDS = Array<{ url: string, jwt: JWT }>
+interface MDOC { status: number, version: string, documents: mdocDocument[] }
+
+type RESULT<T, E = Error> =
+  | { ok: true, value: T }
+  | { ok: false, error: E }

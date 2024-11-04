@@ -10,7 +10,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
 use prep_inputs::{parse_config, unpack_int_to_string_unquoted, prepare_prover_inputs};
-use utils::{read_from_file, write_to_b64url, write_to_file};
+use utils::{read_from_file, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
 use crate::{
@@ -29,7 +29,7 @@ pub mod daystamp;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
-const MDL_EXAMPLE_AGE_GREATER_THAN : usize = 18;    // mDL show proofs will prove that the holder is older than this 
+const MDL_AGE_GREATER_THAN : usize = 18;         // mDL show proofs will prove that the holder is older than this value (in years)
 
 pub type CrescentPairing = ECPairing;
 
@@ -399,7 +399,7 @@ pub fn run_show(
     let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk).unwrap();
     
     let show_proof = if client_state.credtype == "mdl" {
-        create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, MDL_EXAMPLE_AGE_GREATER_THAN)  
+        create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
         create_show_proof(&mut client_state, &range_pk, &io_locations)
     };
@@ -426,7 +426,11 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     // }
 
     let verify_timer = std::time::Instant::now();
-    show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &show_proof.revealed_inputs);
+    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &show_proof.revealed_inputs);
+    if !ret {
+        println!("show_groth16.verify failed");
+        return (false, "".to_string());
+    }
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     let delta = 
@@ -439,12 +443,12 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
 
     if delta > SHOW_PROOF_VALIDITY_SECONDS {
         println!("Invalid show proof -- older than {} seconds", SHOW_PROOF_VALIDITY_SECONDS);
-        assert!(delta <= SHOW_PROOF_VALIDITY_SECONDS);
+        return (false, "".to_string());
     }
 
     let mut ped_com_exp_value = show_proof.show_groth16.commited_inputs[0].clone();
     ped_com_exp_value -= vp.pvk.vk.gamma_abc_g1[exp_value_pos] * cur_time;
-    show_proof.show_range.verify(
+    let ret = show_proof.show_range.verify(
         &ped_com_exp_value,
         RANGE_PROOF_INTERVAL_BITS,
         &vp.range_vk,
@@ -452,16 +456,24 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         &vp.pvk,
         "exp_value",
     );
+    if !ret {
+        println!("show_range.verify failed");
+        return (false, "".to_string());
+    }    
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
     // TODO: it's currently hacky how the verifier knows which revealed inputs correspond 
     // to what.  In this example we have to subtract 2 (rather than 1) from email_value pos to account for
     // the committed attribute.  When we refactor revealed inputs and the modulus IOs we can address this.
-    let domain = unpack_int_to_string_unquoted( &show_proof.revealed_inputs[email_value_pos - 2].into_bigint()).unwrap();
+    let domain = match unpack_int_to_string_unquoted( &show_proof.revealed_inputs[email_value_pos - 2].into_bigint()) {
+        Ok(domain) => domain,
+        Err(e) => {
+            println!("Proof was valid, but failed to unpack domain string, {:?}", e);
+            return (false, "".to_string());
+        }
+    };
     println!("Token is valid, Prover revealed email domain: {}", domain);
 
-    // We return true here since groth16.verify and show_range.verify just assert and panic if there is a failure
-    // TODO: refactor verify functions to return booleans, so that we can return an error to the application, rather than bringing down the world.
     (true, domain)
 }
 
@@ -497,12 +509,12 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 
     if delta > SHOW_PROOF_VALIDITY_SECONDS {
         println!("Invalid show proof -- older than {} seconds", SHOW_PROOF_VALIDITY_SECONDS);
-        assert!(delta <= SHOW_PROOF_VALIDITY_SECONDS);
+        return (false, "".to_string());
     }  
 
     let mut ped_com_valid_until_value = show_proof.show_groth16.commited_inputs[0].clone();
     ped_com_valid_until_value -= vp.pvk.vk.gamma_abc_g1[valid_until_value_pos] * cur_time;
-    show_proof.show_range.verify(
+    let ret = show_proof.show_range.verify(
         &ped_com_valid_until_value,
         RANGE_PROOF_INTERVAL_BITS,
         &vp.range_vk,
@@ -510,26 +522,35 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         &vp.pvk,
         "valid_until_value",
     );
+    if !ret {
+        println!("show_range.verify failed");
+        return (false, "".to_string());
+    }      
 
-    assert!(show_proof.show_range2.is_some());
+    if !show_proof.show_range2.is_some() {
+        println!("mDL proof is invalid; missing second range proof");
+        return (false, "".to_string());
+    }
     let days_in_21y = Fr::from(days_to_be_age(age) as u64);
     let mut ped_com_dob = show_proof.show_groth16.commited_inputs[1].clone();
     ped_com_dob -= vp.pvk.vk.gamma_abc_g1[dob_value_pos] * days_in_21y;
-    show_proof.show_range2.as_ref().unwrap().verify(
+    let ret = show_proof.show_range2.as_ref().unwrap().verify(
         &ped_com_dob,
         RANGE_PROOF_INTERVAL_BITS,
         &vp.range_vk,
         &io_locations,
         &vp.pvk,
         "dob_value",
-    );    
+    );
+    if !ret {
+        println!("show_range2.verify failed");
+        return (false, "".to_string());
+    }      
 
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
     println!("mDL is valid, holder is over {} years old", age);
 
-    // We return true here since groth16.verify and show_range.verify just assert and panic if there is a failure
-    // TODO: refactor verify functions to return booleans, so that we can return an error to the application, rather than bringing down the world.
     (true, "".to_string())
 }
 
@@ -545,10 +566,17 @@ pub fn run_verifier(base_path: PathBuf) {
 
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str};
 
-    let _verify_result = if show_proof.show_range2.is_some() {
-        verify_show_mdl(&vp, &show_proof, MDL_EXAMPLE_AGE_GREATER_THAN)
+    let (verify_result, data) = if show_proof.show_range2.is_some() {
+        verify_show_mdl(&vp, &show_proof, MDL_AGE_GREATER_THAN)
     } else {
         verify_show(&vp, &show_proof)
     };
+
+    if verify_result {
+        println!("Verify succeeded, got data '{}'", data);
+    }
+    else {
+        println!("Verify failed")
+    }
 
 }

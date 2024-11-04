@@ -58,7 +58,7 @@ const commonOutput = {
 }
 
 const watch = {
-  include: ['src/**', '.env'],
+  include: ['src/**', 'public/**', 'manifests/**', '.env'],
   clearScreen: true
 }
 
@@ -96,6 +96,7 @@ const commonPlugins = [
       this.addWatchFile(path.resolve(__dirname, 'manifests/manifest.chrome.json'))
       this.addWatchFile(path.resolve(__dirname, 'manifests/manifest.firefox.json'))
       this.addWatchFile(path.resolve(__dirname, 'public/popup.html'))
+      this.addWatchFile(path.resolve(__dirname, 'public/popup.css'))
     }
   }
 ]
@@ -150,7 +151,7 @@ const content = {
   popup.js
 */
 const popup = {
-  input: ['src/popup.ts', 'src/components/toggle.ts', 'src/components/walletItem.ts'],
+  input: ['src/popup.ts', 'src/components/toggle.ts', 'src/components/card.ts', 'src/components/collapsible.ts'],
   treeshake: {
     moduleSideEffects: []
   },
