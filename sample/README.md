@@ -48,7 +48,7 @@ The sample defines the following *schema UIDs* expressing the credential type an
 * Description: a mobile Driver's License
 * Credential type: mDL
 * Supported disclosure UIDs
-  * `crescent://age_over_21`: reveal that an encoded date of birth makes the user older than 18 years old
+  * `crescent://age_over_18`: reveal that an encoded date of birth makes the user older than 18 years old
 
 ## Credential issuance
 

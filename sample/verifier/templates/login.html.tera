@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta crescent_verify_url="{{ crescent_verify_url  | safe }}">
-    <meta crescent_disclosure_uid="{{ crescent_disclosure_uid  | safe }}">
-    <title>Login - {{ verifier_name }}</title>
-    <link rel="stylesheet" href="css/style.css">
+    <meta crescent_verify_url="{{ site1_verify_url  | safe }}">
+    <meta crescent_disclosure_uid="crescent://email_domain">
+    <title>Login - {{ site1_verifier_name }}</title>
+    <link rel="stylesheet" href="css/site1_style.css">
 </head>
 <body>
-    <h1>{{ verifier_name }} Login</h1>
+    <h1>{{ site1_verifier_name }} Login</h1>
     {% if error %}
         <p style="color: red;">{{ error }}</p>
     {% endif %}
