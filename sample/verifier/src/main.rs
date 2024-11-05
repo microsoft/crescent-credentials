@@ -18,6 +18,8 @@ use jsonwebkey::JsonWebKey;
 use std::path::Path;
 use std::fs;
 use std::io;
+use std::sync::Mutex;
+use uuid::Uuid;
 use crescent::{utils::read_from_b64url, CachePaths, CrescentPairing, ShowProof, VerifierParams, verify_show};
 use crescent_sample_setup_service::common::*;
 
@@ -58,6 +60,14 @@ fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<
     Ok(())
 }
 
+#[derive(Clone)]
+struct ValidationResult {
+    schema_UID: String,
+    issuer_URL: String,
+    disclosure_uid: String,
+    disclosed_info: Option<String>,
+}
+
 // verifer config from Rocket.toml
 struct VerifierConfig {
     // site 1 (JWT verifier)
@@ -69,6 +79,9 @@ struct VerifierConfig {
     site2_verify_url: String,
     site2_verifier_name: String,
     site2_verifier_domain: String,
+
+    // holds validation state
+    validation_results: Mutex<HashMap<String, ValidationResult>>,
 }
 
 // struct for the JWT info
@@ -115,20 +128,26 @@ fn login_page(verifier_config: &State<VerifierConfig>) -> Template {
 }
 
 // route to serve the protected resource page after successful verification  (site 1 - JWT verifier)
-#[get("/resource")]
-fn resource_page(verifier_config: &State<VerifierConfig>) -> Template {
+#[get("/resource?<session_id>")]
+fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving site 1 resource page");
-    let site1_verifier_name_str = verifier_config.site1_verifier_name.as_str();
 
-    // render the resource page
-    Template::render("resource",
-        context! {
-            site1_verifier_name: site1_verifier_name_str,
-            email_domain: "example.com" // TODO: get it from /verify (passing it as a query params is insecure, even for a demo, so perhaps we can use a cookie or session)
-        }
-    )
+    let validation_result = verifier_config
+        .validation_results
+        .lock()
+        .unwrap()
+        .get(&session_id)
+        .cloned();
+
+    if let Some(result) = validation_result {
+        Template::render("resource", context! {
+            site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
+            email_domain: result.disclosed_info.unwrap_or_else(|| "example.com".to_string()),
+        })
+    } else {
+        Template::render("error", context! { error: "Invalid session ID" })
+    }
 }
-
 // route to serve the signup1 page (site 2 - mDL verifier)
 #[get("/signup1")]
 fn signup1_page(verifier_config: &State<VerifierConfig>) -> Template {
@@ -142,19 +161,25 @@ fn signup1_page(verifier_config: &State<VerifierConfig>) -> Template {
 }
 
 // route to serve the signup2 page (site 2 - mDL verifier)
-#[get("/signup2")]
-fn signup2_page(verifier_config: &State<VerifierConfig>) -> Template {
+#[get("/signup2?<session_id>")]
+fn signup2_page(session_id: String, verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving site 2 signup2 page");
-    let site2_verifier_name_str = verifier_config.site2_verifier_name.as_str();
 
-    // render the signup2 page
-    Template::render("signup2",
-        context! {
-            site2_verifier_name: site2_verifier_name_str,
-        }
-    )
+    let validation_result = verifier_config
+        .validation_results
+        .lock()
+        .unwrap()
+        .get(&session_id)
+        .cloned();
+
+    if validation_result.is_some() {
+        Template::render("signup2", context! {
+            site2_verifier_name: verifier_config.site2_verifier_name.as_str(),
+        })
+    } else {
+        Template::render("error", context! { error: "Invalid session ID" })
+    }
 }
-
 async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(), String> {
     // Prepare the JWK URL
     let jwk_url = format!("{}/.well-known/jwks.json", issuer_url);
@@ -214,7 +239,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         error_template!(msg, verifier_config);
     }
 
-    // Check that the schema and disclosue are compatible
+    // Check that the schema and disclosure are compatible
     if !is_disc_supported_by_schema(&proof_info.disclosure_uid, &proof_info.schema_UID) {
         let msg = format!("Disclosure UID {} is not supported by schema {}", proof_info.disclosure_uid, proof_info.schema_UID);
         error_template!(msg, verifier_config);
@@ -256,30 +281,43 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         Err(_) => error_template!("Invalid proof; deserialization error", verifier_config),
     };
 
+    let is_valid;
+    let disclosed_info;
     if cred_type == "jwt" {
-        let (is_valid, email_domain) = verify_show(&vp, &show_proof);
+        let (valid, info) = verify_show(&vp, &show_proof);
+        is_valid = valid;
+        disclosed_info = Some(info);
+    } else {
+        let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap(); // disclosure UID validated, so unwrap should be safe
+        let (valid, info) = verify_show_mdl(&vp, &show_proof, age);
+        is_valid = valid;
+        disclosed_info = Some(info);
+    }
 
-        if is_valid {
-            // redirect to the resource page (with status code 303 to ensure a GET request is made)
-            println!("*** Proof is valid, email domain is {}. Redirecting to resource page", email_domain);
-            Ok(Custom(Status::SeeOther, Redirect::to(uri!(resource_page))))
-        } else {
-            // return an error template if the proof is invalid
-            error_template!("Proof is invalid.", verifier_config);
-        }
-    } 
-    else {    // mdl
-        let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap(); // disclosure UID already validated; should not fail
-        let (is_valid, _) = verify_show_mdl(&vp, &show_proof, age);
+    if is_valid {
+        // Generate a unique session_id
+        let session_id = Uuid::new_v4().to_string();
 
-        if is_valid {
-            // redirect to the resource page (with status code 303 to ensure a GET request is made)
-            println!("*** Proof is valid, user satisfies {}. Redirecting to signup2 page", proof_info.disclosure_uid);
-            Ok(Custom(Status::SeeOther, Redirect::to(uri!(signup2_page))))
-        } else {
-            // return an error template if the proof is invalid
-            error_template!("Proof is invalid.", verifier_config);
-        }        
+        // Store the validation result in the hashmap
+        let validation_result = ValidationResult {
+            schema_UID: proof_info.schema_UID.clone(),
+            issuer_URL: proof_info.issuer_URL.clone(),
+            disclosure_uid: proof_info.disclosure_uid.clone(),
+            disclosed_info: disclosed_info.clone(),
+        };
+        verifier_config.validation_results.lock().unwrap().insert(session_id.clone(), validation_result);
+
+        // Redirect to the resource page or signup2 page with the session_id as a query parameter
+        let redirect_url = match cred_type {
+            "jwt" => uri!(resource_page(session_id = session_id.clone())).to_string(),
+            "mdl" => uri!(signup2_page(session_id = session_id.clone())).to_string(),
+            _ => return error_template!("Unsupported credential type", verifier_config),
+        };
+
+        Ok(Custom(Status::SeeOther, Redirect::to(redirect_url)))
+    } else {
+        // return an error template if the proof is invalid
+        error_template!("Proof is invalid.", verifier_config);
     }
 }
 
@@ -302,6 +340,7 @@ fn rocket() -> _ {
         site2_verifier_name,
         site2_verifier_domain,
         site2_verify_url,
+        validation_results: Mutex::new(HashMap::new()),
     };
     
     rocket::build()
