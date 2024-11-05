@@ -1,3 +1,10 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+use std::path::Path;
+use std::fs;
+use std::io;
+
 // TODO: Encode this information in a json config file containing, e.g,. 
 //   schema_uid: jwt_corporate_1
 //   cred_type : jwt
@@ -49,18 +56,6 @@ pub fn disc_uid_to_age(disc_uid : &String) -> Result<usize, &'static str> {
     }
 }
 
-// TODO: this function is not correct; works for now, but in future we could have e.g., JWTs that support over_18, the both mdl and jwt could be returned
-// Only the verifier needs this info. Perhaps the prover should tell the verifier which cred type they are using (presumably from a list of verifier
-// accepted cred types)
-pub fn cred_type_from_disc_uid(disc_uid: &String) -> Result<&'static str, &'static str> {
-    match disc_uid.as_str() {
-        "crescent://over_18" => Ok("mdl"),
-        "crescent://over_21" => Ok("mdl"),
-        "crescent://over_65" => Ok("mdl"),
-        "crescent://email_domain" => Ok("jwt"),
-        _ => Err("cred_type_from_disc_uid: Unknown disclosure UID"),
-    }
-}
 
 pub fn cred_type_from_schema(schema_uid : &String) -> Result<&'static str, &'static str> {
     match schema_uid.as_str() {
@@ -68,4 +63,36 @@ pub fn cred_type_from_schema(schema_uid : &String) -> Result<&'static str, &'sta
         "mdl_1" => Ok("mdl"),
         _ => Err("cred_type_from_schema: Unknown schema UID"),
     }
+}
+
+#[cfg(unix)]
+use std::os::unix::fs::symlink as symlink_any;
+
+#[cfg(windows)]
+fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
+    if src.is_file() {
+        std::os::windows::fs::symlink_file(src, dst)
+    } else if src.is_dir() {
+        std::os::windows::fs::symlink_dir(src, dst)
+    } else {
+        Err(io::Error::new(io::ErrorKind::Other, "Source path is neither file nor directory"))
+    }
+}
+
+// copies the contents of the shared folder to the target folder using symlinks
+pub fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<()> {
+    // Ensure the target folder exists
+    fs::create_dir_all(target_folder)?;
+
+    for entry in fs::read_dir(shared_folder)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let abs_entry_path = entry_path.canonicalize()?;
+        let target_path = target_folder.join(entry.file_name());
+
+        // Create symlink from absolute source path to target path
+        symlink_any(&abs_entry_path, &target_path)?;
+    }
+
+    Ok(())
 }

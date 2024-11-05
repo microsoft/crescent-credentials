@@ -27,39 +27,6 @@ use crescent_sample_setup_service::common::*;
 const CRESCENT_DATA_BASE_PATH : &str = "./data/issuers";
 const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
 
-// TODO: move this to common area
-#[cfg(unix)]
-use std::os::unix::fs::symlink as symlink_any;
-
-#[cfg(windows)]
-fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
-    if src.is_file() {
-        std::os::windows::fs::symlink_file(src, dst)
-    } else if src.is_dir() {
-        std::os::windows::fs::symlink_dir(src, dst)
-    } else {
-        Err(io::Error::new(io::ErrorKind::Other, "Source path is neither file nor directory"))
-    }
-}
-
-// copies the contents of the shared folder to the target folder using symlinks
-fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<()> {
-    // Ensure the target folder exists
-    fs::create_dir_all(target_folder)?;
-
-    for entry in fs::read_dir(shared_folder)? {
-        let entry = entry?;
-        let entry_path = entry.path();
-        let abs_entry_path = entry_path.canonicalize()?;
-        let target_path = target_folder.join(entry.file_name());
-
-        // Create symlink from absolute source path to target path
-        symlink_any(&abs_entry_path, &target_path)?;
-    }
-
-    Ok(())
-}
-
 #[derive(Clone)]
 struct ValidationResult {
     schema_UID: String,
@@ -99,9 +66,9 @@ struct ProofInfo {
 // helper function to provide the base context for the login page
 fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, String> {
     let site1_verifier_name_str = verifier_config.site1_verifier_name.clone();
-    let site1_verify_url_str = uri!(verify).to_string(); // TODO: FIX THIS
+    let site1_verify_url_str = uri!(verify).to_string();
     let site2_verifier_name_str = verifier_config.site2_verifier_name.clone();
-    let site2_verify_url_str = uri!(verify).to_string(); // TODO: FIX THIS
+    let site2_verify_url_str = uri!(verify).to_string();
 
     let mut context = HashMap::new();
     context.insert("site1_verifier_name".to_string(), site1_verifier_name_str);
@@ -256,7 +223,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         error_template!(msg, verifier_config);
     }
 
-    let cred_type = match cred_type_from_disc_uid(&proof_info.disclosure_uid) {
+    let cred_type = match cred_type_from_schema(&proof_info.schema_UID) {
         Ok(cred_type) => cred_type,
         Err(_) => error_template!("Credential type not found", verifier_config),
     };

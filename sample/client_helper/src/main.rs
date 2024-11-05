@@ -7,22 +7,17 @@ use crescent::groth16rand::ClientState;
 use crescent::prep_inputs::{parse_config, prepare_prover_inputs};
 use crescent::rangeproof::RangeProofPK;
 use crescent::structs::{GenericInputsJSON, IOLocations};
-use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, verify_show, CachePaths, CrescentPairing, ShowProof};
-use crescent::VerifierParams;
+use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, CachePaths, CrescentPairing};
 use crescent::utils::{read_from_b64url, read_from_file, write_to_b64url};
 use crescent::ProverParams;
 
 use crescent_sample_setup_service::common::*;
+
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
-use rocket::time::macros::time;
-use rocket::tokio::net::TcpListener;
 use rocket::{get, post};
-use rocket::tokio::spawn;
 use rocket::State;
 use rocket::fs::FileServer;
-use sha2::{Sha256, Digest};
-use base64_url::encode;
 
 use uuid::Uuid;
 use tokio::sync::Mutex;
@@ -33,9 +28,6 @@ use std::collections::HashMap;
 use std::fs::{self};
 use std::sync::Arc;
 use std::path::Path;
-use std::io;
-
-
 // For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
 // TODO: we could make web requests to get the data from the setup service, but this will take more effort (as documented in the sample README).
 //       The code we use in unit tests to make web requests doesn't work from a route handler, we need to investigate.  It may 
@@ -44,40 +36,6 @@ use std::io;
 //       For caching the client helper could re-use the CachePaths struct and approach.
 const CRESCENT_DATA_BASE_PATH : &str = "./data/creds";
 const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
-
-// TODO: move this to common area
-#[cfg(unix)]
-use std::os::unix::fs::symlink as symlink_any;
-
-#[cfg(windows)]
-fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
-    if src.is_file() {
-        std::os::windows::fs::symlink_file(src, dst)
-    } else if src.is_dir() {
-        std::os::windows::fs::symlink_dir(src, dst)
-    } else {
-        Err(io::Error::new(io::ErrorKind::Other, "Source path is neither file nor directory"))
-    }
-}
-
-// copies the contents of the shared folder to the target folder using symlinks
-fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<()> {
-    // Ensure the target folder exists
-    fs::create_dir_all(target_folder)?;
-
-    for entry in fs::read_dir(shared_folder)? {
-        let entry = entry?;
-        let entry_path = entry.path();
-        let abs_entry_path = entry_path.canonicalize()?;
-        let target_path = target_folder.join(entry.file_name());
-
-        // Create symlink from absolute source path to target path
-        symlink_any(&abs_entry_path, &target_path)?;
-    }
-
-    Ok(())
-}
-
 
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone)]
@@ -160,10 +118,6 @@ async fn fetch_and_save_jwk(issuer_url: &str, cred_folder: &str) -> Result<(), S
 }
 
 fn compute_cred_uid(cred : &String) -> String {
-    
-    //let digest = Sha256::digest(cred);
-    //let cred_uid = base64_url::encode(&digest[0..16]);
-
     let cred_uid = Uuid::new_v4().to_string();
 
     cred_uid
