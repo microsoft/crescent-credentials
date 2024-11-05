@@ -63,9 +63,9 @@ struct ProofInfo {
 // helper function to provide the base context for the login page
 fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, String> {
     let site1_verifier_name_str = verifier_config.site1_verifier_name.clone();
-    let site1_verify_url_str = uri!(verify).to_string(); // TODO: FIX THIS
+    let site1_verify_url_str = uri!(verify).to_string();
     let site2_verifier_name_str = verifier_config.site2_verifier_name.clone();
-    let site2_verify_url_str = uri!(verify).to_string(); // TODO: FIX THIS
+    let site2_verify_url_str = uri!(verify).to_string();
 
     let mut context = HashMap::new();
     context.insert("site1_verifier_name".to_string(), site1_verifier_name_str);
