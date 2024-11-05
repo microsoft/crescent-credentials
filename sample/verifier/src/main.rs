@@ -60,9 +60,15 @@ fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<
 
 // verifer config from Rocket.toml
 struct VerifierConfig {
-    crescent_verify_url: String,
-    verifier_name: String,
-    verifier_domain: String,
+    // site 1 (JWT verifier)
+    site1_verify_url: String,
+    site1_verifier_name: String,
+    site1_verifier_domain: String,
+    
+    // site 2 (mDL verifier)
+    site2_verify_url: String,
+    site2_verifier_name: String,
+    site2_verifier_domain: String,
 }
 
 // struct for the JWT info
@@ -75,13 +81,17 @@ struct ProofInfo {
 }
 
 // helper function to provide the base context for the login page
-fn base_login_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, String> {
-    let verifier_name_str = verifier_config.verifier_name.clone();
-    let crescent_verify_url_str = uri!(verify).to_string();
+fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, String> {
+    let site1_verifier_name_str = verifier_config.site1_verifier_name.clone();
+    let site1_verify_url_str = uri!(verify).to_string(); // TODO: FIX THIS
+    let site2_verifier_name_str = verifier_config.site2_verifier_name.clone();
+    let site2_verify_url_str = uri!(verify).to_string(); // TODO: FIX THIS
 
     let mut context = HashMap::new();
-    context.insert("verifier_name".to_string(), verifier_name_str);
-    context.insert("crescent_verify_url".to_string(), crescent_verify_url_str);
+    context.insert("site1_verifier_name".to_string(), site1_verifier_name_str);
+    context.insert("site1_verify_url".to_string(), site1_verify_url_str);
+    context.insert("site2_verifier_name".to_string(), site2_verifier_name_str);
+    context.insert("site2_verify_url".to_string(), site2_verify_url_str);
     
     context
 }
@@ -92,43 +102,55 @@ fn index_redirect() -> Redirect {
     Redirect::to("/login")
 }
 
-// route to serve the login page
+// route to serve the login page (site 1 - JWT verifier)
 #[get("/login")]
 fn login_page(verifier_config: &State<VerifierConfig>) -> Template {
-    println!("*** Serving login page");
+    println!("*** Serving site 1 login page");
 
     // set the template meta values
-    let context = base_login_context(verifier_config);
+    let context = base_context(verifier_config);
     
     // render the login page
     Template::render("login", context)
 }
 
-// route to serve the protected resource page after successful verification
+// route to serve the protected resource page after successful verification  (site 1 - JWT verifier)
 #[get("/resource")]
 fn resource_page(verifier_config: &State<VerifierConfig>) -> Template {
-    println!("*** Serving resource page");
-    let verifier_name_str = verifier_config.verifier_name.as_str();
+    println!("*** Serving site 1 resource page");
+    let site1_verifier_name_str = verifier_config.site1_verifier_name.as_str();
 
     // render the resource page
     Template::render("resource",
         context! {
-            verifier_name: verifier_name_str,
+            site1_verifier_name: site1_verifier_name_str,
             email_domain: "example.com" // TODO: get it from /verify (passing it as a query params is insecure, even for a demo, so perhaps we can use a cookie or session)
         }
     )
 }
 
-// route to serve the protected resource page after successful verification
-#[get("/resource_over18")]
-fn resource_page_over18(verifier_config: &State<VerifierConfig>) -> Template {
-    println!("*** Serving resource page (over 18)");
-    let verifier_name_str = verifier_config.verifier_name.as_str();
+// route to serve the signup1 page (site 2 - mDL verifier)
+#[get("/signup1")]
+fn signup1_page(verifier_config: &State<VerifierConfig>) -> Template {
+    println!("*** Serving site 2 signup1 page");
 
-    // render the resource page
-    Template::render("resource_over18",
+    // set the template meta values
+    let context = base_context(verifier_config);
+    
+    // render the login page
+    Template::render("signup1", context)
+}
+
+// route to serve the signup2 page (site 2 - mDL verifier)
+#[get("/signup2")]
+fn signup2_page(verifier_config: &State<VerifierConfig>) -> Template {
+    println!("*** Serving site 2 signup2 page");
+    let site2_verifier_name_str = verifier_config.site2_verifier_name.as_str();
+
+    // render the signup2 page
+    Template::render("signup2",
         context! {
-            verifier_name: verifier_name_str,
+            site2_verifier_name: site2_verifier_name_str,
         }
     )
 }
@@ -171,7 +193,7 @@ async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(),
 macro_rules! error_template {
     ($msg:expr, $verifier_config:expr) => {{
         println!("*** {}", $msg);
-        let mut context = base_login_context($verifier_config);
+        let mut context = base_context($verifier_config);
         context.insert("error".to_string(), $msg.to_string());
         return Err(Template::render("login", context));
     }};
@@ -252,8 +274,8 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 
         if is_valid {
             // redirect to the resource page (with status code 303 to ensure a GET request is made)
-            println!("*** Proof is valid, user satisfies {}. Redirecting to resource page", proof_info.disclosure_uid);
-            Ok(Custom(Status::SeeOther, Redirect::to(uri!(resource_page_over18))))
+            println!("*** Proof is valid, user satisfies {}. Redirecting to signup2 page", proof_info.disclosure_uid);
+            Ok(Custom(Status::SeeOther, Redirect::to(uri!(signup2_page))))
         } else {
             // return an error template if the proof is invalid
             error_template!("Proof is invalid.", verifier_config);
@@ -265,20 +287,27 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 fn rocket() -> _ {
     // Load verifier configuration
     let figment = rocket::Config::figment();
-    let verifier_name: String = figment.extract_inner("verifier_name").unwrap_or_else(|_| "Example Verifier".to_string());
-    let verifier_domain: String = figment.extract_inner("verifier_domain").unwrap_or_else(|_| "example.com".to_string());
-    let crescent_verify_url: String = figment.extract_inner("crescent_verify_url").unwrap_or_else(|_| "example.com/verify".to_string());
-    
+    let site1_verifier_name: String = figment.extract_inner("site1_verifier_name").unwrap_or_else(|_| "Example Verifier".to_string());
+    let site1_verifier_domain: String = figment.extract_inner("site1_verifier_domain").unwrap_or_else(|_| "example.com".to_string());
+    let site1_verify_url: String = format!("http://{}/verify", site1_verifier_domain);
+
+    let site2_verifier_name: String = figment.extract_inner("site2_verifier_name").unwrap_or_else(|_| "Example Verifier".to_string());
+    let site2_verifier_domain: String = figment.extract_inner("site2_verifier_domain").unwrap_or_else(|_| "example.com".to_string());
+    let site2_verify_url: String = format!("http://{}/verify", site2_verifier_domain);
+
     let verifier_config = VerifierConfig {
-        verifier_name,
-        verifier_domain,
-        crescent_verify_url,
+        site1_verifier_name,
+        site1_verifier_domain,
+        site1_verify_url,
+        site2_verifier_name,
+        site2_verifier_domain,
+        site2_verify_url,
     };
     
     rocket::build()
         .manage(verifier_config)
         .mount("/", FileServer::from("static"))
-        .mount("/", routes![index_redirect, login_page, verify, resource_page, resource_page_over18])
+        .mount("/", routes![index_redirect, login_page, resource_page, signup1_page, signup2_page, verify])
     .attach(Template::fairing())
 }
 

@@ -1,6 +1,8 @@
 # Sample Verifier
 
-This folder contains a sample verifier who can validate Crescent proofs.
+This folder contains a sample verifier who can validate Crescent proofs. The project contains two sample web sites illustrating different use scenarios:
+* Site 1: a mental health site requiring proof of employment (through email domain disclosure) for access
+* Site 2: a social media site requiring proof of age for access
 
 ## Setup
 

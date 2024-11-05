@@ -15,7 +15,7 @@ Two scripts help with managing the sample projects:
 * `./setup-sample.sh`: runs the setup script for (using a default config) and builds the issuer, client_helper, and verifier projects; each must then be started in their own console with `cargo run --release`. The client must be setup and installed separately. 
 * `./clean-sample.sh [--data-and-build]`: cleans the data (if the build files too, if the `--data-and-build` flag is passed) for the issuer, client_helper, and verifier projects.
 
-Each component must be setup and modified individually; see their respective README for details. 
+Each component must be setup and modified individually; see their respective README for details. Once setup, follow the instructions from <a href="sample.html">this page</a> to go through the sample demo steps.
 
 # Sample Overview
 
@@ -48,7 +48,7 @@ The sample defines the following *schema UIDs* expressing the credential type an
 * Description: a mobile Driver's License
 * Credential type: mDL
 * Supported disclosure UIDs
-  * `crescent://age_over_21`: reveal that an encoded date of birth makes the user older than 18 years old
+  * `crescent://age_over_18`: reveal that an encoded date of birth makes the user older than 18 years old
 
 ## Credential issuance
 
