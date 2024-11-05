@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta crescent_verify_url="{{ site2_verify_url  | safe }}">
+    <meta crescent_disclosure_uid="crescent://over_18">
+    <title>{{ site2_verifier_name }} Sign Up</title>
+    <link rel="stylesheet" href="css/site2_style.css">
+</head>
+<body>
+    <h1>{{ site2_verifier_name }} Sign Up Page</h1>
+    <h2>Age Verification</h2>
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    <p>Welcome to {{ site2_verifier_name }}, the best place to connect with your community.</p>
+
+    <p>You need to be over-18 to create an account on our site. Please present a proof of age to continue. Nothing else will be learned by our service or its issuer.</p>
+</body>
+</html>

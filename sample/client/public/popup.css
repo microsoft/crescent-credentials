@@ -1,10 +1,35 @@
 /* Tab button styles */
 * {
     font-family: 'Roboto', Arial, Helvetica, sans-serif;
+    box-sizing: border-box;
+}
+
+:root {
+    --config-value-width: 300px;
+}
+
+html {
+    width: 450px;
+    height: 600px;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    height: 100%;
+    margin: 0px;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
 }
 
 #tab-buttons {
     margin-bottom: -1px;
+    z-index: 1;
+}
+
+#tab-container {
+    flex-grow: 1;
 }
 
 .tab {
@@ -95,4 +120,62 @@
 
 toggle-switch {
     margin-top: 5px;
+}
+
+.config-button {
+    width: var(--config-value-width);
+    padding: 5px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    background-color: #f1f1f1;
+    border-radius: 8px;
+    width: 100px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+select,
+input[type="text"] {
+    width: var(--config-value-width);
+    padding: 5px;
+    margin: 5px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: right;
+}
+
+/* select {
+    width: var(--config-value-width);
+    padding: 5px;
+    margin: 5px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+} */
+
+.config-section-header {
+    font-size: 1.4em;
+    font-weight: bold;
+    margin: 10px 0;
+    display: inline-block;
+}
+
+.config-label {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 5px 0;
+}
+
+.config-subsection {
+    margin: 10px 0;
+}
+
+.config-setting {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    font-size: 0.9em;
+    padding: 0 0 0 5px;
+}
+
+.config-button-disabled {
+    color: grey;
 }

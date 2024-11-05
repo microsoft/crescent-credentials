@@ -1,0 +1,140 @@
+/* General body styling */
+body {
+    background-color: #e6f7ff; /* Light blue background */
+    color: #333333; /* Dark gray text for readability */
+    font-family: 'Verdana', sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+/* Header styling */
+h1 {
+    color: #004d99; /* Deep blue for headers */
+    font-size: 2.5em;
+    margin-bottom: 20px;
+}
+
+/* Paragraph styling */
+p {
+    color: #333333; /* Dark gray for standard text */
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+/* Error message styling */
+p[style="color: red;"] {
+    color: #cc0000; /* Red for error messages */
+    font-weight: bold;
+}
+
+/* Form group styling */
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #b3d9ff;
+    border-radius: 5px;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 10px;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus, input[type="password"]:focus {
+    border-color: #3399ff; /* Highlight border on focus */
+    outline: none;
+}
+
+button {
+    background-color: #3399ff; /* Blue button background */
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #007acc; /* Darker blue on hover */
+}
+
+/* Add a subtle box-shadow and padding for sections */
+body > * {
+    background-color: #ffffff; /* White background for content */
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    max-width: 600px;
+    width: 100%;
+}
+
+/* Styling links */
+a {
+    color: #0066cc;
+    text-decoration: underline;
+    transition: color 0.3s;
+}
+
+a:hover {
+    color: #004d99;
+}
+
+/* Profile image section styling */
+.profile-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    border: 2px solid #b3d9ff;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    background-color: #f0f8ff; /* Light background for contrast */
+}
+
+.profile-section img {
+    width: 120px;
+    height: 120px;
+    border-radius: 10px;
+    object-fit: cover;
+    margin-bottom: 10px; /* Space between image and button */
+    border: 2px solid #3399ff;
+}
+
+.profile-section button {
+    background-color: #3399ff; /* Match button style */
+    color: #ffffff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.profile-section button:hover {
+    background-color: #007acc; /* Darker blue on hover */
+}
+
+/* Styling for combined profile and form layout */
+.profile-form-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
