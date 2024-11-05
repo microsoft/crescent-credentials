@@ -70,6 +70,9 @@ struct ValidationResult {
 
 // verifer config from Rocket.toml
 struct VerifierConfig {
+    // server port
+    port: String,
+
     // site 1 (JWT verifier)
     site1_verify_url: String,
     site1_verifier_name: String,
@@ -109,10 +112,18 @@ fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, Stri
     context
 }
 
-// redirect from `/` to `/login`
+// route to serve the index page
 #[get("/")]
-fn index_redirect() -> Redirect {
-    Redirect::to("/login")
+fn index_page(verifier_config: &State<VerifierConfig>) -> Template {
+    println!("*** Serving the index page");
+
+    Template::render("index", context! {
+        port: verifier_config.port.as_str(),
+        site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
+        site2_verifier_name: verifier_config.site2_verifier_name.as_str(),
+        site1_verifier_domain: verifier_config.site1_verifier_domain.as_str(),
+        site2_verifier_domain: verifier_config.site2_verifier_domain.as_str(),
+    })
 }
 
 // route to serve the login page (site 1 - JWT verifier)
@@ -325,6 +336,8 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 fn rocket() -> _ {
     // Load verifier configuration
     let figment = rocket::Config::figment();
+    let port: String = figment.extract_inner("port").unwrap_or_else(|_| "8004".to_string());
+
     let site1_verifier_name: String = figment.extract_inner("site1_verifier_name").unwrap_or_else(|_| "Example Verifier".to_string());
     let site1_verifier_domain: String = figment.extract_inner("site1_verifier_domain").unwrap_or_else(|_| "example.com".to_string());
     let site1_verify_url: String = format!("http://{}/verify", site1_verifier_domain);
@@ -334,6 +347,7 @@ fn rocket() -> _ {
     let site2_verify_url: String = format!("http://{}/verify", site2_verifier_domain);
 
     let verifier_config = VerifierConfig {
+        port,
         site1_verifier_name,
         site1_verifier_domain,
         site1_verify_url,
@@ -346,7 +360,7 @@ fn rocket() -> _ {
     rocket::build()
         .manage(verifier_config)
         .mount("/", FileServer::from("static"))
-        .mount("/", routes![index_redirect, login_page, resource_page, signup1_page, signup2_page, verify])
+        .mount("/", routes![index_page, login_page, resource_page, signup1_page, signup2_page, verify])
     .attach(Template::fairing())
 }
 
