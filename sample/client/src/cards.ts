@@ -7,7 +7,6 @@
 
 import { MSG_WALLET_UPDATED } from './constants.js'
 import { addData, getData } from './indexeddb.js'
-import { listen } from './listen.js'
 import { fields } from './mdoc.js'
 import schemas from './schema.js'
 
@@ -65,8 +64,6 @@ export class Card implements ICard {
     if (typeof domain !== 'string') {
       return { ok: false, error: new Error('domain is not a string') }
     }
-
-    // let type: 'JWT' | 'MDOC' = 'JWT'
 
     const schema = schemas[schemaName]
     const decoded = schema.decode(encoded)
@@ -146,13 +143,6 @@ export class Wallet {
     Wallet._cards.push(...cards.map(card => new Card(card)))
 
     console.debug('Wallet.cards:', Wallet._cards)
-
-    listen(MSG_WALLET_UPDATED, async () => {
-      await Wallet.reload()
-      if (Wallet._onUpdated !== null) {
-        Wallet._onUpdated()
-      }
-    })
 
     if (Wallet._onReady !== null) {
       console.debug('Wallet init onReady callback')

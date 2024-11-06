@@ -5,29 +5,34 @@
 
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
-import { type Card, Wallet } from './cards.js'
-import { ping } from './clientHelper.js'
-import type { CardElement } from './components/card.js'
 import {
   MSG_POPUP_BACKGROUND_DISCLOSE, MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, MSG_BACKGROUND_POPUP_PREPARED,
   MSG_BACKGROUND_POPUP_PREPARE_STATUS, MSG_POPUP_BACKGROUND_PREPARE, MSG_POPUP_BACKGROUND_IMPORT,
   MSG_POPUP_BACKGROUND_DELETE
 } from './constants.js'
-import { listen } from './listen.js'
+import { type Card, Wallet } from './cards.js'
+import { ping } from './clientHelper.js'
+import type { CardElement } from './components/card.js'
+import { sendMessage, setListener } from './listen.js'
 import { getElementById } from './utils.js'
 import config from './config.js'
+
+const puid = Math.random().toString(36).substring(7)
+console.debug('popup.js: load', puid)
+
+const listener = setListener('popup')
+
+const importSettings: { domain: string | null, schema: string | null } = {
+  domain: null,
+  schema: null
+}
 
 chrome.runtime.onMessage.addListener((message: MESSAGE_PAYLOAD, sender) => {
   const dateNow = new Date(Date.now())
   console.debug('TOP-LEVEL LISTENER', dateNow.toLocaleString(), message, sender)
 })
 
-const puid = Math.random().toString(36).substring(7)
-
-console.debug('popup.js: load', puid)
-
 const PREPARED_MESSAGE_DURATION = 2000
-
 const disclosureRequests: Array<{ ids: Array<{ id: number, property: string }>, url: string, uid: string }> = []
 let _ready = false
 
@@ -46,7 +51,7 @@ function handleDisclosureRequest (): void {
     }
     entry.status = 'DISCLOSABLE'
     entry.disclose = (card: Card) => {
-      void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_DISCLOSE, data: { id: card.id, url, uid } })
+      void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, card.id, uid)
     }
     entry.discloseRequest(url, id.property, uid)
   })
@@ -54,44 +59,6 @@ function handleDisclosureRequest (): void {
 
 async function init (): Promise<void> {
   console.debug('init start')
-
-  // MSG_BACKGROUND_POPUP_PREPARE_STATUS
-  listen<{ id: number, progress: number }>(MSG_BACKGROUND_POPUP_PREPARE_STATUS, (data) => {
-    const { id, progress } = data
-    const entry = lookupCardElement(id)
-    if (entry?.card == null) {
-      throw new Error('Card is null')
-    }
-    entry.progress.value = progress
-  })
-
-  // MSG_BACKGROUND_POPUP_PREPARED
-  listen<{ id: number }>(MSG_BACKGROUND_POPUP_PREPARED, (data) => {
-    const { id } = data
-    const entry = lookupCardElement(id)
-    if (entry?.card == null) {
-      throw new Error('Card is null')
-    }
-
-    entry.progress.value = 100
-    entry.progress.label = 'Prepared'
-    setTimeout(() => {
-      entry.progress.hide()
-    }, PREPARED_MESSAGE_DURATION)
-  })
-
-  // MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST
-  listen<{ issuerTokensIds: Array<{ id: number, property: string }>, url: string, uid: string }>(MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, (data) => {
-    console.debug('MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST', data)
-    const { url, uid } = data
-
-    disclosureRequests.push({ ids: data.issuerTokensIds, url, uid })
-    if (_ready) {
-      handleDisclosureRequest()
-    }
-  })
-
-  const _onReady: (() => void) | null = null
 
   await new Promise((resolve) => {
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -160,7 +127,7 @@ async function init (): Promise<void> {
 async function importFileSelected (event: ProgressEvent<FileReader>): Promise<void> {
   const encoded = event.target?.result as string
   const schema = getElementById<HTMLSelectElement>('dropdown-import-schema').value
-  const result = await chrome.runtime.sendMessage<MESSAGE_PAYLOAD, RESULT<Card, Error>>({ action: MSG_POPUP_BACKGROUND_IMPORT, data: { encoded, domain: importSettings.domain, schema } })
+  const result = await sendMessage<RESULT<Card, Error>>('background', MSG_POPUP_BACKGROUND_IMPORT, importSettings.domain, schema, encoded)
 
   if (!result.ok) {
     await showError(result.error.message)
@@ -196,10 +163,6 @@ function activateTab (tab: HTMLElement): void {
   getElementById<HTMLDivElement>(tabContentId).classList.add('active-content')
 }
 
-async function sendBackgroundMessage<T> (action: string, data: Record<string, unknown>): Promise<T> {
-  return await chrome.runtime.sendMessage({ action, data })
-}
-
 function showTab (name: string): void {
   const tab = document.querySelector<HTMLButtonElement>(`button[data-tab="${name}"`)
   if (tab === null) {
@@ -228,7 +191,7 @@ function addWalletEntry (_card: Card): void {
   cardComponent.status = _card.status
 
   cardComponent.accept = (card: Card) => {
-    void sendBackgroundMessage<RESULT<string, Error>>(MSG_POPUP_BACKGROUND_PREPARE, { id: card.id })
+    void sendMessage<RESULT<boolean, Error>>('background', MSG_POPUP_BACKGROUND_PREPARE, card.id)
       .then(async (result) => {
         if (!result.ok) {
           await showError(result.error.message)
@@ -243,8 +206,7 @@ function addWalletEntry (_card: Card): void {
 
   cardComponent.delete = function (card: Card) {
     walletDiv.removeChild(cardComponent)
-    void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_DELETE, data: { id: card.id } }).then(() => {
-      // void loadCards()
+    void sendMessage('background', MSG_POPUP_BACKGROUND_DELETE, card.id).then(() => {
       void Wallet.reload()
     })
   }
@@ -263,11 +225,6 @@ function lookupCardElement (id: number): CardElement | undefined {
   }) as CardElement | undefined
 }
 
-const importSettings: { domain: string | null, schema: string | null } = {
-  domain: null,
-  schema: null
-}
-
 getElementById<HTMLInputElement>('text-import-domain').addEventListener('input', function (event) {
   const value = (event.target as HTMLInputElement).value
   const buttonImportFile = getElementById<HTMLInputElement>('button-import-card')
@@ -279,10 +236,6 @@ getElementById<HTMLInputElement>('text-import-domain').addEventListener('input',
   }
   buttonImportFile.disabled = !validDomain
   validDomain ? buttonImportFile.classList.remove('config-button-disabled') : buttonImportFile.classList.add('config-button-disabled')
-})
-
-void init().then(() => {
-
 })
 
 async function showError (message: string): Promise<void> {
@@ -311,3 +264,37 @@ function closeOverlay (): void {
   error.style.display = 'none'
   pick.style.display = 'none'
 }
+
+// MSG_BACKGROUND_POPUP_PREPARE_STATUS
+listener.handle(MSG_BACKGROUND_POPUP_PREPARE_STATUS, (id: number, progress: number) => {
+  const entry = lookupCardElement(id)
+  if (entry?.card == null) {
+    throw new Error('Card is null')
+  }
+  entry.progress.value = progress
+})
+
+// MSG_BACKGROUND_POPUP_PREPARED
+listener.handle(MSG_BACKGROUND_POPUP_PREPARED, (id: number) => {
+  const entry = lookupCardElement(id)
+  if (entry?.card == null) {
+    throw new Error('Card is null')
+  }
+  entry.progress.value = 100
+  entry.progress.label = 'Prepared'
+  setTimeout(() => {
+    entry.progress.hide()
+  }, PREPARED_MESSAGE_DURATION)
+})
+
+// MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST
+listener.handle(MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, (issuerTokensIds: Array<{ id: number, property: string }>, url: string, uid: string) => {
+  disclosureRequests.push({ ids: issuerTokensIds, url, uid })
+  if (_ready) {
+    handleDisclosureRequest()
+  }
+})
+
+void init().then(() => {
+  listener.go()
+})
