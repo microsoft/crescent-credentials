@@ -1,3 +1,8 @@
+/*
+ *  Copyright (c) Microsoft Corporation.
+ *  Licensed under the MIT license.
+ */
+
 import { decodeJwt } from './jwt.js'
 import { decode as mdocDecode } from './mdoc.js'
 

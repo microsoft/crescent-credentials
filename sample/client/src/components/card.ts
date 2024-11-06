@@ -134,7 +134,7 @@ export class CardElement extends LitElement {
       return html`<div>Card is null</div>`
     }
 
-    const color = `#${(Math.floor(200 - (Math.random() * 60))).toString(16)}${(Math.floor(200 - (Math.random() * 60))).toString(16)}${(Math.floor(200 - (Math.random() * 60))).toString(16)}`
+    const color = `#4E95D9` // matching the crescent logo color
 
     return html`
       <div class="container" style="background-color:${color}">

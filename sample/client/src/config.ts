@@ -1,3 +1,8 @@
+/*
+ *  Copyright (c) Microsoft Corporation.
+ *  Licensed under the MIT license.
+ */
+
 import 'dotenv/config'
 
 const schemaList = process.env.SCHEMAS ?? 'jwt_corporate_1,mdl_1'

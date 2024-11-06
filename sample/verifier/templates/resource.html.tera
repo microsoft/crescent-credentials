@@ -6,14 +6,31 @@
     <link rel="stylesheet" href="css/site1_style.css">
 </head>
 <body>
-    <h1>{{ site1_verifier_name }} Mental Health Clinic</h1>
+    <div style="display: flex; align-items: center;">
+        <img src="img/corp-leaf.png" style="width: 5em; margin-right: 1em;">
+        <h1>{{ site1_verifier_name }} Health</h1>
+    </div>
 
     <p>Your email from {{ email_domain }} was successfully validated. You can now access the resources on our site.</p>
 
-    <ul>
-        <li><a href="">Book an appointment</a></li>
-        <li><a href="">Browse the specialists directory</a></li>
-        <li><a href="">Chat with our AI therapist</a></li>
-    </ul>
+    <div style="padding: 1em; background-color: #faf9f6; border-radius: 8px; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); margin-top: 1em;">
+        <ul style="list-style-type: none; padding: 0;">
+            <li style="margin-bottom: 1em;">
+                <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
+                    <img src="img/calendar.png" style="width: 1.5em; margin-right: 0.5em;"> Book an appointment
+                </a>
+            </li>
+            <li style="margin-bottom: 1em;">
+                <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
+                    <img src="img/provider.png" style="width: 1.5em; margin-right: 0.5em;"> Browse the specialists directory
+                </a>
+            </li>
+            <li>
+                <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
+                    <img src="img/aitherapist.png" style="width: 1.5em; margin-right: 0.5em;"> Chat with our AI therapist
+                </a>
+            </li>
+        </ul>
+    </div>
 </body>
 </html>

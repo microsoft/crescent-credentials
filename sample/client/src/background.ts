@@ -182,7 +182,7 @@ listener.handle(MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, async (url: string, uid
 }
 )
 
-listener.handle(MSG_POPUP_BACKGROUND_DISCLOSE, async (id: number, uid: string, _url: string) => {
+listener.handle(MSG_POPUP_BACKGROUND_DISCLOSE, async (id: number, uid: string, url: string) => {
   const card = Wallet.find(id)
   if (card === undefined) {
     throw new Error('Card not found')
@@ -209,7 +209,8 @@ listener.handle(MSG_POPUP_BACKGROUND_DISCLOSE, async (id: number, uid: string, _
 
   // TODO: remove hardcoded URL
   const params = {
-    url: 'http://fabrikam.com:8004/verify',
+    url,
+    disclosure_uid: uid,
     issuer_URL: card.issuer.url,
     schema_UID: card.token.schema,
     proof: _showProof.value
