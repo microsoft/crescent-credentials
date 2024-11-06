@@ -51,7 +51,7 @@ function handleDisclosureRequest (): void {
     }
     entry.status = 'DISCLOSABLE'
     entry.disclose = (card: Card) => {
-      void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, card.id, uid)
+      void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, card.id, uid, url)
     }
     entry.discloseRequest(url, id.property, uid)
   })

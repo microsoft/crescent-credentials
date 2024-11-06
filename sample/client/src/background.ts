@@ -71,8 +71,8 @@ async function disclosableCards (uid: string): Promise<Array<{ id: number, prope
 function getDisclosureProperty (card: Card, uid: string): string | null {
   switch (uid) {
     case 'crescent://email_domain':
-      // eslint-disable-next-line no-case-declarations
-      const emailValue = (card.token.value as JWT_TOKEN).payload.email as string | undefined ?? ''
+      // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
+      const emailValue = (card.token.value as JWT_TOKEN | undefined)?.payload?.email as string | undefined ?? ''
       return emailValue === '' ? null : emailValue.replace(/^.*@/, '')
     default:
       return null
@@ -194,12 +194,10 @@ listener.handle(MSG_POPUP_BACKGROUND_DISCLOSE, async (id: number, uid: string, u
     return
   }
 
-  // TODO: remove hardcoded URL
-  await fetchText('http://127.0.0.1:8004/verify', { issuer_URL: card.issuer.url, disclosure_uid: uid, schema_UID: card.token.schema, proof: _showProof.value }, 'POST')
-
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
-
-  console.debug(tabs)
+  if (tabs.length === 0) {
+    throw new Error('No active tab found')
+  }
 
   const tabid = tabs[0].id
 

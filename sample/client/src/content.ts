@@ -70,7 +70,7 @@ chrome.runtime.onMessage.addListener((request, _sender, _sendResponse) => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { url, ...data } = request.data
 
-    fetch(url as string, {
+    fetch(`${url}/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
