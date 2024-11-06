@@ -17,18 +17,86 @@ import { listen } from './listen.js'
 import { getElementById } from './utils.js'
 import config from './config.js'
 
+chrome.runtime.onMessage.addListener((message: MESSAGE_PAYLOAD, sender) => {
+  const dateNow = new Date(Date.now())
+  console.debug('TOP-LEVEL LISTENER', dateNow.toLocaleString(), message, sender)
+})
+
 const puid = Math.random().toString(36).substring(7)
 
 console.debug('popup.js: load', puid)
 
 const PREPARED_MESSAGE_DURATION = 2000
 
+const disclosureRequests: Array<{ ids: Array<{ id: number, property: string }>, url: string, uid: string }> = []
+let _ready = false
+
+function handleDisclosureRequest (): void {
+  const request = disclosureRequests.pop()
+  if (request === undefined) {
+    return
+  }
+
+  const { ids, url, uid } = request
+
+  ids.forEach((id) => {
+    const entry = lookupCardElement(id.id)
+    if (entry === undefined) {
+      throw new Error('Entry not found')
+    }
+    entry.status = 'DISCLOSABLE'
+    entry.disclose = (card: Card) => {
+      void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_DISCLOSE, data: { id: card.id, url, uid } })
+    }
+    entry.discloseRequest(url, id.property, uid)
+  })
+}
+
 async function init (): Promise<void> {
   console.debug('init start')
+
+  // MSG_BACKGROUND_POPUP_PREPARE_STATUS
+  listen<{ id: number, progress: number }>(MSG_BACKGROUND_POPUP_PREPARE_STATUS, (data) => {
+    const { id, progress } = data
+    const entry = lookupCardElement(id)
+    if (entry?.card == null) {
+      throw new Error('Card is null')
+    }
+    entry.progress.value = progress
+  })
+
+  // MSG_BACKGROUND_POPUP_PREPARED
+  listen<{ id: number }>(MSG_BACKGROUND_POPUP_PREPARED, (data) => {
+    const { id } = data
+    const entry = lookupCardElement(id)
+    if (entry?.card == null) {
+      throw new Error('Card is null')
+    }
+
+    entry.progress.value = 100
+    entry.progress.label = 'Prepared'
+    setTimeout(() => {
+      entry.progress.hide()
+    }, PREPARED_MESSAGE_DURATION)
+  })
+
+  // MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST
+  listen<{ issuerTokensIds: Array<{ id: number, property: string }>, url: string, uid: string }>(MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, (data) => {
+    console.debug('MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST', data)
+    const { url, uid } = data
+
+    disclosureRequests.push({ ids: data.issuerTokensIds, url, uid })
+    if (_ready) {
+      handleDisclosureRequest()
+    }
+  })
+
+  const _onReady: (() => void) | null = null
 
   await new Promise((resolve) => {
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     document.addEventListener('DOMContentLoaded', async function (): Promise<void> {
+      // Init wallet data from store
       await Wallet.init(puid)
 
       const tabs = document.querySelectorAll<HTMLButtonElement>('.tab')
@@ -43,13 +111,16 @@ async function init (): Promise<void> {
       })
 
       getElementById<HTMLInputElement>('file-import-file').addEventListener('change', (event) => {
-        const file: File | undefined = (event.target as HTMLInputElement | undefined)?.files?.[0]
+        const fileControl = event.target as HTMLInputElement
+        const file: File | undefined = fileControl.files?.[0]
         if (file == null) {
           return
         }
         const reader = new FileReader()
         reader.onload = importFileSelected
         reader.readAsText(file)
+        // clear the value so that the change event is fired even if the same file is selected again
+        fileControl.value = ''
       })
 
       const schemaDropDown = getElementById<HTMLSelectElement>('dropdown-import-schema')
@@ -73,7 +144,11 @@ async function init (): Promise<void> {
         })
       })
 
+      // Init wallet UI from wallet data
       await initWallet ()
+
+      _ready = true
+      handleDisclosureRequest()
 
       resolve(true)
     })
@@ -85,16 +160,18 @@ async function init (): Promise<void> {
 async function importFileSelected (event: ProgressEvent<FileReader>): Promise<void> {
   const encoded = event.target?.result as string
   const schema = getElementById<HTMLSelectElement>('dropdown-import-schema').value
-  void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_IMPORT, data: { encoded, domain: importSettings.domain, schema } })
-    .then(async (_result: RESULT<string, Error>) => {
-      await Wallet.reload()
-    })
-    .then(async () => {
-      await initWallet ()
-    })
-    .then(async () => {
-      _showTab('wallet')
-    })
+  const result = await chrome.runtime.sendMessage<MESSAGE_PAYLOAD, RESULT<Card, Error>>({ action: MSG_POPUP_BACKGROUND_IMPORT, data: { encoded, domain: importSettings.domain, schema } })
+
+  if (!result.ok) {
+    await showError(result.error.message)
+    return
+  }
+
+  await Wallet.reload()
+
+  await initWallet ()
+
+  showTab('wallet')
 }
 
 function activateTab (tab: HTMLElement): void {
@@ -123,7 +200,7 @@ async function sendBackgroundMessage<T> (action: string, data: Record<string, un
   return await chrome.runtime.sendMessage({ action, data })
 }
 
-function _showTab (name: string): void {
+function showTab (name: string): void {
   const tab = document.querySelector<HTMLButtonElement>(`button[data-tab="${name}"`)
   if (tab === null) {
     throw new Error(`Tab ${name} not found`)
@@ -151,15 +228,17 @@ function addWalletEntry (_card: Card): void {
   cardComponent.status = _card.status
 
   cardComponent.accept = (card: Card) => {
-    void sendBackgroundMessage(MSG_POPUP_BACKGROUND_PREPARE, { id: card.id })
+    void sendBackgroundMessage<RESULT<string, Error>>(MSG_POPUP_BACKGROUND_PREPARE, { id: card.id })
+      .then(async (result) => {
+        if (!result.ok) {
+          await showError(result.error.message)
+          cardComponent.status = 'PENDING'
+        }
+      })
   }
 
   cardComponent.reject = (_card: Card) => {
     walletDiv.removeChild(cardComponent)
-  }
-
-  cardComponent.disclose = (card: Card) => {
-    void chrome.runtime.sendMessage({ action: MSG_POPUP_BACKGROUND_DISCLOSE, data: { id: card.id } })
   }
 
   cardComponent.delete = function (card: Card) {
@@ -203,42 +282,32 @@ getElementById<HTMLInputElement>('text-import-domain').addEventListener('input',
 })
 
 void init().then(() => {
-// MSG_BACKGROUND_POPUP_PREPARE_STATUS
-  listen<{ id: number, progress: number }>(MSG_BACKGROUND_POPUP_PREPARE_STATUS, (data) => {
-    const { id, progress } = data
-    const entry = lookupCardElement(id)
-    if (entry?.card == null) {
-      throw new Error('Card is null')
-    }
-    entry.progress.value = progress
-  })
 
-  // MSG_BACKGROUND_POPUP_PREPARED
-  listen<{ id: number }>(MSG_BACKGROUND_POPUP_PREPARED, (data) => {
-    const { id } = data
-    const entry = lookupCardElement(id)
-    if (entry?.card == null) {
-      throw new Error('Card is null')
-    }
-
-    entry.progress.value = 100
-    entry.progress.label = 'Prepared'
-    setTimeout(() => {
-      entry.progress.hide()
-    }, PREPARED_MESSAGE_DURATION)
-  })
-
-  // MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST
-  listen<{ issuerTokensIds: Array<{ id: number, property: string }>, url: string, uid: string }>(MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, (data) => {
-    console.debug('MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST', data)
-    const { url: pageUrl, uid } = data
-    data.issuerTokensIds.forEach((id) => {
-      const entry = lookupCardElement(id.id)
-      if (entry === undefined) {
-        throw new Error('Entry not found')
-      }
-      entry.status = 'DISCLOSABLE'
-      entry.discloseRequest(pageUrl, id.property, uid)
-    })
-  })
 })
+
+async function showError (message: string): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const overlay = getElementById<HTMLDivElement>('overlay')
+    const error = getElementById<HTMLDivElement>('error-dialog')
+    const errorMessage = getElementById<HTMLParagraphElement>('error-overlay-message')
+    const errorButton = getElementById<HTMLInputElement>('error-overlay-button')
+    overlay.classList.add('overlay-error')
+    overlay.style.display = 'flex'
+    error.style.display = 'inline-block'
+    errorMessage.innerText = message
+    errorButton.onclick = () => {
+      closeOverlay()
+      resolve()
+    }
+  })
+}
+
+function closeOverlay (): void {
+  const overlay = getElementById<HTMLDivElement>('overlay')
+  const error = getElementById<HTMLDivElement>('error-dialog')
+  const pick = getElementById<HTMLDivElement>('pick-dialog')
+  overlay.classList.remove('overlay-error', 'pick')
+  overlay.style.display = 'none'
+  error.style.display = 'none'
+  pick.style.display = 'none'
+}

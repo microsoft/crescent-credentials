@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
 import { MSG_BACKGROUND_CONTENT_SEND_PROOF, MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, MSG_CONTENT_BACKGROUND_IMPORT_CARD } from './constants.js'
+import { sendMessage } from './listen.js'
 
 console.debug('content.js: load')
 
@@ -14,8 +15,7 @@ if (metaTagJwt != null) {
   const metaValue = metaTagJwt.getAttribute('content')
   console.log('Detected meta value:', metaValue)
   const domain = new URL(window.location.href).origin
-  void chrome.runtime.sendMessage({ action: MSG_CONTENT_BACKGROUND_IMPORT_CARD, data: { encoded: metaValue, schema: 'jwt_corporate_1' /* TODO: get schema from issuer */, domain } })
-  console.log(metaValue)
+  void sendMessage(MSG_CONTENT_BACKGROUND_IMPORT_CARD, { encoded: metaValue, schema: 'jwt_corporate_1' /* TODO: get schema from issuer */, domain })
 }
 
 const crescentVerifyUrlMeta = document.querySelector('meta[crescent_verify_url]')

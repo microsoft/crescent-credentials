@@ -13,6 +13,8 @@
 */
 
 interface MESSAGE_PAYLOAD {
+  // destination: 'content' | 'background' | 'popup' | 'offscreen'
+  // routed: boolean
   action: string
   data: Record<string, unknown>
 }

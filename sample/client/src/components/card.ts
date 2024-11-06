@@ -1,3 +1,10 @@
+/*
+ *  Copyright (c) Microsoft Corporation.
+ *  Licensed under the MIT license.
+ */
+
+/* eslint-disable @typescript-eslint/no-magic-numbers */
+
 import { LitElement, html, css, type TemplateResult } from 'lit'
 import { unsafeHTML } from 'lit/directives/unsafe-html.js'
 import { property } from 'lit/decorators.js'
@@ -191,6 +198,8 @@ export class CardElement extends LitElement {
 
   private _ready = false
 
+  public _disclosureParams: { verifierUrl: string, disclosureValue: string, disclosureUid: string } | null = null
+
   firstUpdated (): void {
     // super.connectedCallback()
     this._ready = true
@@ -248,6 +257,8 @@ export class CardElement extends LitElement {
     const discloseVerifierLabel = this.shadowRoot!.querySelector<HTMLParagraphElement>('#discloseVerifierLabel')!
     disclosePropertyLabel.innerText = `${disclosureUid.replace('crescent://', '')} : ${disclosureValue}`
     discloseVerifierLabel.innerText = `to ${verifierUrl}?`
+
+    this._disclosureParams = { verifierUrl, disclosureValue, disclosureUid }
   }
 
   get progress (): { show: () => void, hide: () => void, value: number, label: string } {
