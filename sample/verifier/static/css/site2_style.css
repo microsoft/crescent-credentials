@@ -1,21 +1,50 @@
+@font-face {
+    font-family: 'IGSans';
+    src: url('../fonts/Instagram-Sans.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IGSansHeadline';
+    src: url('../fonts/Instagram-Sans-Headline.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Streetwear';
+    src: url('../fonts/Streetwear.otf') format('otf');
+    font-weight: normal;
+    font-style: normal;
+}
+
 /* General body styling */
 body {
-    background-color: #e6f7ff; /* Light blue background */
-    color: #333333; /* Dark gray text for readability */
-    font-family: 'Verdana', sans-serif;
-    margin: 0;
-    padding: 0;
     display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
+    align-items: center;
     height: 100vh;
+    margin: 0;
+    background-color: #f3f5f6; 
+    color: #333333; 
+    font-family: 'IGSans', sans-serif;
 }
+body > * {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 0px;
+    border: 1px solid #cccccc; /* Thin grey border */
+    /* box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); */
+    max-width: 400px;
+    width: 100%;
+}
+
 
 /* Header styling */
 h1 {
-    color: #004d99; /* Deep blue for headers */
-    font-size: 2.5em;
+   /* color: #004d99;*/
+    font-family: 'Brush Script MT', cursive;
+    font-size: 4.5em;
     margin-bottom: 20px;
 }
 
@@ -23,8 +52,8 @@ h1 {
 p {
     color: #333333; /* Dark gray for standard text */
     font-size: 1.1em;
-    line-height: 1.6;
-    margin-bottom: 20px;
+    /* line-height: 1.6;
+    margin-bottom: 20px; */
 }
 
 /* Error message styling */
@@ -75,13 +104,17 @@ button:hover {
 }
 
 /* Add a subtle box-shadow and padding for sections */
-body > * {
-    background-color: #ffffff; /* White background for content */
+.boxed  {
+    background-color: #ffffff; 
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
     max-width: 600px;
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Styling links */

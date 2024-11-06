@@ -49,9 +49,9 @@
                 <div style="flex: 1; height: 1px; background-color: darkgray;"></div>
             </div>
             <div style="display: flex; justify-content: center; align-items: center; padding: 1em; background-color: lightgray; border-radius: 8px; cursor: pointer; width: 80%; margin: 0 auto;">
-                Log in with your corporate credentials
+                Log in with your corporate credentials*
             </div>
-            <p style="text-align: center; font-size:90%">*Note that your employer may learn of your use of our services</p>
+            <p style="text-align: center; font-size:90%">*Your employer may learn of your use of our services, and additional information such as your full name, email adress will be shared with us.</p>
         </div>
     </div>
 

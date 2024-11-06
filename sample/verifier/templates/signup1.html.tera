@@ -8,13 +8,36 @@
     <link rel="stylesheet" href="css/site2_style.css">
 </head>
 <body>
-    <h1>{{ site2_verifier_name }} Sign Up Page</h1>
-    <h2>Age Verification</h2>
+
+<div style="boxed">
+    <div style="display: flex; align-items: center; justify-content: center;">
+        <!-- <img src="img/social-logo.jpg" style="width: 8em; margin-right: 1em;"></br> -->
+        <h1> Soc.ial </h1>
+        
+    </div>
+
     {% if error %}
         <p style="color: red;">{{ error }}</p>
     {% endif %}
-    <p>Welcome to {{ site2_verifier_name }}, the best place to connect with your community.</p>
+    <div style="display: flex; justify-content: center; text-align: center;">
+        <p>Sign up to see photos and videos from your friends</br></p>
+    </div>
 
-    <p>You need to be over-18 to create an account on our site. Please present a proof of age to continue. Nothing else will be learned by our service or its issuer.</p>
+    <div style="height: 1em;"></div>
+    <h2>Age Verification</h2>
+    <div style="display: flex; align-items: center;">
+    <img src="img/icon128.png" style="width: 3em; margin-right: 1em;"> 
+    <p><strong>You need to be 18 or older to create an account on our site.</strong> 
+    Please present a proof of age to continue. 
+    We will only learn that you  are old enough, the rest of your driver's license stays private! </p>
+    </div>
+    <div style="height: 2em;"></div>
+
+    <div style="display: flex; justify-content: center;">
+        <img src="img/social-stock.jpg" style="width: 20em; margin-right: 1em; opacity: 0.5;">
+    </div>
+</div>
+
 </body>
+
 </html>
