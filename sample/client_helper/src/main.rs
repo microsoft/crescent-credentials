@@ -128,7 +128,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     println!("*** /prepare called");
     println!("Schema UID: {}", cred_info.schema_UID);
     println!("Issuer URL: {}", cred_info.issuer_URL);
-    println!("Credential: {}", cred_info.cred);
+    println!("Credential: {}... ({} bytes)", &cred_info.cred[..50], cred_info.cred.len());
 
     // verify if the schema_UID is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&cred_info.schema_UID.as_str()) {
