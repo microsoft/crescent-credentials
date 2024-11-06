@@ -166,6 +166,7 @@ async function init (): Promise<void> {
 
       const params = {
         url: 'http://fabrikam.com:8004/verify', // TODO: shouldn't be hardcoded
+        disclosure_uid: data.uid,
         issuer_URL: card.issuer.url,
         schema_UID: card.token.schema,
         proof: _showProof.value
