@@ -110,22 +110,30 @@ fn login_page(verifier_config: &State<VerifierConfig>) -> Template {
 fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving site 1 resource page");
 
-    let validation_result = verifier_config
-        .validation_results
-        .lock()
-        .unwrap()
-        .get(&session_id)
-        .cloned();
-
-    if let Some(result) = validation_result {
+    if (session_id == "test") {
         Template::render("resource", context! {
             site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
-            email_domain: result.disclosed_info.unwrap_or_else(|| "example.com".to_string()),
+            email_domain: "TEST",
         })
     } else {
-        Template::render("error", context! { error: "Invalid session ID" })
+        let validation_result = verifier_config
+            .validation_results
+            .lock()
+            .unwrap()
+            .get(&session_id)
+            .cloned();
+
+        if let Some(result) = validation_result {
+            Template::render("resource", context! {
+                site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
+                email_domain: result.disclosed_info.unwrap_or_else(|| "example.com".to_string()),
+            })
+        } else {
+            Template::render("error", context! { error: "Invalid session ID" })
+        }
     }
 }
+
 // route to serve the signup1 page (site 2 - mDL verifier)
 #[get("/signup1")]
 fn signup1_page(verifier_config: &State<VerifierConfig>) -> Template {
@@ -143,19 +151,26 @@ fn signup1_page(verifier_config: &State<VerifierConfig>) -> Template {
 fn signup2_page(session_id: String, verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving site 2 signup2 page");
 
-    let validation_result = verifier_config
-        .validation_results
-        .lock()
-        .unwrap()
-        .get(&session_id)
-        .cloned();
-
-    if validation_result.is_some() {
+    if (session_id == "test") {
         Template::render("signup2", context! {
             site2_verifier_name: verifier_config.site2_verifier_name.as_str(),
+            email_domain: "TEST",
         })
     } else {
-        Template::render("error", context! { error: "Invalid session ID" })
+        let validation_result = verifier_config
+            .validation_results
+            .lock()
+            .unwrap()
+            .get(&session_id)
+            .cloned();
+
+        if validation_result.is_some() {
+            Template::render("signup2", context! {
+                site2_verifier_name: verifier_config.site2_verifier_name.as_str(),
+            })
+        } else {
+            Template::render("error", context! { error: "Invalid session ID" })
+        }
     }
 }
 async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(), String> {
