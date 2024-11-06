@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Verifier Index Page</title>
+</head>
+<body>
+    <h1>Verifier Index Page</h1>
+    <p>The Verifier project hosts two virtual sites:</p>
+    
+    <h3>{{ site1_verifier_name }} Mental Health Clinic</h3>
+
+    <p>
+    This is a page that verifies an employment JWT to provide access to some resources:
+    <a href="http://{{ site1_verifier_domain }}:{{ port }}/login">http://{{ site1_verifier_domain }}:{{ port }}/login</a>
+    </p>
+
+    <h3>{{ site2_verifier_name }} Site</h3>
+    <p>
+    This is a page that verifies over18 proof from a mDL to allow account creation:
+    <a href="http://{{ site2_verifier_domain }}:{{ port }}/signup1">http://{{ site2_verifier_domain }}:{{ port }}/signup1</a>
+    </p>
+
+</body>
+</html>

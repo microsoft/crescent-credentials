@@ -27,39 +27,6 @@ use crescent_sample_setup_service::common::*;
 const CRESCENT_DATA_BASE_PATH : &str = "./data/issuers";
 const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
 
-// TODO: move this to common area
-#[cfg(unix)]
-use std::os::unix::fs::symlink as symlink_any;
-
-#[cfg(windows)]
-fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
-    if src.is_file() {
-        std::os::windows::fs::symlink_file(src, dst)
-    } else if src.is_dir() {
-        std::os::windows::fs::symlink_dir(src, dst)
-    } else {
-        Err(io::Error::new(io::ErrorKind::Other, "Source path is neither file nor directory"))
-    }
-}
-
-// copies the contents of the shared folder to the target folder using symlinks
-fn copy_with_symlinks(shared_folder: &Path, target_folder: &Path) -> io::Result<()> {
-    // Ensure the target folder exists
-    fs::create_dir_all(target_folder)?;
-
-    for entry in fs::read_dir(shared_folder)? {
-        let entry = entry?;
-        let entry_path = entry.path();
-        let abs_entry_path = entry_path.canonicalize()?;
-        let target_path = target_folder.join(entry.file_name());
-
-        // Create symlink from absolute source path to target path
-        symlink_any(&abs_entry_path, &target_path)?;
-    }
-
-    Ok(())
-}
-
 #[derive(Clone)]
 struct ValidationResult {
     schema_UID: String,
@@ -70,6 +37,9 @@ struct ValidationResult {
 
 // verifer config from Rocket.toml
 struct VerifierConfig {
+    // server port
+    port: String,
+
     // site 1 (JWT verifier)
     site1_verify_url: String,
     site1_verifier_name: String,
@@ -96,9 +66,9 @@ struct ProofInfo {
 // helper function to provide the base context for the login page
 fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, String> {
     let site1_verifier_name_str = verifier_config.site1_verifier_name.clone();
-    let site1_verify_url_str = uri!(verify).to_string(); // TODO: FIX THIS
+    let site1_verify_url_str = uri!(verify).to_string();
     let site2_verifier_name_str = verifier_config.site2_verifier_name.clone();
-    let site2_verify_url_str = uri!(verify).to_string(); // TODO: FIX THIS
+    let site2_verify_url_str = uri!(verify).to_string();
 
     let mut context = HashMap::new();
     context.insert("site1_verifier_name".to_string(), site1_verifier_name_str);
@@ -109,10 +79,18 @@ fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, Stri
     context
 }
 
-// redirect from `/` to `/login`
+// route to serve the index page
 #[get("/")]
-fn index_redirect() -> Redirect {
-    Redirect::to("/login")
+fn index_page(verifier_config: &State<VerifierConfig>) -> Template {
+    println!("*** Serving the index page");
+
+    Template::render("index", context! {
+        port: verifier_config.port.as_str(),
+        site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
+        site2_verifier_name: verifier_config.site2_verifier_name.as_str(),
+        site1_verifier_domain: verifier_config.site1_verifier_domain.as_str(),
+        site2_verifier_domain: verifier_config.site2_verifier_domain.as_str(),
+    })
 }
 
 // route to serve the login page (site 1 - JWT verifier)
@@ -245,7 +223,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         error_template!(msg, verifier_config);
     }
 
-    let cred_type = match cred_type_from_disc_uid(&proof_info.disclosure_uid) {
+    let cred_type = match cred_type_from_schema(&proof_info.schema_UID) {
         Ok(cred_type) => cred_type,
         Err(_) => error_template!("Credential type not found", verifier_config),
     };
@@ -325,6 +303,8 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 fn rocket() -> _ {
     // Load verifier configuration
     let figment = rocket::Config::figment();
+    let port: String = figment.extract_inner("port").unwrap_or_else(|_| "8004".to_string());
+
     let site1_verifier_name: String = figment.extract_inner("site1_verifier_name").unwrap_or_else(|_| "Example Verifier".to_string());
     let site1_verifier_domain: String = figment.extract_inner("site1_verifier_domain").unwrap_or_else(|_| "example.com".to_string());
     let site1_verify_url: String = format!("http://{}/verify", site1_verifier_domain);
@@ -334,6 +314,7 @@ fn rocket() -> _ {
     let site2_verify_url: String = format!("http://{}/verify", site2_verifier_domain);
 
     let verifier_config = VerifierConfig {
+        port,
         site1_verifier_name,
         site1_verifier_domain,
         site1_verify_url,
@@ -346,7 +327,7 @@ fn rocket() -> _ {
     rocket::build()
         .manage(verifier_config)
         .mount("/", FileServer::from("static"))
-        .mount("/", routes![index_redirect, login_page, resource_page, signup1_page, signup2_page, verify])
+        .mount("/", routes![index_page, login_page, resource_page, signup1_page, signup2_page, verify])
     .attach(Template::fairing())
 }
 
