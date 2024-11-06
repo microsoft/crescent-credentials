@@ -152,7 +152,7 @@ async function init (): Promise<void> {
       console.log('card:', card)
       console.log('data:', data)
 
-      await fetchText('http://127.0.0.1:8004/verify', { issuer_URL: card.issuer.url, disclosure_uid: data.uid, schema_UID: card.token.schema, proof: _showProof.value }, 'POST')
+      await fetchText('http://127.0.0.1:8004/verify' /* TODO: shouldn't be hardcoded */, { issuer_URL: card.issuer.url, disclosure_uid: data.uid, schema_UID: card.token.schema, proof: _showProof.value }, 'POST')
 
       const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
 
@@ -165,7 +165,7 @@ async function init (): Promise<void> {
       }
 
       const params = {
-        url: 'http://fabrikam.com:8004/verify',
+        url: 'http://fabrikam.com:8004/verify', // TODO: shouldn't be hardcoded
         issuer_URL: card.issuer.url,
         schema_UID: card.token.schema,
         proof: _showProof.value
