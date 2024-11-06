@@ -10,7 +10,7 @@
 <body>
     <div style="display: flex; align-items: center;">
         <img src="img/corp-leaf.png" style="width: 5em; margin-right: 1em;">
-        <h1>Welcome to {{ site1_verifier_name }} Health!</h1>
+        <h1>Welcome to {{ site1_verifier_name }} Health</h1>
     </div>
 
     <div style="display: flex;">

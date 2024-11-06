@@ -8,7 +8,7 @@
 <body>
     <div style="display: flex; align-items: center;">
         <img src="img/corp-leaf.png" style="width: 5em; margin-right: 1em;">
-        <h1>{{ site1_verifier_name }} Mental Health Clinic</h1>
+        <h1>{{ site1_verifier_name }} Health</h1>
     </div>
 
     <p>Your email from {{ email_domain }} was successfully validated. You can now access the resources on our site.</p>

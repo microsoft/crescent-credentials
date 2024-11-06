@@ -13,18 +13,12 @@ body {
     font-family: 'HKGroteskRegular', sans-serif;
     margin: 2em;
     padding: 0;
-    /* display: flex;
-    flex-direction: column; */
-    /* align-items: center;
-    justify-content: center; */
-    /* height: 100vh; */
 }
 
 /* Header styling */
 h1 {
     color: #03230a;
     font-size: 2.5em;
-    /*margin-bottom: 20px;*/
 }
 
 /* Paragraph styling */
@@ -39,16 +33,6 @@ p {
 p[style="color: red;"] {
     color: #ff4c4c;
     font-weight: bold;
-}
-
-/* Add a subtle box-shadow and padding for sections */
-body > * {
-    /* background-color: #a2f5b8; */
-    /* padding: 20px; */
-    /* border-radius: 8px; */
-    /* box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); */
-    /* max-width: 600px; */
-    /* width: 100%; */
 }
 
 /* Add a subtle hover effect to links */
