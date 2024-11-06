@@ -112,6 +112,7 @@ export class Wallet {
 
   private static _nextCardId = 0
   private static _onUpdated: (() => void) | null = null
+  private static _onReady: (() => void) | null = null
 
   private constructor () {
     // do nothing
@@ -153,7 +154,21 @@ export class Wallet {
       }
     })
 
+    if (Wallet._onReady !== null) {
+      console.debug('Wallet init onReady callback')
+      Wallet._onReady()
+    }
+
     return Wallet._instance
+  }
+
+  // eslint-disable-next-line accessor-pairs
+  public static set onReady (callback: () => void) {
+    if (Wallet._instance !== null) {
+      console.debug('Wallet already ready callback')
+      callback()
+    }
+    Wallet._onReady = callback
   }
 
   public static async reload (): Promise<Wallet | null> {
@@ -173,7 +188,9 @@ export class Wallet {
     card.id = Wallet._nextCardId++
     Wallet._cards.push(card)
     await Wallet.save()
-    void chrome.runtime.sendMessage({ action: MSG_WALLET_UPDATED, data: {} })
+    void chrome.runtime.sendMessage({ action: MSG_WALLET_UPDATED, data: {} }).catch((_error) => {
+      console.warn('NO LISTENER', MSG_WALLET_UPDATED)
+    })
   }
 
   public static async remove (id: number): Promise<void> {
@@ -183,7 +200,9 @@ export class Wallet {
     if (index !== -1) {
       Wallet._cards.splice(index, 1)
       await Wallet.save()
-      void chrome.runtime.sendMessage({ action: MSG_WALLET_UPDATED, data: {} })
+      void chrome.runtime.sendMessage({ action: MSG_WALLET_UPDATED, data: {} }).catch((_error) => {
+        console.warn('NO LISTENER', MSG_WALLET_UPDATED)
+      })
     }
   }
 
