@@ -6,5 +6,5 @@ site1_verifier_name = "Fabrikam"
 site1_verifier_domain = "fabrikam.com"
 
 # mDL verifier
-site2_verifier_name = "Social"
+site2_verifier_name = "Soc.ial"
 site2_verifier_domain = "soc.ial"

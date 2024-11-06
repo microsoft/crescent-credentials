@@ -8,12 +8,56 @@
     <link rel="stylesheet" href="css/site1_style.css">
 </head>
 <body>
-    <h1>{{ site1_verifier_name }} Mental Health Clinic - Login</h1>
+    <div style="display: flex; align-items: center;">
+        <img src="img/corp-leaf.png" style="width: 5em; margin-right: 1em;">
+        <h1>Welcome to {{ site1_verifier_name }} Health</h1>
+    </div>
+
+    <div style="display: flex;">
+        <!-- first column -->
+        <div style="flex: 1; padding-right: 1em;">
+            <p>We’re so excited you’re here. Get accessible, and confidential mental health care that fits your needs.</p>
+            <div style="display: flex; align-items: center;">
+            <img src="img/water.png" style="width: 4em; margin-right: 1em;"> 
+            <h2>Personalized mental health care</h2>
+            </div>
+            <p>In addition, get access to on-demand wellness exercises to improve your sleep, help you manage stress, and more.</p>
+                        <div style="display: flex; align-items: center;">
+            <img src="img/calendar.png" style="width: 4em; margin-right: 1em;">
+            <h2>Confidential care on your time</h2>
+            </div>
+            <p>Match with a provider and schedule an appointment within 2 days of signing up, including nights and weekends.</p>
+                        <div style="display: flex; align-items: center;">
+            <img src="img/provider.png" style="width: 4em; margin-right: 1em;">
+            <h2>High-quality, diverse providers</h2>
+            </div>
+            <p>Search for someone by specialty, gender, ethnicity, language, and more. Our providers are as diverse as the people we support.</p>
+        </div>
+        <!-- vertical rule -->
+        <div style="width: 1px; background-color: darkgray;"></div>
+        <!-- second column -->
+        <div style="flex: 1; padding-left: 1em;">
+        <h1> Log in </h1>
+            <p>This service is provided for free by your employer.</p></br>
+
+            <div style="display: flex; align-items: center;">
+            <img src="img/icon128.png" style="width: 3em; margin-right: 1em;"><p> You can use the Crescent wallet to  present an employment credential to access the site. Only the domain name of your employer will be revealed to us to confirm your eligibility.</p>
+            </div>
+            <div style="display: flex; align-items: center; margin: 1em 2em;">
+                <div style="flex: 1; height: 1px; background-color: darkgray;"></div>
+                <span style="padding: 0 1em; white-space: nowrap;">or</span>
+                <div style="flex: 1; height: 1px; background-color: darkgray;"></div>
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; padding: 1em; background-color: lightgray; border-radius: 8px; cursor: pointer; width: 80%; margin: 0 auto;">
+                Log in with your corporate credentials*
+            </div>
+            <p style="text-align: center; font-size:90%">*Your employer may learn of your use of our services, and additional information such as your full name, email adress will be shared with us.</p>
+        </div>
+    </div>
+
     {% if error %}
         <p style="color: red;">{{ error }}</p>
     {% endif %}
-    <p>Welcome to our mental health virtual clinic.</p>
 
-    <p>This service is provided for free by your employer. Please present an employment credential disclosing the email domain to access the site. Nothing else will be learned by our service or its issuer.</p>
 </body>
 </html>
