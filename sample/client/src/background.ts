@@ -217,7 +217,6 @@ listener.handle(MSG_POPUP_BACKGROUND_DISCLOSE, async (id: number, uid: string, u
     throw new Error('Tab not found')
   }
 
-  // TODO: remove hardcoded URL
   const params = {
     url,
     disclosure_uid: uid,
