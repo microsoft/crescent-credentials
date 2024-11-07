@@ -76,8 +76,8 @@ function getDisclosureProperty (card: Record<string, unknown>, uid: string): str
   switch (uid) {
     case 'crescent://email_domain':
       // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
-      const emailValue = card.email as string // (card.token.value as JWT_TOKEN | undefined)?.payload?.email as string | undefined ?? ''
-      return emailValue === '' ? null : emailValue.replace(/^.*@/, '')
+      const emailValue = card.email as string | undefined// (card.token.value as JWT_TOKEN | undefined)?.payload?.email as string | undefined ?? ''
+      return emailValue === undefined ? null : emailValue.replace(/^.*@/, '')
     case 'crescent://over_18':
       // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
       const dob = card.birth_date as string | undefined
