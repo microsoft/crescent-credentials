@@ -5,7 +5,7 @@
 
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
-import { status, prepare, show } from './clientHelper.js'
+import { status, prepare, show, deleteCred } from './clientHelper.js'
 import {
   MSG_POPUP_BACKGROUND_DISCLOSE, MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, MSG_CONTENT_BACKGROUND_IMPORT_CARD,
   MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, MSG_BACKGROUND_POPUP_ERROR, MSG_BACKGROUND_POPUP_PREPARED,
@@ -102,8 +102,12 @@ listener.handle(MSG_CONTENT_BACKGROUND_IMPORT_CARD, async (domain: string, schem
 })
 
 listener.handle(MSG_POPUP_BACKGROUND_DELETE, async (id: number) => {
+  const card = Wallet.find(id)
+  if (card === undefined) {
+    throw new Error('Card not found')
+  }
+  deleteCred(card.credUid)
   await Wallet.remove(id)
-  // TODO: call the client-helper service to delete the credential
   await Promise.resolve('deleted')
 })
 
@@ -199,7 +203,7 @@ listener.handle(MSG_POPUP_BACKGROUND_DISCLOSE, async (id: number, uid: string, u
   if (card === undefined) {
     throw new Error('Card not found')
   }
-  const _showProof = await show(card, uid)
+  const _showProof = await show(card.credUid, uid)
 
   if (!_showProof.ok) {
     console.error('Failed to show proof:', _showProof.error)
