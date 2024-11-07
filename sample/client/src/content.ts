@@ -21,10 +21,10 @@ if (metaTagJwt != null) {
 const crescentVerifyUrlMeta = document.querySelector('meta[crescent_verify_url]')
 const crescentDisclosureUidMeta = document.querySelector('meta[crescent_disclosure_uid]')
 if (crescentVerifyUrlMeta != null && crescentDisclosureUidMeta != null) {
-  const verifierDomain = window.location.origin
+  const verifyUrl = window.location.origin + crescentVerifyUrlMeta.getAttribute('crescent_verify_url')
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const disclosureUid = crescentDisclosureUidMeta.getAttribute('crescent_disclosure_uid')!
-  void sendMessage('background', MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, verifierDomain, disclosureUid)
+  void sendMessage('background', MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, verifyUrl, disclosureUid)
 }
 
 // Function to create and insert a banner at the top of the page
@@ -70,7 +70,7 @@ chrome.runtime.onMessage.addListener((request, _sender, _sendResponse) => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { url, ...data } = request.data
 
-    fetch(`${url}/verify`, {
+    fetch(url as string, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

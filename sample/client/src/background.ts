@@ -13,8 +13,8 @@ import {
   MSG_BACKGROUND_CONTENT_SEND_PROOF, MSG_POPUP_BACKGROUND_IMPORT
 } from './constants.js'
 import { sendMessage, setListener } from './listen.js'
-import { fetchText } from './utils.js'
 import { Card, Wallet } from './cards.js'
+import { fields } from './mdoc.js'
 
 const bgid = Math.random().toString(36).substring(7)
 
@@ -61,19 +61,28 @@ function _notify (title: string, message: string): void {
 
 async function disclosableCards (uid: string): Promise<Array<{ id: number, property: string }>> {
   const preparedCredentials = Wallet.cards.filter(card => card.status === 'PREPARED')
-  const cardsWithUidValue = preparedCredentials.filter((card) => {
-    return getDisclosureProperty(card, uid) !== null
-  })
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  return cardsWithUidValue.map(card => ({ id: card.id, property: getDisclosureProperty(card, uid)! }))
+
+  const cardsWithUidValue = preparedCredentials.map((card) => {
+    const tokenFields = card.token.type === 'JWT'
+      ? (card.token.value as JWT_TOKEN).payload
+      : fields(card.token.value as MDOC)
+    return { id: card.id, property: getDisclosureProperty(tokenFields, uid) }
+  }).filter(card => card.property !== null) as Array<{ id: number, property: string }>
+
+  return cardsWithUidValue
 }
 
-function getDisclosureProperty (card: Card, uid: string): string | null {
+function getDisclosureProperty (card: Record<string, unknown>, uid: string): string | null {
   switch (uid) {
     case 'crescent://email_domain':
       // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
-      const emailValue = (card.token.value as JWT_TOKEN | undefined)?.payload?.email as string | undefined ?? ''
+      const emailValue = card.email as string // (card.token.value as JWT_TOKEN | undefined)?.payload?.email as string | undefined ?? ''
       return emailValue === '' ? null : emailValue.replace(/^.*@/, '')
+    case 'crescent://over_18':
+      // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
+      const dob = card.birth_date as string | undefined
+      return dob === undefined ? null : 'Age >= 18'
+
     default:
       return null
   }
@@ -145,6 +154,8 @@ listener.handle(MSG_POPUP_BACKGROUND_PREPARE, async (id: number) => {
       void sendMessage('popup', MSG_BACKGROUND_POPUP_ERROR, card.id)
     })
   }
+
+  return result
 }
 )
 
@@ -187,7 +198,7 @@ listener.handle(MSG_POPUP_BACKGROUND_DISCLOSE, async (id: number, uid: string, u
   if (card === undefined) {
     throw new Error('Card not found')
   }
-  const _showProof = await show(card)
+  const _showProof = await show(card, uid)
 
   if (!_showProof.ok) {
     console.error('Failed to show proof:', _showProof.error)
