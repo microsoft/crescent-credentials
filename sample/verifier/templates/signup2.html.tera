@@ -9,7 +9,10 @@
 
 <div class="boxed">
     <h1>{{ site2_verifier_name }} Sign Up</h1>
-    <p>Thank you for proving that your are over 18. You can now create an account.</p>
+    <p style="text-align: center;">
+        <strong>Thank you for proving that you are over 18.</strong><br>
+        You can now create an account.
+    </p>
 
     <div class="profile-form-container">
         <div class="profile-section">

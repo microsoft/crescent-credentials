@@ -69,8 +69,8 @@ export async function status (credUid: string, progress: () => void): Promise<RE
   })
 }
 
-export async function show (card: Card): Promise<RESULT<ShowProof, Error>> {
-  const response = await fetchText(`${config.client_helper_url}/show`, { cred_uid: card.credUid, disc_uid: 'crescent://email_domain' }, 'GET')
+export async function show (card: Card, disclosureUid: string): Promise<RESULT<ShowProof, Error>> {
+  const response = await fetchText(`${config.client_helper_url}/show`, { cred_uid: card.credUid, disc_uid: disclosureUid }, 'GET')
   if (!response.ok) {
     return response
   }

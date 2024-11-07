@@ -15,16 +15,16 @@ if (metaTagJwt != null) {
   const metaValue = metaTagJwt.getAttribute('content')
   console.log('Detected meta value:', metaValue)
   const domain = new URL(window.location.href).origin
-  void sendMessage(MSG_CONTENT_BACKGROUND_IMPORT_CARD, { encoded: metaValue, schema: 'jwt_corporate_1' /* TODO: get schema from issuer */, domain })
+  void sendMessage('background', MSG_CONTENT_BACKGROUND_IMPORT_CARD, domain, 'jwt_corporate_1', metaValue)
 }
 
 const crescentVerifyUrlMeta = document.querySelector('meta[crescent_verify_url]')
 const crescentDisclosureUidMeta = document.querySelector('meta[crescent_disclosure_uid]')
 if (crescentVerifyUrlMeta != null && crescentDisclosureUidMeta != null) {
-  const verifierDomain = window.location.origin
+  const verifyUrl = window.location.origin + crescentVerifyUrlMeta.getAttribute('crescent_verify_url')
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const disclosureUid = crescentDisclosureUidMeta.getAttribute('crescent_disclosure_uid')!
-  void chrome.runtime.sendMessage({ action: MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, data: { url: verifierDomain, uid: disclosureUid } })
+  void sendMessage('background', MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, verifyUrl, disclosureUid)
 }
 
 // Function to create and insert a banner at the top of the page

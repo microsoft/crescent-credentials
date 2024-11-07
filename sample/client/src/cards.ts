@@ -7,7 +7,6 @@
 
 import { MSG_WALLET_UPDATED } from './constants.js'
 import { addData, getData } from './indexeddb.js'
-import { listen } from './listen.js'
 import { fields } from './mdoc.js'
 import schemas from './schema.js'
 
@@ -65,8 +64,6 @@ export class Card implements ICard {
     if (typeof domain !== 'string') {
       return { ok: false, error: new Error('domain is not a string') }
     }
-
-    // let type: 'JWT' | 'MDOC' = 'JWT'
 
     const schema = schemas[schemaName]
     const decoded = schema.decode(encoded)
@@ -142,17 +139,10 @@ export class Wallet {
 
     const cards = await getData<Card[]>('crescent', 'jwts') ?? []
 
-    Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => a.id - b.id)[0].id + 1 : 0
+    Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => b.id - a.id)[0].id + 1 : 0
     Wallet._cards.push(...cards.map(card => new Card(card)))
 
     console.debug('Wallet.cards:', Wallet._cards)
-
-    listen(MSG_WALLET_UPDATED, async () => {
-      await Wallet.reload()
-      if (Wallet._onUpdated !== null) {
-        Wallet._onUpdated()
-      }
-    })
 
     if (Wallet._onReady !== null) {
       console.debug('Wallet init onReady callback')
@@ -177,7 +167,7 @@ export class Wallet {
 
     Wallet._cards.length = 0
 
-    Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => a.id - b.id)[0].id + 1 : 0
+    Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => b.id - a.id)[0].id + 1 : 0
     Wallet._cards.push(...cards.map(card => new Card(card)))
 
     return Wallet._instance

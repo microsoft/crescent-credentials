@@ -12,8 +12,7 @@ import { getElementById } from '../utils'
 import './collapsible.js'
 import { fields } from '../mdoc'
 import type { Card, Card_status } from '../cards'
-
-// type WalletEntryState = 'consent' | 'preparing' | 'prepared' | 'disclosing' | 'disclosed' | 'error' | 'idle'
+import 'dotenv/config'
 
 export class CardElement extends LitElement {
   // Define properties for domain and email

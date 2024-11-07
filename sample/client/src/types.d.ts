@@ -13,10 +13,10 @@
 */
 
 interface MESSAGE_PAYLOAD {
-  // destination: 'content' | 'background' | 'popup' | 'offscreen'
-  // routed: boolean
+  destination: 'content' | 'background' | 'popup' | 'offscreen'
+  routed: boolean
   action: string
-  data: Record<string, unknown>
+  data: unknown[]
 }
 
 interface JWT_TOKEN { header: Record<string, unknown>, payload: Record<string, unknown>, signature: string }
