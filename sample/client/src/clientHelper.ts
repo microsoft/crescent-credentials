@@ -53,7 +53,7 @@ export async function status (credUid: string, progress: () => void): Promise<RE
 
         const status = await response.text()
 
-        if (status === 'error' || status.startsWith('Error:')) {
+        if (status === 'unknown' || status.startsWith('Error:')) {
           clearInterval(intervalId)
           resolve({ ok: false, error: new Error(status) })
         }
