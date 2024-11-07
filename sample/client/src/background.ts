@@ -81,7 +81,7 @@ function getDisclosureProperty (card: Record<string, unknown>, uid: string): str
     case 'crescent://over_18':
       // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
       const dob = card.birth_date as string | undefined
-      return dob === undefined ? null : 'Age >= 18'
+      return dob === undefined ? null : 'age is over 18'
 
     default:
       return null
@@ -103,6 +103,7 @@ listener.handle(MSG_CONTENT_BACKGROUND_IMPORT_CARD, async (domain: string, schem
 
 listener.handle(MSG_POPUP_BACKGROUND_DELETE, async (id: number) => {
   await Wallet.remove(id)
+  // TODO: call the client-helper service to delete the credential
   await Promise.resolve('deleted')
 })
 

@@ -22,12 +22,19 @@
     <div id="tab-container">
         <div id="wallet" class="tab-content active-content">
             <h1>Wallet</h1>
+            <hr>
+            <div id="empty-wallet">
+                <p>Your wallet is empty.</p>
+                <p>Import a credential to get started.</p>
+            </div>
             <div id="wallet-info">
+                <!-- cards will be displayed here -->
             </div>
         </div>
 
         <div id="about" class="tab-content">
             <h1>About</h1>
+            <hr>
             <p>Version <span id="version">0.1</span> (dev preview)</p>
             <p>This is a prototype browser extension for the Crescent framework.</p>
             <p>See the <a href="https://github.com/microsoft/crescent" target="_blank">project page</a>
@@ -38,6 +45,7 @@
             <h1>Config</h1>
             <hr>
             <span class="config-section-header">Client Helper</span>
+            <p>Enter the URL of the Client Helper service.</p>
             <div class="config-setting">
                 <span class="config-label">URL</span>
                 <input type="text" id="client-helper-url" placeholder="Client Helper URL">
@@ -45,9 +53,10 @@
             <br>
             <hr>
             <span class="config-section-header">Import Credential</span>
+            <p>Enter the issuer domain and schema UID for the credential, then import the file.</p>
             <div class="config-setting">
                 <span class="config-label">Domain</span>
-                <input type="text" id="text-import-domain" placeholder="Credential domain  (e.g., example.com)"
+                <input type="text" id="text-import-domain" placeholder="Issuer domain  (e.g., example.com)"
                     placeholder="example.com" pattern="^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$"
                     title="Please enter a valid domain (e.g., example.com)">
             </div>
