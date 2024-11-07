@@ -139,7 +139,7 @@ export class Wallet {
 
     const cards = await getData<Card[]>('crescent', 'jwts') ?? []
 
-    Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => a.id - b.id)[0].id + 1 : 0
+    Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => b.id - a.id)[0].id + 1 : 0
     Wallet._cards.push(...cards.map(card => new Card(card)))
 
     console.debug('Wallet.cards:', Wallet._cards)
@@ -167,7 +167,7 @@ export class Wallet {
 
     Wallet._cards.length = 0
 
-    Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => a.id - b.id)[0].id + 1 : 0
+    Wallet._nextCardId = cards.length > 0 ? cards.sort((a, b) => b.id - a.id)[0].id + 1 : 0
     Wallet._cards.push(...cards.map(card => new Card(card)))
 
     return Wallet._instance
