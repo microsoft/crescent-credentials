@@ -1,23 +1,3 @@
-@font-face {
-    font-family: 'IGSans';
-    src: url('../fonts/Instagram-Sans.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
-}
-
-@font-face {
-    font-family: 'IGSansHeadline';
-    src: url('../fonts/Instagram-Sans-Headline.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
-}
-@font-face {
-    font-family: 'Streetwear';
-    src: url('../fonts/Streetwear.otf') format('otf');
-    font-weight: normal;
-    font-style: normal;
-}
-
 /* General body styling */
 body {
     display: flex;
@@ -27,7 +7,7 @@ body {
     margin: 0;
     background-color: #f3f5f6; 
     color: #333333; 
-    font-family: 'IGSans', sans-serif;
+    font-family: 'Verdana', sans-serif;
 }
 body > * {
     background-color: #ffffff;
