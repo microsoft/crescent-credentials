@@ -3,7 +3,6 @@
  *  Licensed under the MIT license.
  */
 
-import type { Card } from './cards'
 import config from './config'
 import { fetchText } from './utils'
 
@@ -54,7 +53,7 @@ export async function status (credUid: string, progress: () => void): Promise<RE
 
         const status = await response.text()
 
-        if (status === 'error' || status.startsWith('Error:')) {
+        if (status === 'unknown' || status.startsWith('Error:')) {
           clearInterval(intervalId)
           resolve({ ok: false, error: new Error(status) })
         }
@@ -69,9 +68,18 @@ export async function status (credUid: string, progress: () => void): Promise<RE
   })
 }
 
-export async function show (card: Card, disclosureUid: string): Promise<RESULT<ShowProof, Error>> {
-  const response = await fetchText(`${config.client_helper_url}/show`, { cred_uid: card.credUid, disc_uid: disclosureUid }, 'GET')
+export async function deleteCred (credUid: string): Promise<boolean> {
+  const response = await fetch(`${config.client_helper_url}/delete?cred_uid=${credUid}`).catch((_error) => {
+    console.error('Failed to delete cred:', credUid)
+    return { ok: false }
+  })
+  return response.ok
+}
+
+export async function show (credUid: string, disclosureUid: string): Promise<RESULT<ShowProof, Error>> {
+  const response = await fetchText(`${config.client_helper_url}/show`, { cred_uid: credUid, disc_uid: disclosureUid }, 'GET')
   if (!response.ok) {
+    console.error('Failed to show:', response.error)
     return response
   }
   return response
@@ -79,6 +87,7 @@ export async function show (card: Card, disclosureUid: string): Promise<RESULT<S
 
 export async function ping (url: string): Promise<boolean> {
   const response = await fetch(`${url}/status?cred_uid=ping`).catch((_error) => {
+    console.error('Failed to ping:', url)
     return { ok: false }
   })
   return response.ok
