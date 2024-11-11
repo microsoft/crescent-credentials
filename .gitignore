@@ -6,6 +6,9 @@ Cargo.lock
 creds/test-vectors
 !creds/test-vectors/README
 
+# ignore node_modules
+node_modules/
+
 # sample files
 sample/issuer/.well-known/
 sample/issuer/keys/
