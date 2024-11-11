@@ -7,7 +7,7 @@
 </head>
 <body>
     <div style="display: flex; align-items: center;">
-        <img src="img/corp-leaf.png" style="width: 5em; margin-right: 1em;">
+        <img src="img/site1-logo.png" style="width: 5em; margin-right: 1em;">
         <h1>{{ site1_verifier_name }} Health</h1>
     </div>
 
@@ -17,17 +17,17 @@
         <ul style="list-style-type: none; padding: 0;">
             <li style="margin-bottom: 1em;">
                 <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
-                    <img src="img/calendar.png" style="width: 1.5em; margin-right: 0.5em;"> Book an appointment
+                    <img src="img/site1-calendar.png" style="width: 1.5em; margin-right: 0.5em;"> Book an appointment
                 </a>
             </li>
             <li style="margin-bottom: 1em;">
                 <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
-                    <img src="img/provider.png" style="width: 1.5em; margin-right: 0.5em;"> Browse the specialists directory
+                    <img src="img/site1-network.png" style="width: 1.5em; margin-right: 0.5em;"> Browse the specialists directory
                 </a>
             </li>
             <li>
                 <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
-                    <img src="img/aitherapist.png" style="width: 1.5em; margin-right: 0.5em;"> Chat with our AI therapist
+                    <img src="img/site1-aitherapist.png" style="width: 1.5em; margin-right: 0.5em;"> Chat with our AI therapist
                 </a>
             </li>
         </ul>
