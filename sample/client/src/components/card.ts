@@ -158,7 +158,7 @@ export class CardElement extends LitElement {
         </div>
 
         <div id="consent">
-          <p>${card.issuer.name} would like to add credentials to your wallet</p>
+          <p>${card.issuer.name} would like to add a credential to your wallet</p>
           <div style="display: flex; justify-content: center; gap: 10px;">
             <button class='button' id="walletItemAccept" @click=${this._handleAccept.bind(this)}>Accept</button>
             <button class='button' id="walletItemReject" @click=${this._handleReject.bind(this)}>Reject</button>

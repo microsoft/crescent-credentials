@@ -128,7 +128,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     println!("*** /prepare called");
     println!("Schema UID: {}", cred_info.schema_UID);
     println!("Issuer URL: {}", cred_info.issuer_URL);
-    println!("Credential: {}", cred_info.cred);
+    println!("Credential: {}... ({} bytes)", &cred_info.cred[..50], cred_info.cred.len());
 
     // verify if the schema_UID is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&cred_info.schema_UID.as_str()) {
@@ -238,11 +238,13 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
 async fn status(cred_uid: String, state: &State<SharedState>) -> String {
     println!("*** /status called with credential UID: {}", cred_uid);
     let tasks = state.inner().0.lock().await;
-    match tasks.get(&cred_uid) {
-        Some(Some(_)) => "ready".to_string(), // If ShowData exists, return "ready"
-        Some(None) => "preparing".to_string(), // If still preparing, return "preparing"
-        None => "unknown".to_string(), // If no entry exists, return "unknown"
-    }
+    let status = match tasks.get(&cred_uid) {
+        Some(Some(_)) => "ready".to_string(),    // If ShowData exists, return "ready"
+        Some(None) => "preparing".to_string(),   // If still preparing, return "preparing"
+        None => "unknown".to_string(),           // If no entry exists, return "unknown"
+    };
+    println!("Status for cred_uid {}: {}", cred_uid, status);
+    status
 }
 
 #[get("/getshowdata?<cred_uid>")]
@@ -300,27 +302,48 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
     }
 }
 
-
 #[get("/delete?<cred_uid>")]
 async fn delete(cred_uid: String, state: &State<SharedState>) -> String {
     println!("*** /delete called with credential UID: {}", cred_uid);
 
-    // Define the path to the credential-specific folder
-    let cred_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, cred_uid);
+    let mut delete_successful = false;
+    let mut last_error = None;
 
-    // Attempt to remove the credential folder and handle errors if the folder does not exist
-    match fs::remove_dir_all(&cred_folder) {
-        Ok(_) => println!("Successfully deleted folder for cred_uid: {}", cred_uid),
-        Err(e) => println!("Failed to delete folder for cred_uid: {}. Error: {}", cred_uid, e),
+    // We don't know the schema_uid for the cred_uid, so we need to try all supported ones
+    // (we could lookup the schema_uid from the show_data associated from the cred_uid,
+    // but that would only be available for prepared credentials)
+
+    // Iterate over each schema_uid in SCHEMA_UIDS
+    for schema_uid in SCHEMA_UIDS.iter() {
+        // Define the path to the credential-specific folder
+        let cred_folder = format!("{}/{}/{}", CRESCENT_DATA_BASE_PATH, schema_uid, cred_uid);
+        println!("Attempting to delete folder: {}", cred_folder);
+
+        // Attempt to remove the credential folder
+        match fs::remove_dir_all(&cred_folder) {
+            Ok(_) => {
+                println!("Successfully deleted folder for cred_uid: {} under schema_uid: {}", cred_uid, schema_uid);
+                delete_successful = true;
+                break;  // Stop after successful deletion
+            }
+            Err(e) => {
+                println!("Failed to delete folder for cred_uid: {} under schema_uid: {}. Error: {}", cred_uid, schema_uid, e);
+                last_error = Some(e);
+            }
+        }
     }
 
     // Remove the entry from shared state
     let mut tasks = state.inner().0.lock().await;
     tasks.remove(&cred_uid);
-  
-    "Deleted".to_string()
+    
+    // Check if deletion was successful
+    if delete_successful {
+        "Deleted".to_string()
+    } else {
+        format!("Failed to delete folder for cred_uid: {}. Last error: {:?}", cred_uid, last_error)
+    }
 }
-
 
 #[launch]
 fn rocket() -> _ {

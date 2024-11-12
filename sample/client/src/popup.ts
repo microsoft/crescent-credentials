@@ -175,10 +175,16 @@ async function initWallet (): Promise<void> {
   console.debug('initWallet start')
   const walletDiv = getElementById<HTMLDivElement>('wallet-info')
   walletDiv.replaceChildren()
-  Wallet.cards.forEach((card) => {
-    console.debug(card)
-    addWalletEntry(card)
-  })
+  const emptyWalletDiv = getElementById<HTMLDivElement>('empty-wallet')
+  if (Wallet.cards.length === 0) {
+    emptyWalletDiv.style.display = 'block' // display the empty wallet message
+  } else {
+    emptyWalletDiv.style.display = 'none'
+    Wallet.cards.forEach((card) => {
+      console.debug(card)
+      addWalletEntry(card)
+    })
+  }
   console.debug('initWallet done')
 }
 
