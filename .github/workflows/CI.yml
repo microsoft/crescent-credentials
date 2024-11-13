@@ -38,12 +38,12 @@ jobs:
           git submodule update --init --recursive
           pip install git+https://github.com/peppelinux/pyMDOC-CBOR.git
 
-      - name: Setup the project for rs256
+      - name: Run circuit setup for rs256
         run: |
           cd setup/scripts
           ./run_setup.sh rs256
 
-      - name: Setup the project for mDL
+      - name: Run circuit setup for mDL
         run: |
           cd setup/scripts
           ./run_setup.sh mdl1
