@@ -27,7 +27,7 @@
             </li>
             <li>
                 <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
-                    <img src="img/site1-aitherapist.png" style="width: 1.5em; margin-right: 0.5em;"> Chat with someone now
+                    <img src="img/site1-chat.png" style="width: 1.5em; margin-right: 0.5em;"> Chat with someone now
                 </a>
             </li>
         </ul>
