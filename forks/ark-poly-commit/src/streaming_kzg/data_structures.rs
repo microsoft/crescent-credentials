@@ -139,6 +139,7 @@ where
 }
 
 /// Stream implementation of foleded polynomial.
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub struct FoldedPolynomialStream<'a, F, S>(FoldedPolynomialTree<'a, F, S>, usize);
 /// Iterator implementation of foleded polynomial.
