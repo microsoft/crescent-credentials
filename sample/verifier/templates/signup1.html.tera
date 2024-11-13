@@ -6,6 +6,7 @@
     <meta crescent_disclosure_uid="crescent://over_18">
     <title>{{ site2_verifier_name }} Sign Up</title>
     <link rel="stylesheet" href="css/site2_style.css">
+    <link rel="icon" href="img/site2-favicon.ico" type="image/x-icon">
 </head>
 <body>
 
