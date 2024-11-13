@@ -32,7 +32,7 @@ jobs:
           cd circom
           git checkout v2.1.6
           cargo build --release
-          cargo install --path .
+          cargo install --path circom
           export PATH=$PATH:~/.cargo/bin
           cd ..
           git submodule update --init --recursive
