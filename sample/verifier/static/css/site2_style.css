@@ -8,6 +8,7 @@ body {
     background-color: #f3f5f6; 
     color: #333333; 
     font-family: 'Verdana', sans-serif;
+    font-size: 90%;
 }
 body > * {
     background-color: #ffffff;
