@@ -1,0 +1,91 @@
+name: CI Workflow
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip nodejs
+          curl --proto '=https' --tlsv1.3 -sSf https://sh.rustup.rs | sh -s -- -y
+          source $HOME/.cargo/env
+          pip install python_jwt
+          git clone https://github.com/iden3/circom.git
+          cd circom
+          git checkout v2.1.6
+          cargo build --release
+          cargo install --path circom
+          export PATH=$PATH:~/.cargo/bin
+          cd ..
+          git submodule update --init --recursive
+          pip install git+https://github.com/peppelinux/pyMDOC-CBOR.git
+
+      - name: Run circuit setup for rs256
+        run: |
+          cd setup/scripts
+          ./run_setup.sh rs256
+
+      - name: Run circuit setup for mDL
+        run: |
+          cd setup/scripts
+          ./run_setup.sh mdl1
+
+# RS256 Commands
+      - name: Run ZKSetup for rs256
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace zksetup --name rs256
+
+      - name: Run Prove for rs256
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace prove --name rs256
+
+      - name: Run Show for rs256
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace show --name rs256
+
+      - name: Run Verify for rs256
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace verify --name rs256
+
+# mDL Commands
+      - name: Run ZKSetup for mDL
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace zksetup --name rs256
+
+      - name: Run Prove for mDL
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace prove --name rs256
+
+      - name: Run Show for mDL
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace show --name rs256
+
+      - name: Run Verify for mDL
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace verify --name rs256
