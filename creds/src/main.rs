@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use crescent::{run_zksetup, run_prover, run_show, run_verifier};
 use std::env::current_dir;
 

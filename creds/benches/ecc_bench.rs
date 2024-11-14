@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
@@ -6,8 +9,6 @@ use ark_bn254::{Bn254, Fr};
 use ark_ec::VariableBaseMSM;
 use ark_std::{rand::SeedableRng, UniformRand};
 use crescent::utils::msm_select;
-
-
 
 pub fn ecc_bn254_benchmark(c: &mut Criterion) {
     const MSM_LEN : usize = 12;
@@ -54,8 +55,7 @@ pub fn ecc_bn254_benchmark(c: &mut Criterion) {
         })
     });
 
-    
-    // G2
+        // G2
     c.bench_function(&format!("Bn254 G2 scalar mul time"), |b| {
         b.iter(|| {
             let _res = bases2[0] * scalars[0];

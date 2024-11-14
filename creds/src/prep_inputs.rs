@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use jwt_simple::prelude::*;
 use serde_json::Value;
 use serde_json::json;
@@ -11,7 +14,6 @@ use std::fs;
 use ark_std::path::PathBuf;
 use ark_ff::BigInteger;
 use crate::return_error;
-
 
 // If not set in config.json, the max_jwt_len is set to this value. 
 const DEFAULT_MAX_TOKEN_LENGTH : usize = 2048;

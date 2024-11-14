@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 #!/usr/bin/python3
 
 import python_jwt as jwt, jwcrypto.jwk as jwk

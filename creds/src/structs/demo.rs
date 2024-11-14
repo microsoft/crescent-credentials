@@ -1,5 +1,7 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use ark_bn254::Bn254 as ECPairing;
-//use ark_bls12_381::Bls12_381 as ECPairing;
 use ark_circom::CircomBuilder;
 use serde::{Deserialize, Serialize};
 

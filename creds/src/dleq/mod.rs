@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use crate::utils::biguint_to_scalar;
 use crate::utils::hash_to_curve_vartime;
 use ark_ec::CurveGroup;

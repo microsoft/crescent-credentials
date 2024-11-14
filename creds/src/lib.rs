@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use std::{fs, path::PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use ark_bn254::{Bn254 as ECPairing, Fr};
