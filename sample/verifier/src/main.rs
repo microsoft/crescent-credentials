@@ -10,7 +10,7 @@ use rocket_dyn_templates::{context, Template};
 use rocket::response::{Redirect};
 use rocket::response::status::Custom;
 use rocket::State;
-use rocket::fs::FileServer;
+use rocket::fs::{FileServer, NamedFile};
 use rocket::http::Status;
 use std::collections::HashMap;
 use serde_json::Value;
@@ -110,7 +110,7 @@ fn login_page(verifier_config: &State<VerifierConfig>) -> Template {
 fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving site 1 resource page");
 
-    if (session_id == "test") {
+    if session_id == "test" {
         Template::render("resource", context! {
             site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
             email_domain: "TEST",
@@ -151,7 +151,7 @@ fn signup1_page(verifier_config: &State<VerifierConfig>) -> Template {
 fn signup2_page(session_id: String, verifier_config: &State<VerifierConfig>) -> Template {
     println!("*** Serving site 2 signup2 page");
 
-    if (session_id == "test") {
+    if session_id == "test" {
         Template::render("signup2", context! {
             site2_verifier_name: verifier_config.site2_verifier_name.as_str(),
             email_domain: "TEST",
@@ -314,6 +314,16 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     }
 }
 
+#[get("/site1-favicon.ico")]
+async fn site1_favicon() -> Option<NamedFile> {
+    NamedFile::open("static/img/site1-favicon.ico").await.ok()
+}
+
+#[get("/site2-favicon.ico")]
+async fn site2_favicon() -> Option<NamedFile> {
+    NamedFile::open("static/img/site2-favicon.ico").await.ok()
+}
+
 #[launch]
 fn rocket() -> _ {
     // Load verifier configuration
@@ -342,7 +352,7 @@ fn rocket() -> _ {
     rocket::build()
         .manage(verifier_config)
         .mount("/", FileServer::from("static"))
-        .mount("/", routes![index_page, login_page, resource_page, signup1_page, signup2_page, verify])
+        .mount("/", routes![index_page, login_page, resource_page, signup1_page, signup2_page, verify, site1_favicon, site2_favicon])
     .attach(Template::fairing())
 }
 

@@ -291,6 +291,11 @@ fn create_demo_users(issuer_config: &IssuerConfig) -> Vec<User> {
     ]
 }
 
+#[get("/favicon.ico")]
+async fn favicon() -> Option<NamedFile> {
+    NamedFile::open("static/img/favicon.ico").await.ok()
+}
+
 #[launch]
 fn rocket() -> _ {
     // load the private key at server startup
@@ -341,7 +346,8 @@ fn rocket() -> _ {
                 login,
                 welcome_page,
                 issue_token,
-                serve_jwks
+                serve_jwks,
+                favicon
             ],
         )
 }
