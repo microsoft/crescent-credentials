@@ -73,19 +73,19 @@ jobs:
       - name: Run ZKSetup for mDL
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace zksetup --name rs256
+          cargo run --bin crescent --release --features print-trace zksetup --name mdl1
 
       - name: Run Prove for mDL
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace prove --name rs256
+          cargo run --bin crescent --release --features print-trace prove --name mdl1
 
       - name: Run Show for mDL
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace show --name rs256
+          cargo run --bin crescent --release --features print-trace show --name mdl1
 
       - name: Run Verify for mDL
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace verify --name rs256
+          cargo run --bin crescent --release --features print-trace verify --name mdl1
