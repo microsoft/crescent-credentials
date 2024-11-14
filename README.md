@@ -1,12 +1,13 @@
 # Crescent
 
-Crescent is a library to generate proofs of possession of JWT (JSON Web Tokens) credentials. 
-By creating a proof for a JWT, rather than sending it directly, the credential holder may choose
-to keep some of the claims in the token private, while still providing the verifier with assurance
-that the revealed claims are correct and that the underlying token is still valid.
+Crescent is a library to generate proofs of possession of JSON Web Tokens (JWT) and
+mobile Driver's Licenses (mDL) credentials. 
+By creating a proof for a JWT or mDL, rather than sending it directly, the credential holder may choose
+to keep some of the claims in the credential private, while still providing the verifier with assurance
+that the revealed claims are correct and that the underlying credential is still valid.
 
 This repository contains the Crescent library and a sample application consisting of a JWT issuer,
-a setup service, a browser extension client and server helper, and a web server verifier.
+a setup service, a browser extension client and client helper service, and a web server verifier.
 
 ## Setup and demo cheat sheet
 Once the dev dependencies are installed, to run the end-to-end demo use these commands.
