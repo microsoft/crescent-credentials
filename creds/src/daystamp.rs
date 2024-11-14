@@ -1,6 +1,7 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use chrono::{DateTime, Datelike, Local};
-
-
 
 // The function ymd_to_ordinal() and supporting functions are ported from 
 //    https://github.com/python/cpython/blob/54b5e4da8a4c6ae527ab238fcd6b9ba0a3ed0fc7/Lib/datetime.py#L63

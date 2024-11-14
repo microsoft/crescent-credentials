@@ -1,5 +1,7 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use ark_bn254::{Bn254 as ECPairing, Fr};
-//use ark_bls12_381::Bls12_381 as ECPairing;
 use ark_circom::{CircomBuilder, CircomConfig};
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::Groth16;

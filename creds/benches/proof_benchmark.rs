@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use criterion::{criterion_group, criterion_main, Criterion};
 use ark_bn254::{Bn254, Fr};
@@ -8,7 +11,6 @@ use rayon::ThreadPoolBuilder;
 type G1 = <Bn254 as ark_ec::pairing::Pairing>::G1;
 
 pub fn range_proof_benchmark(c: &mut Criterion) {
-
 
     const N_BITS : usize = 32;
 

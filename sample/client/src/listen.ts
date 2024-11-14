@@ -1,8 +1,9 @@
-/* eslint-disable @typescript-eslint/no-magic-numbers */
 /*
  *  Copyright (c) Microsoft Corporation.
  *  Licensed under the MIT license.
  */
+
+/* eslint-disable @typescript-eslint/no-magic-numbers */
 
 import { AWAIT_ASYNC_RESPONSE } from './constants.js'
 
