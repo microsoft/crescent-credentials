@@ -40,7 +40,7 @@ const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
 // struct for the JWT info
 #[derive(Serialize, Deserialize, Clone)]
 struct CredInfo {
-    cred: String,        // The credential (a JWT)
+    cred: String,       // The credential
     schema_UID: String, // The schema UID for the credential
     issuer_URL: String  // The URL of the issuer
 }
