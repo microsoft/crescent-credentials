@@ -208,6 +208,23 @@ async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(),
     Ok(())
 }
 
+async fn fetch_and_save_mdl_issuer_key(issuer_url: &str, issuer_folder: &str) -> Result<(), String> {
+
+    println!("Got issuer_url = {}", issuer_url);
+    println!("Got issuer_folder = {}", issuer_folder);
+
+    // Save the PEM-encoded key to issuer.pub in the issuer_folder
+    let pub_key_path = Path::new(issuer_folder).join("issuer.pub");
+    let rv = fs::copy("../../creds/test-vectors/mdl1/issuer.pub", &pub_key_path);
+    if(rv.is_err()) {
+        let msg = format!("Failed to to copy issuer public key; {:?}", rv);
+        return Err(msg);
+    }
+
+    println!("Saved issuer's public key to {:?}", &pub_key_path);
+    Ok(())
+}
+
 macro_rules! error_template {
     ($msg:expr, $verifier_config:expr) => {{
         println!("*** {}", $msg);
@@ -262,8 +279,12 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 
         if cred_type == "jwt" {
             // Fetch the issuer's public key and save it to issuer.pub 
-            fetch_and_save_jwk(&proof_info.issuer_URL, &issuer_folder).await.expect("Failed to fetch and save issuer's public key");
+            fetch_and_save_jwk(&proof_info.issuer_URL, &issuer_folder).await.expect("Failed to fetch and save issuer's public key (JWT case)");
         }
+        if cred_type == "mdl" {
+            // For now, mDL issuer public keys are assumed to be on the filesystem, rather than hosted somewhere
+            fetch_and_save_mdl_issuer_key(&proof_info.issuer_URL, &issuer_folder).await.expect("Failed to fetch and save issuer's public key (mDL case)");
+        }        
     }
 
     let paths = CachePaths::new_from_str(&issuer_folder);
