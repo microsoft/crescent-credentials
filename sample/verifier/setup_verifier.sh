@@ -39,4 +39,7 @@ for i in "${!SOURCE_DIRS[@]}"; do
     echo "Finished copying for $TARGET_DIR"
 done
 
+# Copy the issuer public key for the mDL demo only
+cp "${SOURCE_DIRS[1]}/issuer.pub" "${TARGET_DIRS[1]}/"
+
 echo "All copy operations complete."

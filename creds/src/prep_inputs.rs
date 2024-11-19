@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+use ark_ff::PrimeField;
 use jwt_simple::prelude::*;
 use serde_json::Value;
 use serde_json::json;
@@ -18,6 +19,7 @@ use crate::return_error;
 // If not set in config.json, the max_jwt_len is set to this value. 
 const DEFAULT_MAX_TOKEN_LENGTH : usize = 2048;
 const CIRCOM_RS256_LIMB_BITS : usize = 121;
+const CIRCOM_ES256_LIMB_BITS : usize = 43;  // Limb size required by ecdsa-p256 circuit
 lazy_static! {
     static ref CRESCENT_SUPPORTED_ALGS: HashSet<&'static str> = {
         let mut set = HashSet::new();
@@ -36,6 +38,54 @@ lazy_static! {
         set.insert("max_jwt_len");
         set
     };
+}
+
+
+pub fn pem_key_type(key : &String) -> Result<&str, &str> {
+
+        if RS256PublicKey::from_pem(&key).is_ok() {
+            Ok("RS256")
+        } 
+        else if ES256PublicKey::from_pem(&key).is_ok() {
+            Ok("ES256")
+        }
+        else {
+            Err("Unsupported algorithm")
+        }
+}
+
+pub fn pem_to_inputs<F>(issuer_pem : &String) -> Result<Vec<F>, Box<dyn std::error::Error>>
+    where F: PrimeField 
+{
+    
+    let inputs = match pem_key_type(&issuer_pem) {
+        Ok("RS256") => {
+            let issuer_pub = RS256PublicKey::from_pem(&issuer_pem).unwrap();
+            let limbs = to_circom_ints(&issuer_pub.to_components().n, CIRCOM_RS256_LIMB_BITS)?;
+            limbs.into_iter().map(|x| F::from_le_bytes_mod_order(&x.to_bytes_le().1)).collect::<Vec<F>>()
+        }
+        Ok("ES256") =>  {
+            let issuer_pub = ES256PublicKey::from_pem(&issuer_pem).unwrap();
+            let x = &issuer_pub.public_key().to_bytes_uncompressed()[1..33];    // byte 1 is 0x04, per SEC1 `Elliptic-Curve-Point-to-Octet-String` 
+            let y = &issuer_pub.public_key().to_bytes_uncompressed()[33..65];
+            let limbs_x = to_circom_ints(&x.to_vec(), CIRCOM_ES256_LIMB_BITS)?;
+            let limbs_y = to_circom_ints(&y.to_vec(), CIRCOM_ES256_LIMB_BITS)?;
+            let limbs_x_fe = limbs_x.into_iter().map(|a| F::from_le_bytes_mod_order(&a.to_bytes_le().1)).collect::<Vec<F>>();
+            let limbs_y_fe = limbs_y.into_iter().map(|a| F::from_le_bytes_mod_order(&a.to_bytes_le().1)).collect::<Vec<F>>();
+            let mut limbs = limbs_x_fe;
+            limbs.extend(limbs_y_fe);
+            limbs
+        }
+        Err(e) =>  {
+            return Err(e.into());
+        }
+        _ => {
+            return Err("unknown error".into())
+        }
+    };
+
+    Ok(inputs)
+
 }
 
 pub fn prepare_prover_inputs(config : &serde_json::Map<String, Value>, token_str : &String, issuer_pem : &String ) -> 
@@ -360,7 +410,14 @@ fn base_64_decoded_header_padding(header_len: usize) -> Result<String, Box<dyn s
 
 }
 
+// Convert integer n to limbs, encoded as strings
 fn to_circom_limbs(n_bytes: &Vec<u8>, limb_size: usize)-> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let limbs = to_circom_ints(n_bytes, limb_size)?;
+    Ok(limbs.into_iter().map(|l| l.to_str_radix(10)).collect())
+}
+
+// Convert integer n to limbs
+fn to_circom_ints(n_bytes: &Vec<u8>, limb_size: usize)-> Result<Vec<BigInt>, Box<dyn std::error::Error>> {
     let n = BigInt::from_bytes_be(num_bigint::Sign::Plus, &n_bytes);    
     let num_limbs = (n.bits() as usize + limb_size - 1) / limb_size;
 
@@ -374,8 +431,7 @@ fn to_circom_limbs(n_bytes: &Vec<u8>, limb_size: usize)-> Result<Vec<String>, Bo
         limbs.push(limb);
     }
 
-    // Convert to strings before returning
-    Ok(limbs.into_iter().map(|l| l.to_str_radix(10)).collect())
+    Ok(limbs)
 }
 
 fn b64_to_circom_limbs(n_b64: &str, limb_size: usize) -> Result<Vec<String>, Box<dyn std::error::Error>> {
