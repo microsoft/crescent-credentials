@@ -4,6 +4,7 @@
  */
 
 import { LitElement, html, css, type TemplateResult } from 'lit'
+import { live } from 'lit/directives/live.js'
 import { property } from 'lit/decorators.js'
 
 export class ToggleSwitch extends LitElement {
@@ -84,7 +85,7 @@ export class ToggleSwitch extends LitElement {
       <div class="container">
         <span class="label">${this.label}</span>
         <label class="switch">
-          <input type="checkbox" ?checked=${this.checked} @change=${this._onChange}>
+          <input type="checkbox" .checked="${live(this.checked)}" @change=${this._onChange}>
           <span class="slider"></span>
         </label>
       </div>

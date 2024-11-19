@@ -3,20 +3,19 @@
  *  Licensed under the MIT license.
  */
 
+/* eslint-disable @typescript-eslint/no-magic-numbers */
+
+import {
+  MSG_BACKGROUND_POPUP_ERROR, MSG_BACKGROUND_POPUP_PREPARE_STATUS, MSG_BACKGROUND_POPUP_PREPARED,
+  MSG_POPUP_BACKGROUND_DELETE, MSG_POPUP_BACKGROUND_PREPARE
+} from './constants'
 import config from './config'
-import { fetchText } from './utils'
+import { assert, isBackground } from './utils'
+import { type clientUid, Credential } from './cred'
+import { sendMessage, setListener } from './listen'
+import { removeData } from './indexeddb'
 
-const PREPARE_POLL_INTERVAL = parseInt(process.env.PREPARE_POLL_INTERVAL ?? '5000')
-
-export interface ClientHelperShowResponse {
-  client_state_b64: string
-  range_pk_b64: string
-  io_locations_str: string
-}
-
-export type ShowProof = string
-
-export async function prepare (issuerUrl: string, jwt: string, schemaUid: string): Promise<RESULT<string, Error>> {
+async function _prepare (issuerUrl: string, jwt: string, schemaUid: string): Promise<RESULT<string, Error>> {
   const options = {
     method: 'POST',
     headers: {
@@ -29,7 +28,7 @@ export async function prepare (issuerUrl: string, jwt: string, schemaUid: string
     })
   }
 
-  const response = await fetch(`${config.client_helper_url}/prepare`, options).catch((error) => {
+  const response = await fetch(`${config.clientHelperUrl}/prepare`, options).catch((error) => {
     return { text: () => `ERROR: ${error}` }
   })
 
@@ -42,12 +41,12 @@ export async function prepare (issuerUrl: string, jwt: string, schemaUid: string
   return { ok: true, value: credUid }
 }
 
-export async function status (credUid: string, progress: () => void): Promise<RESULT<string, Error>> {
+export async function fetchPrepareStatus (credUid: string, progress: () => void): Promise<RESULT<string, Error>> {
   return await new Promise((resolve) => {
     const intervalId = setInterval(
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       async () => {
-        const response = await fetch(`${config.client_helper_url}/status?cred_uid=${credUid}`).catch((error) => {
+        const response = await fetch(`${config.clientHelperUrl}/status?cred_uid=${credUid}`).catch((error) => {
           return { text: () => `Error: ${error.message}` }
         })
 
@@ -64,25 +63,16 @@ export async function status (credUid: string, progress: () => void): Promise<RE
         }
 
         progress()
-      }, PREPARE_POLL_INTERVAL)
+      }, config.pollInterval)
   })
 }
 
-export async function deleteCred (credUid: string): Promise<boolean> {
-  const response = await fetch(`${config.client_helper_url}/delete?cred_uid=${credUid}`).catch((_error) => {
+async function _deleteCred (credUid: string): Promise<boolean> {
+  const response = await fetch(`${config.clientHelperUrl}/delete?cred_uid=${credUid}`).catch((_error) => {
     console.error('Failed to delete cred:', credUid)
     return { ok: false }
   })
   return response.ok
-}
-
-export async function show (card: Card, disclosureUid: string): Promise<RESULT<ShowProof, Error>> {
-  const response = await fetchText(`${config.client_helper_url}/show`, { cred_uid: card.credUid, disc_uid: disclosureUid }, 'GET')
-  if (!response.ok) {
-    console.error('Failed to show:', response.error)
-    return response
-  }
-  return response
 }
 
 export async function ping (url: string): Promise<boolean> {
@@ -91,4 +81,87 @@ export async function ping (url: string): Promise<boolean> {
     return { ok: false }
   })
   return response.ok
+}
+
+async function pollStatus (cred: Credential): Promise<void> {
+  let progress = 0
+  const credUid = cred.id
+
+  const result = await fetchPrepareStatus (credUid,
+    () => {
+      progress = Math.ceil((100 - progress) * 0.05) + progress
+      cred.progress = progress
+      void cred.save().then(() => {
+        void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARE_STATUS, credUid, progress).catch((_error) => {
+          console.warn('NO LISTENER', MSG_BACKGROUND_POPUP_PREPARE_STATUS)
+        })
+      })
+    }
+  )
+
+  if (result.ok) {
+    cred.progress = 100
+    cred.status = 'PREPARED'
+    await cred.save()
+    await Credential.load()
+    void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARED, credUid)
+  }
+  else {
+    console.error('Failed to prepare:', result.error)
+    cred.status = 'ERROR'
+    await cred.save()
+    void sendMessage('popup', MSG_BACKGROUND_POPUP_ERROR, credUid)
+  }
+}
+
+export async function prepare (cred: Credential): Promise<clientUid> {
+  const result = await sendMessage<RESULT<string, Error>>('background', MSG_POPUP_BACKGROUND_PREPARE, cred.id)
+  if (!result.ok) {
+    throw new Error(result.error.message)
+  }
+  const newCredUid = result.value
+  return newCredUid
+}
+
+async function handlePrepare (id: string): Promise<RESULT<string, Error>> {
+  const cred = Credential.get(id)
+  assert(cred)
+
+  const result = await _prepare(cred.data.issuer.url, cred.data.token.raw, cred.data.token.schema)
+  if (!result.ok) {
+    return { ok: false, error: { message: 'Prepare failed. Check Client-Helper service.', name: 'Error' } }
+  }
+
+  // Update the credUid and save to storage as a new entry
+  cred.data.credUid = result.value
+  cred.status = 'PREPARING'
+  await cred.save()
+
+  // Remove the old entry
+  await removeData('crescent', id)
+
+  void pollStatus(cred)
+
+  return result
+}
+
+export async function remove (cred: Credential): Promise<void> {
+  // Client helper will have no record of this credential if it is still in PENDING status
+  if (['PENDING', 'PREPARING'].includes(cred.status)) {
+    return
+  }
+  void sendMessage('background', MSG_POPUP_BACKGROUND_DELETE, cred.id)
+}
+
+async function handleRemove (id: string): Promise<void> {
+  const cred = Credential.get(id)
+  assert(cred)
+  void _deleteCred(cred.id)
+}
+
+// if this is running the the extension background service worker, then listen for messages
+if (isBackground()) {
+  const listener = setListener('background')
+  listener.handle(MSG_POPUP_BACKGROUND_PREPARE, handlePrepare)
+  listener.handle(MSG_POPUP_BACKGROUND_DELETE, handleRemove)
 }

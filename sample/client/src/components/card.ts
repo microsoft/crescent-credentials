@@ -5,25 +5,31 @@
 
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
-import { LitElement, html, css, type TemplateResult } from 'lit'
+import { LitElement, html, css, type TemplateResult, unsafeCSS } from 'lit'
 import { unsafeHTML } from 'lit/directives/unsafe-html.js'
 import { property } from 'lit/decorators.js'
-import { getElementById } from '../utils'
-import './collapsible.js'
-import { fields } from '../mdoc'
-import type { Card, Card_status } from '../cards'
+import { assert, getElementById } from '../utils'
+import type { Card_status, CredentialWithCard } from '../cred'
 import 'dotenv/config'
+import './collapsible.js'
+import myConfig from '../config'
 
 export class CardElement extends LitElement {
-  // Define properties for domain and email
+  private _ready = false
+  private readonly _status: Card_status = 'PENDING'
+  private readonly _progress = 0
+  public _disclosureParams: { verifierUrl: string, disclosureValue: string, disclosureUid: string } | null = null
 
-  // Optional styles for the component
+  @property({ type: Object })
+  private _credential: CredentialWithCard | null = null
+
   static styles = css`
         .container {
             border-radius: 8px;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.4);
             padding: 20px;
             margin-bottom: 10px;
+            background: linear-gradient(-45deg, color-mix(in srgb, black 50%, ${unsafeCSS(myConfig.cardColor)}), ${unsafeCSS(myConfig.cardColor)});
         }
 
         .button {
@@ -39,8 +45,10 @@ export class CardElement extends LitElement {
         }
 
         p {
-            color: white;
-            font-size: 16px;
+            color: #F0F0F0;
+            font-size: 18px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            margin: 8px;
         }
 
         table { 
@@ -49,11 +57,14 @@ export class CardElement extends LitElement {
         }
 
         #info {
-          font-size: 20px;
+          font-size: 26px;
+          letter-spacing: 0.8px;
+          color: #E8E8E8;
           font-weight: bold;
           display: flex;
           justify-content: space-between;
           align-items: center;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         }
 
         #error {
@@ -80,6 +91,8 @@ export class CardElement extends LitElement {
 
         #prepareProgress {
             width: 100%;
+            height: 10px;
+            accent-color: #73FBFD;
         }
 
         #error {
@@ -114,33 +127,18 @@ export class CardElement extends LitElement {
             padding: 5px;
         }
   `
-  @property({ type: Object, reflect: true }) card = null as Card | null
-  @property({ type: Function }) accept?: (card: Card) => void
-  @property({ type: Function }) reject?: (card: Card) => void
-  @property({ type: Function }) disclose?: (card: Card) => void
-  @property({ type: Function }) delete?: (card: Card) => void
-
-  private _cardColor (): void {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const container = this.shadowRoot!.querySelector<HTMLDivElement>('#container')! //
-    container.style.setProperty('background-color', '#809071')
-  }
 
   // The render method to display the content
   render (): TemplateResult {
-    const card = this.card
-    if (card == null) {
-      return html`<div>Card is null</div>`
-    }
-
-    const color = `#4E95D9` // matching the crescent logo color
+    assert (this._credential)
+    const credRecord = this._credential.data
 
     return html`
-      <div class="container" style="background-color:${color}">
+      <div class="container">
 
         <div id="info">
-          <span>${card.issuer.name}</span>
-          <button id="buttonDelete" @click=${this._handleDelete.bind(this)}>
+          <span>${credRecord.issuer.name}</span>
+          <button id="buttonDelete" @click=${this._credential.delete.bind(this._credential)}>
             <img src="../icons/trash.svg" width="15" alt="trashcan icon"/>
           </button>
         </div>
@@ -158,10 +156,10 @@ export class CardElement extends LitElement {
         </div>
 
         <div id="consent">
-          <p>${card.issuer.name} would like to add a credential to your wallet</p>
+          <p>${credRecord.issuer.name} would like to add a credential to your wallet</p>
           <div style="display: flex; justify-content: center; gap: 10px;">
-            <button class='button' id="walletItemAccept" @click=${this._handleAccept.bind(this)}>Accept</button>
-            <button class='button' id="walletItemReject" @click=${this._handleReject.bind(this)}>Reject</button>
+            <button class='button' id="walletItemAccept" @click=${this._credential.accept.bind(this._credential)}>Accept</button>
+            <button class='button' id="walletItemReject" @click=${this._credential.delete.bind(this._credential)}>Reject</button>
           </div>
         </div>
 
@@ -174,7 +172,7 @@ export class CardElement extends LitElement {
         <c2pa-collapsible>
           <span slot="header">&nbsp;</span>
           <div slot="content">
-            ${unsafeHTML(this.jsonToTable(card.token.type === 'JWT' ? (card.token.value as JWT_TOKEN).payload : fields(card.token.value as MDOC)))}
+            ${unsafeHTML(this.jsonToTable(credRecord.token.fields))}
           </div>
         </c2pa-collapsible>
 
@@ -182,25 +180,7 @@ export class CardElement extends LitElement {
     `
   }
 
-  private _state: Card_status = 'PENDING'
-
-  get status (): Card_status {
-    return this._state
-  }
-
-  set status (state: Card_status) {
-    this._state = state
-    if (this._ready) {
-      this._configureFromState()
-    }
-  }
-
-  private _ready = false
-
-  public _disclosureParams: { verifierUrl: string, disclosureValue: string, disclosureUid: string } | null = null
-
   firstUpdated (): void {
-    // super.connectedCallback()
     this._ready = true
     this._configureFromState()
   }
@@ -216,27 +196,26 @@ export class CardElement extends LitElement {
   }
 
   private _configureFromState (): void {
-    if (this._state === 'PENDING') {
-      this.progress.hide()
+    assert(this._credential)
+
+    const status = this._credential.status
+    this.buttons.hide()
+    this.progress.hide()
+    this.disclose.hide()
+
+    if (status === 'PENDING') {
       this.buttons.show()
     }
-    else if (this._state === 'PREPARING') {
+    else if (status === 'PREPARING') {
       this.progress.label = 'Preparing ...'
-
-      this.progress.value = this.card?.progress ?? 0
-      this.buttons.hide()
+      this.progress.value = this._credential.progress
       this.progress.show()
     }
-    else if (this._state === 'PREPARED') {
-      this.buttons.hide()
-      this.progress.hide()
+    else if (status === 'PREPARED') {
+      // nothing to do
     }
-    else if (this._state === 'DISCLOSABLE') {
-      this.buttons.hide()
-      this.progress.hide()
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const discloseSection = this.shadowRoot!.querySelector<HTMLDivElement>('#disclose')!
-      discloseSection.style.display = 'block'
+    else if (status === 'DISCLOSABLE') {
+      this.disclose.show()
     }
   }
 
@@ -250,23 +229,25 @@ export class CardElement extends LitElement {
   }
 
   discloseRequest (verifierUrl: string, disclosureValue: string, disclosureUid: string): void {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const disclosePropertyLabel = this.shadowRoot!.querySelector<HTMLParagraphElement>('#disclosePropertyLabel')!
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const discloseVerifierLabel = this.shadowRoot!.querySelector<HTMLParagraphElement>('#discloseVerifierLabel')!
-    disclosePropertyLabel.innerText = `${disclosureUid.replace('crescent://', '')} : ${disclosureValue}`
-    discloseVerifierLabel.innerText = `to ${verifierUrl}?`
-
+    assert(this.shadowRoot)
+    const disclosePropertyLabel = this.shadowRoot.querySelector<HTMLParagraphElement>('#disclosePropertyLabel')
+    assert(disclosePropertyLabel)
+    const discloseVerifierLabel = this.shadowRoot.querySelector<HTMLParagraphElement>('#discloseVerifierLabel')
+    assert(discloseVerifierLabel)
+    disclosePropertyLabel.innerText = `${disclosureValue}`
+    discloseVerifierLabel.innerText = `to ${verifierUrl.replace(/:\d+.+$/g, '')}?`
     this._disclosureParams = { verifierUrl, disclosureValue, disclosureUid }
   }
 
   get progress (): { show: () => void, hide: () => void, value: number, label: string } {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const progressSection = this.shadowRoot!.querySelector<HTMLDivElement>('#progress')!
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const progressControl = this.shadowRoot!.querySelector<HTMLProgressElement>('#prepareProgress')!
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const progressLabel = this.shadowRoot!.querySelector<HTMLProgressElement>('#progressLabel')!
+    assert(this.shadowRoot)
+    const progressSection = this.shadowRoot.querySelector<HTMLDivElement>('#progress')
+    assert(progressSection)
+    const progressControl = this.shadowRoot.querySelector<HTMLProgressElement>('#prepareProgress')
+    assert(progressControl)
+    const progressLabel = this.shadowRoot.querySelector<HTMLProgressElement>('#progressLabel')
+    assert(progressLabel)
+
     return {
       show: () => {
         progressSection.style.display = 'block'
@@ -300,30 +281,47 @@ export class CardElement extends LitElement {
     }
   }
 
-  private _handleAccept (): void {
-    if (this.accept != null && this.card != null) {
-      this.status = 'PREPARING'
-      this.accept(this.card)
+  get disclose (): { show: () => void, hide: () => void } {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const discloseSection = this.shadowRoot!.querySelector<HTMLDivElement>('#disclose')!
+    return {
+      show: () => {
+        discloseSection.style.display = 'block'
+      },
+      hide: () => {
+        discloseSection.style.display = 'none'
+      }
     }
   }
 
   private _handleReject (): void {
-    if (this.reject != null && this.card != null) {
-      this.reject(this.card)
-    }
+    assert(this._credential)
+    this._credential.reject()
   }
 
   private _handleDisclose (): void {
-    if (this.disclose != null && this.card != null) {
-      this.status = 'DISCLOSING'
-      this.disclose(this.card)
-      window.close()
-    }
+    assert(this._credential)
+    assert(this._disclosureParams?.verifierUrl)
+    assert(this._disclosureParams.disclosureUid)
+    this._credential.disclose(this._disclosureParams.verifierUrl, this._disclosureParams.disclosureUid)
   }
 
-  private _handleDelete (): void {
-    if (this.delete != null && this.card != null) {
-      this.delete(this.card)
+  get credential (): CredentialWithCard {
+    assert(this._credential)
+    return this._credential
+  }
+
+  set credential (credential: CredentialWithCard) {
+    if (credential !== this._credential) {
+      this._credential = credential
+
+      this._credential.onStatusChange = (_status: Card_status) => {
+        this._configureFromState()
+      }
+
+      this._credential.onProgressChange = (progress: number) => {
+        this.progress.value = progress
+      }
     }
   }
 }

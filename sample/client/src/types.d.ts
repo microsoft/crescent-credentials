@@ -13,9 +13,10 @@
 */
 
 interface MESSAGE_PAYLOAD {
-  destination: 'content' | 'background' | 'popup' | 'offscreen'
+  destination: 'content' | 'background' | 'popup'
   routed: boolean
   action: string
+  windowId: number | null
   data: unknown[]
 }
 

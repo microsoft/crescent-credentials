@@ -13,6 +13,7 @@ html {
     height: 600px;
     margin: 0;
     padding: 0;
+    scrollbar-gutter: stable;
 }
 
 body {
@@ -142,14 +143,6 @@ input[type="text"] {
     border-radius: 5px;
     text-align: right;
 }
-
-/* select {
-    width: var(--config-value-width);
-    padding: 5px;
-    margin: 5px 0;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-} */
 
 .config-section-header {
     font-size: 1.4em;
