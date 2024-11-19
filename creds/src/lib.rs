@@ -12,7 +12,7 @@ use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
-use prep_inputs::{parse_config, unpack_int_to_string_unquoted, prepare_prover_inputs};
+use prep_inputs::{parse_config, pem_to_inputs, prepare_prover_inputs, unpack_int_to_string_unquoted};
 use utils::{read_from_file, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
@@ -71,7 +71,8 @@ pub struct VerifierParams<E: Pairing> {
     vk : VerifyingKey<E>,
     pvk : PreparedVerifyingKey<E>,
     range_vk: RangeProofVK<E>,
-    io_locations_str: String // Stored as String since IOLocations does not implement CanonicalSerialize
+    io_locations_str: String, // Stored as String since IOLocations does not implement CanonicalSerialize
+    issuer_pem: String
 }
 impl<E: Pairing> VerifierParams<E> {
     pub fn new(paths : &CachePaths) -> Result<Self, SerializationError> {
@@ -79,7 +80,8 @@ impl<E: Pairing> VerifierParams<E> {
         let vk : VerifyingKey<E> = read_from_file(&paths.groth16_vk)?;
         let range_vk : RangeProofVK<E> = read_from_file(&paths.range_vk)?;
         let io_locations_str = std::fs::read_to_string(&paths.io_locations)?;
-        Ok(Self{vk, pvk, range_vk, io_locations_str})
+        let issuer_pem = std::fs::read_to_string(&paths.issuer_pem)?;
+        Ok(Self{vk, pvk, range_vk, io_locations_str, issuer_pem})
     }
 }
 
@@ -281,19 +283,16 @@ pub fn run_prover(
 
 pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
 {
-
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
     let email_value_pos = io_locations.get_io_location("email_value").unwrap();
-    // The IOs are exp, email_domain and the 17 limbs of the RSA modulus. We make them revealed
-    // TODO: don't add the modulus to revealed inputs, the verifier should know it. Maybe just a key identifier    
-    // TODO: seems error-prone to do this by hand; make a function to reveal 
-    // by name e.g, set_revealed("modulus")
+    // The IOs are exp, email_domain 
     let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
     io_types[email_value_pos -1] = PublicIOType::Revealed;
-    let mut revealed_inputs = client_state.inputs.clone();
-    revealed_inputs.remove(exp_value_pos - 1);  
+
+    let revealed_inputs = vec![client_state.inputs[email_value_pos-1]];
+
     let show_groth16 = client_state.show_groth16(&io_types);
     
     // Create fresh range proof 
@@ -323,9 +322,9 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
     io_types[valid_until_value_pos - 1] = PublicIOType::Committed;
     io_types[dob_value_pos - 1] = PublicIOType::Committed;
-    let mut revealed_inputs = client_state.inputs.clone();
-    revealed_inputs.remove(valid_until_value_pos - 1);
-    revealed_inputs.remove(dob_value_pos - 2);  // minus 2 because there's one less after removing valid_until_value
+
+    let revealed_inputs : Vec<<ECPairing as Pairing>::ScalarField> = vec![];
+
     let show_groth16 = client_state.show_groth16(&io_types);    
     
     // Create fresh range proof for validUntil
@@ -423,13 +422,23 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
     io_types[email_value_pos - 1] = PublicIOType::Revealed;
 
-    // println!("Verifier got revealed inputs: {:?}", &show_proof.revealed_inputs);
+    // Create an inputs vector with the inputs from the prover, and the issuer's public key
+    let public_key_inputs = pem_to_inputs::<<ECPairing as Pairing>::ScalarField>(&vp.issuer_pem);
+    if public_key_inputs.is_err() {
+        print!("Error: Failed to convert issuer public key to input values");
+        return (false, "".to_string());
+    }
+    let mut inputs = public_key_inputs.unwrap();
+    inputs.extend(show_proof.revealed_inputs.clone()); 
+    
+    // println!("Verifier got revealed inputs  : {:?}", &show_proof.revealed_inputs);
+    // println!("Created inputs: ");
     // for (i, input) in show_proof.revealed_inputs.clone().into_iter().enumerate() {
-    //     println!("input {} =  {:?}", i, input.into_bigint().to_string());
+    //     println!("input {}  =  {:?}", i, input.into_bigint().to_string());
     // }
 
     let verify_timer = std::time::Instant::now();
-    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &show_proof.revealed_inputs);
+    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &inputs);
     if !ret {
         println!("show_groth16.verify failed");
         return (false, "".to_string());
@@ -466,9 +475,9 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
     // TODO: it's currently hacky how the verifier knows which revealed inputs correspond 
-    // to what.  In this example we have to subtract 2 (rather than 1) from email_value pos to account for
-    // the committed attribute.  When we refactor revealed inputs and the modulus IOs we can address this.
-    let domain = match unpack_int_to_string_unquoted( &show_proof.revealed_inputs[email_value_pos - 2].into_bigint()) {
+    // to what.  In this example we have to subtract 2 from email_value_pos to account for the committed attribute 
+    // When we refactor revealed inputs and the modulus IOs we can address this.
+    let domain = match unpack_int_to_string_unquoted( &inputs[email_value_pos - 2].into_bigint()) {
         Ok(domain) => domain,
         Err(e) => {
             println!("Proof was valid, but failed to unpack domain string, {:?}", e);
@@ -483,23 +492,30 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
 pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, age: usize) -> (bool, String)
 {
     let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
-    // TODO: load public_IOs file and take modulus from there.  
-    // Or maybe the verifier should work directly from the issuer's public key?
-
     let valid_until_value_pos = io_locations.get_io_location("valid_until_value").unwrap();
     let dob_value_pos = io_locations.get_io_location("dob_value").unwrap();
     let mut io_types = vec![PublicIOType::Revealed; show_proof.inputs_len];
     io_types[valid_until_value_pos - 1] = PublicIOType::Committed;
     io_types[dob_value_pos - 1] = PublicIOType::Committed;
+
+    // Create an inputs vector with the inputs from the prover, and the issuer's public key
+    let public_key_inputs = pem_to_inputs::<<ECPairing as Pairing>::ScalarField>(&vp.issuer_pem);
+    if public_key_inputs.is_err() {
+        print!("Error: Failed to convert issuer public key to input values");
+        return (false, "".to_string());
+    }
+    let mut inputs = public_key_inputs.unwrap();
+    inputs.extend(show_proof.revealed_inputs.clone());     
     
 
     // println!("Verifier got revealed inputs: {:?}", &show_proof.revealed_inputs);
-    // for (i, input) in show_proof.revealed_inputs.clone().into_iter().enumerate() {
+    // println!("Created inputs:");
+    // for (i, input) in inputs.clone().into_iter().enumerate() {
     //     println!("input {} =  {:?}", i, input.into_bigint().to_string());
     // }
 
     let verify_timer = std::time::Instant::now();
-    show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &show_proof.revealed_inputs);
+    show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &inputs);
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     let delta = 
@@ -564,10 +580,9 @@ pub fn run_verifier(base_path: PathBuf) {
     let vk : VerifyingKey<ECPairing> = read_from_file(&paths.groth16_vk).unwrap();
     let range_vk : RangeProofVK<ECPairing> = read_from_file(&paths.range_vk).unwrap();
     let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
-    // TODO: load public_IOs file and take modulus from there.  
-    // Or maybe the verifier should work directly from the issuer's public key?
+    let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
 
-    let vp = VerifierParams{vk, pvk, range_vk, io_locations_str};
+    let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
 
     let (verify_result, data) = if show_proof.show_range2.is_some() {
         verify_show_mdl(&vp, &show_proof, MDL_AGE_GREATER_THAN)
