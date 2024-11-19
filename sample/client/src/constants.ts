@@ -1,7 +1,7 @@
 /*
-*  Copyright (c) Microsoft Corporation.
-*  Licensed under the MIT license.
-*/
+ *  Copyright (c) Microsoft Corporation.
+ *  Licensed under the MIT license.
+ */
 
 export const MSG_CONTENT_BACKGROUND_IMPORT_CARD = 'MSG_CONTENT_BACKGROUND_IMPORT_CARD'
 

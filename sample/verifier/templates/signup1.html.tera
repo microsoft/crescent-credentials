@@ -6,14 +6,13 @@
     <meta crescent_disclosure_uid="crescent://over_18">
     <title>{{ site2_verifier_name }} Sign Up</title>
     <link rel="stylesheet" href="css/site2_style.css">
+    <link rel="icon" href="img/site2-favicon.ico" type="image/x-icon">
 </head>
 <body>
 
 <div style="boxed">
     <div style="display: flex; align-items: center; justify-content: center;">
-        <!-- <img src="img/social-logo.jpg" style="width: 8em; margin-right: 1em;"></br> -->
         <h1> {{ site2_verifier_name }} </h1>
-        
     </div>
 
     {% if error %}
@@ -34,7 +33,7 @@
     <div style="height: 2em;"></div>
 
     <div style="display: flex; justify-content: center;">
-        <img src="img/social-stock.jpg" style="width: 20em; margin-right: 1em; opacity: 0.5;">
+        <img src="img/site2-crowd.jpg" style="width: 20em; margin-right: 1em; opacity: 0.5;">
     </div>
 </div>
 

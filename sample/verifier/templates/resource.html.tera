@@ -4,30 +4,31 @@
     <meta charset="UTF-8">
     <title>Resource - {{ site1_verifier_name }}</title>
     <link rel="stylesheet" href="css/site1_style.css">
+    <link rel="icon" href="img/site1-favicon.ico" type="image/x-icon">
 </head>
 <body>
     <div style="display: flex; align-items: center;">
-        <img src="img/corp-leaf.png" style="width: 5em; margin-right: 1em;">
+        <img src="img/site1-logo.png" style="width: 5em; margin-right: 1em;">
         <h1>{{ site1_verifier_name }} Health</h1>
     </div>
 
     <p>Your email from {{ email_domain }} was successfully validated. You can now access the resources on our site.</p>
 
-    <div style="padding: 1em; background-color: #faf9f6; border-radius: 8px; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); margin-top: 1em;">
+    <div style="padding: 1em; background-color: #faf9f6; border-radius: 8px; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); margin-top: 1em; width:30%; justify-content: center">
         <ul style="list-style-type: none; padding: 0;">
             <li style="margin-bottom: 1em;">
                 <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
-                    <img src="img/calendar.png" style="width: 1.5em; margin-right: 0.5em;"> Book an appointment
+                    <img src="img/site1-calendar.png" style="width: 1.5em; margin-right: 0.5em;"> Book an appointment
                 </a>
             </li>
             <li style="margin-bottom: 1em;">
                 <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
-                    <img src="img/provider.png" style="width: 1.5em; margin-right: 0.5em;"> Browse the specialists directory
+                    <img src="img/site1-network.png" style="width: 1.5em; margin-right: 0.5em;"> Find a provider
                 </a>
             </li>
             <li>
                 <a href="" style="display: flex; align-items: center; justify-content: center; padding: 0.5em; background-color: lightgray; border-radius: 8px; text-decoration: none; color: #03230a;">
-                    <img src="img/aitherapist.png" style="width: 1.5em; margin-right: 0.5em;"> Chat with our AI therapist
+                    <img src="img/site1-chat.png" style="width: 1.5em; margin-right: 0.5em;"> Chat with someone now
                 </a>
             </li>
         </ul>

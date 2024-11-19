@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use jwt_simple::prelude::*;
 use structopt::StructOpt;
 use serde_json::Value;

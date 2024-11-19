@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use crate::utils::hash_to_curve_vartime;
 use crate::utils::msm_select;
 use ark_ec::CurveGroup;

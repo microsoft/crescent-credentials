@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 ################################################
 # crescent_helper.py - Crescent helper python module.
 ################################################

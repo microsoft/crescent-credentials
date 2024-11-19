@@ -4,16 +4,17 @@
     <meta charset="UTF-8">
     <title>{{ site2_verifier_name }} Sign Up Page</title>
     <link rel="stylesheet" href="css/site2_style.css">
+    <link rel="icon" href="img/site2-favicon.ico" type="image/x-icon">
 </head>
 <body>
 
 <div class="boxed">
-    <h1>{{ site2_verifier_name }} Sign Up</h1>
+    <h1> {{ site2_verifier_name }} </h1>
     <p style="text-align: center;">
         <strong>Thank you for proving that you are over 18.</strong><br>
         You can now create an account.
     </p>
-
+    <h2>Account creation</h2>
     <div class="profile-form-container">
         <div class="profile-section">
             <img src="img/default-profile.png" alt="Default Profile Image">

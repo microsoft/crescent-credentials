@@ -1,18 +1,11 @@
-@font-face {
-    font-family: 'HKGroteskRegular';
-    src: url('../fonts/HKGrotesk-Regular.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
-}
-
-
 /* General body styling */
 body {
     background-color: #faf9f6;
     color: #000000;
-    font-family: 'HKGroteskRegular', sans-serif;
+    font-family: 'Helvetica', 'Arial', sans-serif;
     margin: 2em;
     padding: 0;
+    font-size: 90%;
 }
 
 /* Header styling */
