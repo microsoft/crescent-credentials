@@ -209,9 +209,9 @@ async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(),
 }
 
 async fn fetch_and_save_mdl_issuer_key(issuer_url: &str, issuer_folder: &str) -> Result<(), String> {
-
-    println!("Got issuer_url = {}", issuer_url);
-    println!("Got issuer_folder = {}", issuer_folder);
+    // TODO: for now we just copy the issuer public key from the file system, since our sample
+    // issuers are not hosted anywhere. In a real-world scenario, the issuer public key would 
+    // be fetched from the mDL issuer 
 
     // Save the PEM-encoded key to issuer.pub in the issuer_folder
     let pub_key_path = Path::new(issuer_folder).join("issuer.pub");
