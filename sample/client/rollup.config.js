@@ -110,10 +110,9 @@ const commonWarningHandler = (warning, warn) => {
 const background = {
   input: 'src/background.ts',
   treeshake: {
-    moduleSideEffects: [
-      path.resolve(__dirname, 'src\\verifier.ts'),
-      path.resolve(__dirname, 'src\\clientHelper.ts')
-    ]
+    moduleSideEffects: (id) => {
+      return ['src/verifier.ts', 'src/clientHelper.ts'].some(file => id.replace(/\\/g, '/').endsWith(file))
+    }
   },
   output: {
     dir: 'dist/chrome',
