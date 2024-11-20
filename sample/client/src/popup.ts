@@ -114,11 +114,6 @@ async function init (): Promise<void> {
       // Init wallet UI from wallet data
       await initWallet (creds)
 
-      /*
-        Query the active tab for a disclosure request metadata
-      */
-      await scanForDisclosureRequest()
-
       resolve(true)
     })
   })
@@ -273,4 +268,9 @@ listener.handle(MSG_BACKGROUND_POPUP_ACTIVE_TAB_UPDATE, () => {
 void init().then(() => {
   // Messages can arrive before the initialization is complete. We queue them until init is done
   listener.go()
+
+  /*
+    Query the active tab for a disclosure request metadata
+  */
+  void scanForDisclosureRequest()
 })

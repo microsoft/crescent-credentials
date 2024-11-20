@@ -5,7 +5,7 @@
 
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
-import { AWAIT_ASYNC_RESPONSE } from './constants.js'
+import { AWAIT_ASYNC_RESPONSE, DEBUG } from './constants.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type HandlerFunction<T = unknown> = (...args: any[]) => Promise<T> | T
@@ -28,12 +28,6 @@ const _handlers: Record<string, Handler> = {}
 const _listeners: Record<string, Listener | undefined> = {}
 let thisWindowId: number | null = null
 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-// chrome?.windows?.getCurrent((currentWindow) => {
-//   console.debug('currentWindow.id', currentWindow.id)
-//   thisWindowId = currentWindow.id ?? null
-// })
-
 async function getWindowId (): Promise<number | null> {
   return await new Promise((resolve, _reject) => {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -52,7 +46,16 @@ export async function sendMessage<T> (destination: string, action: string, ...da
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   console.debug('sendMessage', action, ...data)
   const windowId = await getWindowId()
-  return await chrome.runtime.sendMessage({ destination, action, data, windowId }) as T
+  return await chrome.runtime.sendMessage({ destination, action, data, windowId }).catch ((error: Error) => {
+    if (error.message.includes('Receiving end does not exist.')) {
+      DEBUG && console.log(`%cNo listener for ${action}`, 'color: yellow;')
+      DEBUG && console.log(`%cThis is expected for some messages to Popup if it is closed.`, 'color: gray;')
+    }
+    else {
+      console.error(`${error.message}`)
+    }
+    return undefined as T
+  })
 }
 
 export function setListener (destination: Destinations): Listener {

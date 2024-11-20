@@ -92,9 +92,7 @@ async function pollStatus (cred: Credential): Promise<void> {
       progress = Math.ceil((100 - progress) * 0.05) + progress
       cred.progress = progress
       void cred.save().then(() => {
-        void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARE_STATUS, credUid, progress).catch((_error) => {
-          console.warn('NO LISTENER', MSG_BACKGROUND_POPUP_PREPARE_STATUS)
-        })
+        void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARE_STATUS, credUid, progress)
       })
     }
   )
