@@ -25,6 +25,8 @@ console.debug('popup.js: load')
 
 const listener = setListener('popup')
 
+let observer: MutationObserver | null = null
+
 const importSettings: { domain: string | null, schema: string | null } = {
   domain: null,
   schema: null
@@ -55,11 +57,6 @@ async function init (): Promise<void> {
       })
       toggleAutoOpen.checked = settings.autoOpen
       toggleAutoOpen.requestUpdate() // TODD: This should not be required to update the toggle UI state
-
-      /*
-        Load saved credentials from storage
-      */
-      const creds = await CredentialWithCard.load()
 
       /*
         Set click handlers on the tabs
@@ -112,7 +109,7 @@ async function init (): Promise<void> {
       })
 
       // Init wallet UI from wallet data
-      await initWallet (creds)
+      await initWallet()
 
       resolve(true)
     })
@@ -145,7 +142,7 @@ async function importFileSelected (event: ProgressEvent<FileReader>): Promise<vo
     return
   }
 
-  await initWallet (await CredentialWithCard.load())
+  await initWallet()
 
   showTab('wallet')
 }
@@ -180,20 +177,29 @@ function showTab (name: string): void {
   activateTab(tab)
 }
 
-async function initWallet (cards: CredentialWithCard[]): Promise<void> {
+async function initWallet (): Promise<void> {
   console.debug('initWallet start')
+  const creds = await CredentialWithCard.load()
   const walletDiv = getElementById<HTMLDivElement>('wallet-info')
-  walletDiv.replaceChildren()
-  const emptyWalletDiv = getElementById<HTMLDivElement>('empty-wallet')
-  if (cards.length === 0) {
-    emptyWalletDiv.style.display = 'block' // display the empty wallet message
-  }
-  else {
-    emptyWalletDiv.style.display = 'none'
-    cards.forEach((card) => {
-      walletDiv.appendChild(card.element)
+
+  // Create a MutationObserver instance
+  if (observer == null) {
+    observer = new MutationObserver((mutationsList) => {
+      const emptyWalletDiv = getElementById<HTMLDivElement>('empty-wallet')
+      for (const mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+          emptyWalletDiv.style.display = walletDiv.childNodes.length === 0 ? 'block' : 'none'
+        }
+      }
     })
+    observer.observe(walletDiv, { childList: true })
   }
+
+  walletDiv.replaceChildren()
+  creds.forEach((cred) => {
+    walletDiv.appendChild(cred.element)
+  })
+
   console.debug('initWallet done')
 }
 
