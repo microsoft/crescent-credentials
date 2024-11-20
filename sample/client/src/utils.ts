@@ -125,7 +125,7 @@ export function guid (): string {
 
 export function assert<T> (value: T | undefined | null): asserts value is T {
   if (value == null) {
-    throw new TypeError('Assert: walue is not defined')
+    throw new TypeError('Assert: value is not defined')
   }
 }
 
