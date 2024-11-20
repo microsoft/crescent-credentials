@@ -16,8 +16,6 @@ const MAJOR_TYPE_MAP = 5
 const MAJOR_TYPE_TAG = 6
 const MAJOR_TYPE_SIMPLE_AND_FLOAT = 7
 
-// let reader: ByteReader
-
 export type CBORType = number | Record<string, unknown> | string | unknown[] | Uint8Array | boolean | null | undefined
 
 export function decode<T> (buffer: Uint8Array): T {

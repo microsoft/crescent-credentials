@@ -22,8 +22,6 @@ const __dirname = getDirname(import.meta.url)
     - background.js
     - content.js
     - popup.js
-    - offscreen.js (conditional, for Chrome v3)
-    - options.js (optional)
 
   - Copy the dist/chrome folder to dist/firefox
 
@@ -48,11 +46,6 @@ const COPYRIGHT = `/*!\n*  Copyright (c) Microsoft Corporation.\n*  Licensed und
 const commonOutput = {
   format: 'esm',
   sourcemap: isDebug,
-  // Put the webextension-polyfill code in a separate file
-  // manualChunks: {
-  //     'npm-package-name': ['npm-package-name']
-  // },
-  // chunkFileNames: 'npm-package-name.js',
   // put a copyright banner at the top of the bundle
   banner: isDebug ? undefined : COPYRIGHT
 }
@@ -117,7 +110,9 @@ const commonWarningHandler = (warning, warn) => {
 const background = {
   input: 'src/background.ts',
   treeshake: {
-    moduleSideEffects: []
+    moduleSideEffects: (id) => {
+      return ['src/verifier.ts', 'src/clientHelper.ts'].some(file => id.replace(/\\/g, '/').endsWith(file))
+    }
   },
   output: {
     dir: 'dist/chrome',
@@ -173,53 +168,6 @@ const popup = {
 }
 
 /*
-  offscreen.js (for Chrome v3)
-*/
-const offscreen = {
-  input: 'src/offscreen.ts',
-  treeshake: {
-    moduleSideEffects: []
-  },
-  output: {
-    dir: 'dist/chrome',
-    ...commonOutput
-  },
-  watch,
-  plugins: [
-    copy({
-      targets: [{ src: 'public/offscreen.html', dest: 'dist/chrome' }]
-    }),
-    ...commonPlugins
-  ],
-  onwarn: commonWarningHandler
-}
-
-/*
-  options.js
-*/
-const options = {
-  input: 'src/options.ts',
-  treeshake: {
-    moduleSideEffects: []
-  },
-  output: {
-    dir: 'dist/chrome',
-    ...commonOutput
-  },
-  watch,
-  plugins: [
-    copy({
-      targets: [
-        { src: 'public/options.html', dest: 'dist/chrome' },
-        { src: 'public/options.css', dest: 'dist/chrome' }
-      ]
-    }),
-    ...commonPlugins
-  ],
-  onwarn: commonWarningHandler
-}
-
-/*
   When the chrome extension is built, we want to duplicate the dist/chrome folder and rename it to firefox
   Then we want to copy the browser-specific manifests to each folder
   We append this copy step to the end of the last bundle so all files are available to copy
@@ -244,7 +192,7 @@ const duplicateFirefox = copy({
 })
 
 // append the duplicateFirefox plugin to the last bundle
-options.plugins.push(duplicateFirefox)
+popup.plugins.push(duplicateFirefox)
 
 // the order matters here
-export default [background, content, offscreen, popup, options]
+export default [background, content, popup]

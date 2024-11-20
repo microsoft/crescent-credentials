@@ -6,7 +6,6 @@
     "permissions": [
         "storage",
         "scripting",
-        "offscreen",
         "notifications",
         "tabs"
     ],
@@ -16,9 +15,6 @@
     },
     "action": {
         "default_popup": "popup.html"
-    },
-    "options_ui": {
-        "page": "options.html"
     },
     "icons": {
         "128": "icons/icon128.png"

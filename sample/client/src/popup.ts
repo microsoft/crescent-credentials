@@ -6,66 +6,61 @@
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
 import {
-  MSG_POPUP_BACKGROUND_DISCLOSE, MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, MSG_BACKGROUND_POPUP_PREPARED,
-  MSG_BACKGROUND_POPUP_PREPARE_STATUS, MSG_POPUP_BACKGROUND_PREPARE, MSG_POPUP_BACKGROUND_IMPORT,
-  MSG_POPUP_BACKGROUND_DELETE
+  MSG_BACKGROUND_POPUP_ACTIVE_TAB_UPDATE, MSG_BACKGROUND_POPUP_IS_OPEN, MSG_BACKGROUND_POPUP_PREPARED,
+  MSG_BACKGROUND_POPUP_PREPARE_STATUS, MSG_POPUP_BACKGROUND_UPDATE, MSG_POPUP_CONTENT_SCAN_DISCLOSURE
 } from './constants.js'
-import { type Card, Wallet } from './cards.js'
 import { ping } from './clientHelper.js'
-import type { CardElement } from './components/card.js'
 import { sendMessage, setListener } from './listen.js'
-import { getElementById } from './utils.js'
+import { assert, getElementById, messageToActiveTab } from './utils.js'
+import { Credential, CredentialWithCard } from './cred.js'
 import config from './config.js'
+import type { ToggleSwitch } from './components/toggle.js'
 
-const puid = Math.random().toString(36).substring(7)
-console.debug('popup.js: load', puid)
+const PREPARED_MESSAGE_DURATION = 2000
+const settings = {
+  autoOpen: false
+}
+
+console.debug('popup.js: load')
 
 const listener = setListener('popup')
+
+let observer: MutationObserver | null = null
 
 const importSettings: { domain: string | null, schema: string | null } = {
   domain: null,
   schema: null
 }
 
-chrome.runtime.onMessage.addListener((message: MESSAGE_PAYLOAD, sender) => {
+chrome.runtime.onMessage.addListener((message: MESSAGE_PAYLOAD, sender, _sendResponse) => {
   const dateNow = new Date(Date.now())
   console.debug('TOP-LEVEL LISTENER', dateNow.toLocaleString(), message, sender)
 })
 
-const PREPARED_MESSAGE_DURATION = 2000
-const disclosureRequests: Array<{ ids: Array<{ id: number, property: string }>, url: string, uid: string }> = []
-let _ready = false
-
-function handleDisclosureRequest (): void {
-  const request = disclosureRequests.pop()
-  if (request === undefined) {
-    return
-  }
-
-  const { ids, url, uid } = request
-
-  ids.forEach((id) => {
-    const entry = lookupCardElement(id.id)
-    if (entry === undefined) {
-      throw new Error('Entry not found')
-    }
-    entry.status = 'DISCLOSABLE'
-    entry.disclose = (card: Card) => {
-      void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, card.id, uid, url)
-    }
-    entry.discloseRequest(url, id.property, uid)
-  })
-}
-
 async function init (): Promise<void> {
   console.debug('init start')
 
-  await new Promise((resolve) => {
+  await new Promise((resolve, _reject) => {
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     document.addEventListener('DOMContentLoaded', async function (): Promise<void> {
-      // Init wallet data from store
-      await Wallet.init(puid)
+      /*
+        Init the auto-open toggle switch
+      */
+      const autoOpenObj = await chrome.storage.local.get(['autoOpen'])
+      settings.autoOpen = autoOpenObj.autoOpen ?? config.autoOpen
+      const toggleAutoOpen = getElementById<ToggleSwitch>('toggleAutoOpenOnDisclosure')
+      // Save the auto-open setting to storage whenever the toggle is changed
+      toggleAutoOpen.addEventListener('change', (event) => {
+        const checked = (event as CustomEvent).detail.checked as boolean
+        void chrome.storage.local.set({ autoOpen: checked })
+        void sendMessage('background', MSG_POPUP_BACKGROUND_UPDATE)
+      })
+      toggleAutoOpen.checked = settings.autoOpen
+      toggleAutoOpen.requestUpdate() // TODD: This should not be required to update the toggle UI state
 
+      /*
+        Set click handlers on the tabs
+      */
       const tabs = document.querySelectorAll<HTMLButtonElement>('.tab')
       tabs.forEach((tab) => {
         tab.addEventListener('click', () => {
@@ -90,8 +85,10 @@ async function init (): Promise<void> {
         fileControl.value = ''
       })
 
+      /*
+        Add the schemas to the dropdown
+      */
       const schemaDropDown = getElementById<HTMLSelectElement>('dropdown-import-schema')
-
       config.schemas.forEach((schema) => {
         const option = document.createElement('option')
         option.value = schema
@@ -99,23 +96,20 @@ async function init (): Promise<void> {
         schemaDropDown.add(option)
       })
 
+      /*
+        Init client helper URL input
+      */
       const clientHelperUrlInput = getElementById<HTMLInputElement>('client-helper-url')
-
-      clientHelperUrlInput.value = config.client_helper_url
-
+      clientHelperUrlInput.value = config.clientHelperUrl
       clientHelperUrlInput.addEventListener('change', function () {
         const url = clientHelperUrlInput.value
-
         void ping(url).then((connected: boolean) => {
           clientHelperUrlInput.style.background = connected ? 'lime' : 'red'
         })
       })
 
       // Init wallet UI from wallet data
-      await initWallet ()
-
-      _ready = true
-      handleDisclosureRequest()
+      await initWallet()
 
       resolve(true)
     })
@@ -124,19 +118,31 @@ async function init (): Promise<void> {
   console.debug('init done')
 }
 
+async function scanForDisclosureRequest (): Promise<void> {
+  const disclosureRequest = await messageToActiveTab<{ url: string, uid: string } | null>(MSG_POPUP_CONTENT_SCAN_DISCLOSURE)
+  console.debug('disclosureRequest', disclosureRequest)
+  if (disclosureRequest != null) {
+    CredentialWithCard.creds.forEach((cred) => {
+      cred.discloserRequest(disclosureRequest.url, disclosureRequest.uid)
+    })
+  }
+}
+
 async function importFileSelected (event: ProgressEvent<FileReader>): Promise<void> {
   const encoded = event.target?.result as string
   const schema = getElementById<HTMLSelectElement>('dropdown-import-schema').value
-  const result = await sendMessage<RESULT<Card, Error>>('background', MSG_POPUP_BACKGROUND_IMPORT, importSettings.domain, schema, encoded)
+  assert(importSettings.domain)
 
-  if (!result.ok) {
-    await showError(result.error.message)
+  try {
+    const cred = new Credential(importSettings.domain, schema, encoded)
+    await cred.save()
+  }
+  catch (error) {
+    await showError((error as Error).message)
     return
   }
 
-  await Wallet.reload()
-
-  await initWallet ()
+  await initWallet()
 
   showTab('wallet')
 }
@@ -173,76 +179,29 @@ function showTab (name: string): void {
 
 async function initWallet (): Promise<void> {
   console.debug('initWallet start')
+  const creds = await CredentialWithCard.load()
   const walletDiv = getElementById<HTMLDivElement>('wallet-info')
-  walletDiv.replaceChildren()
-  const emptyWalletDiv = getElementById<HTMLDivElement>('empty-wallet')
-  if (Wallet.cards.length === 0) {
-    emptyWalletDiv.style.display = 'block' // display the empty wallet message
-  } else {
-    emptyWalletDiv.style.display = 'none'
-    Wallet.cards.forEach((card) => {
-      console.debug(card)
-      addWalletEntry(card)
+
+  // Create a MutationObserver instance
+  if (observer == null) {
+    observer = new MutationObserver((mutationsList) => {
+      const emptyWalletDiv = getElementById<HTMLDivElement>('empty-wallet')
+      for (const mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+          emptyWalletDiv.style.display = walletDiv.childNodes.length === 0 ? 'block' : 'none'
+        }
+      }
     })
+    observer.observe(walletDiv, { childList: true })
   }
+
+  walletDiv.replaceChildren()
+  creds.forEach((cred) => {
+    walletDiv.appendChild(cred.element)
+  })
+
   console.debug('initWallet done')
 }
-
-function addWalletEntry (_card: Card): void {
-  const walletDiv = getElementById<HTMLDivElement>('wallet-info')
-  const cardComponent = document.createElement('card-element') as CardElement
-  cardComponent.card = _card
-  walletDiv.appendChild(cardComponent)
-
-  cardComponent.status = _card.status
-
-  cardComponent.accept = (card: Card) => {
-    void sendMessage<RESULT<boolean, Error>>('background', MSG_POPUP_BACKGROUND_PREPARE, card.id)
-      .then(async (result) => {
-        if (!result.ok) {
-          await showError(result.error.message)
-          cardComponent.status = 'PENDING'
-        }
-      })
-  }
-
-  cardComponent.reject = (_card: Card) => {
-    walletDiv.removeChild(cardComponent)
-  }
-
-  cardComponent.delete = function (card: Card) {
-    walletDiv.removeChild(cardComponent)
-    void sendMessage('background', MSG_POPUP_BACKGROUND_DELETE, card.id).then(() => {
-      void Wallet.reload()
-    })
-  }
-}
-
-function _lookupCard (id: number): Card | undefined {
-  return Wallet.find(id)
-}
-
-function lookupCardElement (id: number): CardElement | undefined {
-  const walletDiv = getElementById<HTMLDivElement>('wallet-info')
-  return Array.from(walletDiv.children).find((child) => {
-    const cardElement = child as CardElement
-    if (cardElement.card == null) return false
-    return cardElement.card.id === id
-  }) as CardElement | undefined
-}
-
-getElementById<HTMLInputElement>('text-import-domain').addEventListener('input', function (event) {
-  const value = (event.target as HTMLInputElement).value
-  const buttonImportFile = getElementById<HTMLInputElement>('button-import-card')
-  const domainPattern = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/
-
-  const validDomain = domainPattern.test(value)
-  if (validDomain) {
-    importSettings.domain = value
-  }
-  buttonImportFile.disabled = !validDomain
-  validDomain ? buttonImportFile.classList.remove('config-button-disabled') : buttonImportFile.classList.add('config-button-disabled')
-})
 
 async function showError (message: string): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -271,36 +230,53 @@ function closeOverlay (): void {
   pick.style.display = 'none'
 }
 
-// MSG_BACKGROUND_POPUP_PREPARE_STATUS
-listener.handle(MSG_BACKGROUND_POPUP_PREPARE_STATUS, (id: number, progress: number) => {
-  const entry = lookupCardElement(id)
-  if (entry?.card == null) {
-    throw new Error('Card is null')
+getElementById<HTMLInputElement>('text-import-domain').addEventListener('input', function (event) {
+  const value = (event.target as HTMLInputElement).value
+  const buttonImportFile = getElementById<HTMLInputElement>('button-import-card')
+  const domainPattern = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/
+
+  const validDomain = domainPattern.test(value)
+  if (validDomain) {
+    importSettings.domain = value
   }
-  entry.progress.value = progress
+  buttonImportFile.disabled = !validDomain
+  validDomain ? buttonImportFile.classList.remove('config-button-disabled') : buttonImportFile.classList.add('config-button-disabled')
 })
 
-// MSG_BACKGROUND_POPUP_PREPARED
-listener.handle(MSG_BACKGROUND_POPUP_PREPARED, (id: number) => {
-  const entry = lookupCardElement(id)
-  if (entry?.card == null) {
+listener.handle(MSG_BACKGROUND_POPUP_IS_OPEN, (): true => {
+  return true
+}, true)
+
+listener.handle(MSG_BACKGROUND_POPUP_PREPARE_STATUS, async (id: string, progress: number) => {
+  const card = CredentialWithCard.get(id)
+  if (card == null) {
     throw new Error('Card is null')
   }
-  entry.progress.value = 100
-  entry.progress.label = 'Prepared'
+  card.progress = progress
+})
+
+listener.handle(MSG_BACKGROUND_POPUP_PREPARED, async (credUid: string) => {
+  const card = CredentialWithCard.get(credUid)
+  if (card == null) {
+    throw new Error('Card is null')
+  }
+  card.progress = 100
+  card.element.progress.label = 'Prepared'
   setTimeout(() => {
-    entry.progress.hide()
+    card.status = 'PREPARED'
   }, PREPARED_MESSAGE_DURATION)
 })
 
-// MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST
-listener.handle(MSG_BACKGROUND_POPUP_DISCLOSE_REQUEST, (issuerTokensIds: Array<{ id: number, property: string }>, url: string, uid: string) => {
-  disclosureRequests.push({ ids: issuerTokensIds, url, uid })
-  if (_ready) {
-    handleDisclosureRequest()
-  }
+listener.handle(MSG_BACKGROUND_POPUP_ACTIVE_TAB_UPDATE, () => {
+  void scanForDisclosureRequest()
 })
 
 void init().then(() => {
+  // Messages can arrive before the initialization is complete. We queue them until init is done
   listener.go()
+
+  /*
+    Query the active tab for a disclosure request metadata
+  */
+  void scanForDisclosureRequest()
 })

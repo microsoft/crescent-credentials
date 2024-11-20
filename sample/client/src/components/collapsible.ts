@@ -21,9 +21,6 @@ const sharedStyles = css`
 export class C2paCollapsible extends LitElement {
   @property({ type: Boolean }) open = false
 
-  // Which collapsible is open (if there are multiple)
-  // static openCollapsible: C2paCollapsible | null = null
-
   static styles = [
     sharedStyles,
     css`
@@ -63,18 +60,8 @@ export class C2paCollapsible extends LitElement {
     
   `]
 
-  // static close (): void {
-  //   if (C2paCollapsible.openCollapsible != null) {
-  //     C2paCollapsible.openCollapsible.toggle()
-  //   }
-  // }
-
   toggle = (): void => {
-    // if (C2paCollapsible.openCollapsible != null && C2paCollapsible.openCollapsible !== this) {
-    //   C2paCollapsible.openCollapsible.toggle()
-    // }
     this.open = !this.open
-    // C2paCollapsible.openCollapsible = this.open ? this : null
     this.requestUpdate()
     console.log(this.open)
   }

@@ -5,26 +5,29 @@
 
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
-import { MSG_BACKGROUND_CONTENT_SEND_PROOF, MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, MSG_CONTENT_BACKGROUND_IMPORT_CARD } from './constants.js'
+import { MSG_BACKGROUND_CONTENT_SEND_PROOF, MSG_CONTENT_BACKGROUND_IMPORT_CARD, MSG_POPUP_CONTENT_SCAN_DISCLOSURE } from './constants.js'
 import { sendMessage } from './listen.js'
+import { assert } from './utils.js'
 
 console.debug('content.js: load')
 
-const metaTagJwt = document.querySelector('meta[name="CRESCENT_JWT"]')
-if (metaTagJwt != null) {
-  const metaValue = metaTagJwt.getAttribute('content')
-  console.log('Detected meta value:', metaValue)
-  const domain = new URL(window.location.href).origin
-  void sendMessage('background', MSG_CONTENT_BACKGROUND_IMPORT_CARD, domain, 'jwt_corporate_1', metaValue)
+async function scanForCredential (): Promise<void> {
+  const metaTagJwt = document.querySelector('meta[name="CRESCENT_JWT"]')
+  if (metaTagJwt != null) {
+    const metaValue = metaTagJwt.getAttribute('content')
+    console.log('Detected meta value:', metaValue)
+    const domain = new URL(window.location.href).origin
+    await sendMessage('background', MSG_CONTENT_BACKGROUND_IMPORT_CARD, domain, 'jwt_corporate_1', metaValue)
+  }
 }
 
-const crescentVerifyUrlMeta = document.querySelector('meta[crescent_verify_url]')
-const crescentDisclosureUidMeta = document.querySelector('meta[crescent_disclosure_uid]')
-if (crescentVerifyUrlMeta != null && crescentDisclosureUidMeta != null) {
-  const verifyUrl = window.location.origin + crescentVerifyUrlMeta.getAttribute('crescent_verify_url')
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const disclosureUid = crescentDisclosureUidMeta.getAttribute('crescent_disclosure_uid')!
-  void sendMessage('background', MSG_CONTENT_BACKGROUND_DISCLOSE_REQUEST, verifyUrl, disclosureUid)
+function queryDisclosureRequest (): { url: string, uid: string } | null {
+  const verifyUrl = document.querySelector('meta[crescent_verify_url]')?.getAttribute('crescent_verify_url') ?? ''
+  const disclosureUid = document.querySelector('meta[crescent_disclosure_uid]')?.getAttribute('crescent_disclosure_uid') ?? ''
+  if (verifyUrl.length > 0 && disclosureUid.length > 0) {
+    return { url: window.location.origin + verifyUrl, uid: disclosureUid }
+  }
+  return null
 }
 
 // Function to create and insert a banner at the top of the page
@@ -64,18 +67,18 @@ function _insertBanner (message: string): void {
 }
 
 // listen for meesgae from background
-chrome.runtime.onMessage.addListener((request, _sender, _sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.action === MSG_BACKGROUND_CONTENT_SEND_PROOF) {
     console.log('Received proof:', request.data)
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { url, ...data } = request.data
+    const params = request.data[0]
+    assert(params)
 
-    fetch(url as string, {
+    fetch(params.url as string, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(params),
       redirect: 'follow'
     })
       .then(async (response) => {
@@ -90,5 +93,22 @@ chrome.runtime.onMessage.addListener((request, _sender, _sendResponse) => {
       .catch((error) => {
         console.error('Error sending proof:', error)
       })
+    return null
+  }
+
+  if (request.action === MSG_POPUP_CONTENT_SCAN_DISCLOSURE) {
+    sendResponse(queryDisclosureRequest())
   }
 })
+
+/*
+  If the page is navigated to from forward or back button, scan for credential and disclosure requests.
+  The page may used a cached version of the page, so the content script may not re-run.
+*/
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    console.debug('scanForDisclosureRequest pageshow')
+  }
+})
+
+void scanForCredential ()

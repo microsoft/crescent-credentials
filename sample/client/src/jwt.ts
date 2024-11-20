@@ -5,7 +5,7 @@
 
 import { base64Decode } from './utils'
 
-export function decodeJwt (token: string): RESULT<JWT_TOKEN, Error> {
+export function decode (token: string): RESULT<JWT_TOKEN, Error> {
   const [headerB64, payloadB64, signatureB64] = token.split('.')
   const decoder = new TextDecoder('utf-8')
   try {
@@ -18,4 +18,8 @@ export function decodeJwt (token: string): RESULT<JWT_TOKEN, Error> {
   catch (error) {
     return { ok: false, error: new Error('cannot base64 decode jwt string') }
   }
+}
+
+export function fields (jwt: JWT_TOKEN): Record<string, unknown> {
+  return jwt.payload
 }
