@@ -28,6 +28,7 @@ use std::collections::HashMap;
 use std::fs::{self};
 use std::sync::Arc;
 use std::path::Path;
+use std::cmp::min;
 // For now we assume that the Client Helper and Crescent Service live on the same machine and share disk access.
 // TODO: we could make web requests to get the data from the setup service, but this will take more effort (as documented in the sample README).
 //       The code we use in unit tests to make web requests doesn't work from a route handler, we need to investigate.  It may 
@@ -128,7 +129,8 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     println!("*** /prepare called");
     println!("Schema UID: {}", cred_info.schema_UID);
     println!("Issuer URL: {}", cred_info.issuer_URL);
-    println!("Credential: {}... ({} bytes)", &cred_info.cred[..50], cred_info.cred.len());
+    let l = min(50, cred_info.cred.len());
+    println!("Credential: {}... ({} bytes)", &cred_info.cred[..l], cred_info.cred.len());
 
     // verify if the schema_UID is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&cred_info.schema_UID.as_str()) {

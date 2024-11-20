@@ -262,8 +262,8 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 
         if cred_type == "jwt" {
             // Fetch the issuer's public key and save it to issuer.pub 
-            fetch_and_save_jwk(&proof_info.issuer_URL, &issuer_folder).await.expect("Failed to fetch and save issuer's public key");
-        }
+            fetch_and_save_jwk(&proof_info.issuer_URL, &issuer_folder).await.expect("Failed to fetch and save issuer's public key (JWT case)");
+        }    
     }
 
     let paths = CachePaths::new_from_str(&issuer_folder);
