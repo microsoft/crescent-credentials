@@ -22,9 +22,9 @@ async function _prepare (issuerUrl: string, jwt: string, schemaUid: string): Pro
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      issuer_URL: issuerUrl,
+      issuer_url: issuerUrl,
       cred: jwt,
-      schema_UID: schemaUid
+      schema_uid: schemaUid
     })
   }
 

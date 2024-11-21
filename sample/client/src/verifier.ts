@@ -39,8 +39,8 @@ async function handleDisclose (id: string, destinationUrl: string, disclosureUid
   const params = {
     url: destinationUrl,
     disclosure_uid: disclosureUid,
-    issuer_URL: cred.data.issuer.url,
-    schema_UID: cred.data.token.schema,
+    issuer_url: cred.data.issuer.url,
+    schema_uid: cred.data.token.schema,
     proof: showProof.value
   }
 
