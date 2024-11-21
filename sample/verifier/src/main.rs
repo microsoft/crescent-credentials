@@ -297,7 +297,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         let redirect_url = match cred_type {
             "jwt" => uri!(resource_page(session_id = session_id.clone())).to_string(),
             "mdl" => uri!(signup2_page(session_id = session_id.clone())).to_string(),
-            _ => return error_template!("Unsupported credential type", verifier_config),
+            _ => error_template!("Unsupported credential type", verifier_config),
         };
 
         Ok(Custom(Status::SeeOther, Redirect::to(redirect_url)))
