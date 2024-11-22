@@ -446,7 +446,6 @@ mod tests {
     const NUM_VARIABLES: usize = (1 << 10) - 100;
     const NUM_INPUTS: usize = 5;
 
-    
     #[derive(Copy)]
     struct DummyCircuit<F: PrimeField> {
         pub a: Option<F>,
