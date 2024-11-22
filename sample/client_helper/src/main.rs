@@ -155,7 +155,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
 
     // Copy the base folder content to the new credential-specific folder
-    let _ = copy_with_symlinks(&shared_folder.as_ref(), &cred_folder.as_ref());
+    copy_with_symlinks(&shared_folder.as_ref(), &cred_folder.as_ref()).map_err(|_| "Failed to copy base folder").unwrap();
     println!("Copied base folder to credential-specific folder: {}", cred_folder);
 
     // Insert task with empty data (indicating "preparing")
