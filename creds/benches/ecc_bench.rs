@@ -85,36 +85,6 @@ pub fn ecc_bn254_benchmark(c: &mut Criterion) {
             let _pairing = Bn254::pairing(rand_g1, rand_g2);
         })
     });    
-
-
-
-
-    // BBS estimates with BN 254 params
-    // https://github.com/mattrglobal/node-bbs-signatures
-    // Estimate the proof costs using appendix A of https://eprint.iacr.org/2023/275.pdf
-    // TODO: An actual BBS implementation that we can compare against: https://github.com/mattrglobal/pairing_crypto
-    //       (but it uses BLS12-381)
-    /*
-    let f = 32;  // size of a G1 scalar field
-    let g1 = f;  // size of a G1 element
-    let _g2 = 2*f;  
-    let sig_size_bytes = g1 + 2*f;
-    println!("Signature size: {} bytes", sig_size_bytes);
-
-    let no_of_hidden_messages = 10;
-    let proof_size_bytes = 3*g1 + (3 + no_of_hidden_messages)*f;
-    println!("Number of hidden attributes = {}", no_of_hidden_messages);
-    println!("Proof size: {} bytes", proof_size_bytes);
-
-    let sm_time = 0.05;
-    let msm_time = 0.34;  // msm of size 2 + no_of_hidden_messages
-    let prover_time = 2.0*sm_time + msm_time;
-    println!("Prover time estimate: {} ms", prover_time);
-
-    let pairing_time = 0.55;
-    let verifier_time = 2.0*pairing_time + msm_time + sm_time;
-    println!("Verifier time estimate: {} ms", verifier_time);
-    */
     
 }
 
