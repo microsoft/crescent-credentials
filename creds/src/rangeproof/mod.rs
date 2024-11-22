@@ -430,7 +430,6 @@ impl<E: Pairing> RangeProof<E> {
 
 #[cfg(test)]
 mod tests {
-    //use ark_bn254::{Bn254, Fr};
     use ark_crypto_primitives::snark::SNARK;
     use ark_ff::PrimeField;
     use ark_groth16::Groth16;
