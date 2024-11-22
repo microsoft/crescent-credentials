@@ -56,6 +56,11 @@ jobs:
           cd setup/scripts
           ./run_setup.sh mdl1
 
+      - name: Run cargo test for /creds
+        run: |
+          cd creds
+          cargo test --release
+
 # RS256 Commands
       - name: Run ZKSetup for rs256
         run: |
