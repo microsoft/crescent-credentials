@@ -34,6 +34,7 @@ const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
 
 pub type CrescentPairing = ECPairing;
+pub type CrescentFr = Fr;
 
 /// Parameters required to create Groth16 proofs
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
