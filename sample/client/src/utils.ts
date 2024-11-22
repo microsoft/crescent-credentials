@@ -91,11 +91,11 @@ export function base64Decode (base64: string): Uint8Array {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/max-params
-function _postToURL (tabId: number, url: string, issuer_URL: string, schema_UID: string, proof: string): void {
+function _postToURL (tabId: number, url: string, issuer_url: string, schema_uid: string, proof: string): void {
   const formHtml = `
       <form id="postForm" action="${url}" method="POST" style="display: none;">
-          <input type="hidden" name="issuer_URL" value="${issuer_URL}">
-          <input type="hidden" name="schema_UID" value="${schema_UID}">
+          <input type="hidden" name="issuer_url" value="${issuer_url}">
+          <input type="hidden" name="schema_uid" value="${schema_uid}">
           <input type="hidden" name="proof" value="${proof}">
       </form>
       <script>

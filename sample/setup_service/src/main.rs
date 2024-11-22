@@ -62,7 +62,7 @@ async fn files(file: PathBuf) -> Option<NamedFile> {
     NamedFile::open(path).await.ok()
 }
 
-// Get the parameters required to generate presentation/show proofs // TODO: add schema_UID to the path (as documented)
+// Get the parameters required to generate presentation/show proofs // TODO: add schema_uid to the path (as documented)
 #[get("/show_params")]
 fn show_params() -> String {
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
@@ -72,7 +72,7 @@ fn show_params() -> String {
     show_params_b64
 }
 
-// Get the parameters required to verify presentation proofs // TODO: add schema_UID to the path (as documented)
+// Get the parameters required to verify presentation proofs // TODO: add schema_uid to the path (as documented)
 #[get("/verifier_params")]
 fn verifier_params() -> String {
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);

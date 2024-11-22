@@ -25,7 +25,7 @@ function queryDisclosureRequest (): { url: string, uid: string } | null {
   const verifyUrl = document.querySelector('meta[crescent_verify_url]')?.getAttribute('crescent_verify_url') ?? ''
   const disclosureUid = document.querySelector('meta[crescent_disclosure_uid]')?.getAttribute('crescent_disclosure_uid') ?? ''
   if (verifyUrl.length > 0 && disclosureUid.length > 0) {
-    return { url: window.location.origin + verifyUrl, uid: disclosureUid }
+    return { url: verifyUrl, uid: disclosureUid }
   }
   return null
 }

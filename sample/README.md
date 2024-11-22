@@ -66,12 +66,12 @@ sequenceDiagram
     B->>I: click "Issue JWT" button
     I->>I: create, sign and return JWT
     I->>E: read JWT from <meta> tag
-    E->>C: post {JWT, schema_UID, issuer_URL} to /prepare
+    E->>C: post {JWT, schema_uid, issuer_url} to /prepare
     C->>E: return cred_UID
     par Client Helper prepares the cred for showing
-        C->>S: fetch Crescent prove params from /prove_params/<schema_UID>
-        C->>S: fetch Crescent show params from /show_params/<schema_UID>
-        C->>I: fetch JWK set from <issuer_URL>/.well-known/jwks.json
+        C->>S: fetch Crescent prove params from /prove_params/<schema_uid>
+        C->>S: fetch Crescent show params from /show_params/<schema_uid>
+        C->>I: fetch JWK set from <issuer_url>/.well-known/jwks.json
         C->>C: prepare JWT for proof
     and Browser Extension pings Client Helper until credential is ready
         loop Every 5 sec
@@ -110,14 +110,14 @@ sequenceDiagram
     participant I as Issuer
     B->>V: visit login page
     V->>E: read {disclosure_UID, verify_URL} from <meta> tag
-    E->>E: filter JWT that support disclosure_UID
+    E->>E: filter JWT that support disclosure_uid
     B->>E: user selects a JWT to present
-    E->>C: fetch show proof from /show?cred_uid=<cred_UID>&disc_uid=<disclosure_UID>
+    E->>C: fetch show proof from /show?cred_uid=<cred_UID>&disc_uid=<disclosure_uid>
     C->>C: generate Crescent proof
     C->>E: return proof
-    E->>V: post {proof, schema_UID, issuer_UID, disclosure_UID} to verify_URL
-    V->>S: fetch Crescent verify params from /verify_params/<schema_UID>
-    V->>I: fetch JWK set from <issuer_URL>/.well-known/jwks.json
+    E->>V: post {proof, schema_uid, issuer_UID, disclosure_uid} to verify_URL
+    V->>S: fetch Crescent verify params from /verify_params/<schema_uid>
+    V->>I: fetch JWK set from <issuer_url>/.well-known/jwks.json
     V->>V: verify proof
     V-->>B: redirect to resource page (on success)
 ```

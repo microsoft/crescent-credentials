@@ -42,8 +42,8 @@ const CRESCENT_SHARED_DATA_SUFFIX : &str = "shared";
 #[derive(Serialize, Deserialize, Clone)]
 struct CredInfo {
     cred: String,       // The credential
-    schema_UID: String, // The schema UID for the credential
-    issuer_URL: String  // The URL of the issuer
+    schema_uid: String, // The schema UID for the credential
+    issuer_url: String  // The URL of the issuer
 }
 
 // holds the ShowData for ready credentials
@@ -118,7 +118,8 @@ async fn fetch_and_save_jwk(issuer_url: &str, cred_folder: &str) -> Result<(), S
     Ok(())
 }
 
-fn compute_cred_uid(cred : &String) -> String {
+fn compute_cred_uid(_cred : &String) -> String {
+    // for now, we just generate a random UUID as the cred_uid
     let cred_uid = Uuid::new_v4().to_string();
 
     cred_uid
@@ -127,16 +128,16 @@ fn compute_cred_uid(cred : &String) -> String {
 #[post("/prepare", format = "json", data = "<cred_info>")]
 async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> String {
     println!("*** /prepare called");
-    println!("Schema UID: {}", cred_info.schema_UID);
-    println!("Issuer URL: {}", cred_info.issuer_URL);
+    println!("Schema UID: {}", cred_info.schema_uid);
+    println!("Issuer URL: {}", cred_info.issuer_url);
     let l = min(50, cred_info.cred.len());
     println!("Credential: {}... ({} bytes)", &cred_info.cred[..l], cred_info.cred.len());
 
-    // verify if the schema_UID is one of our supported SCHEMA_UIDS
-    if !SCHEMA_UIDS.contains(&cred_info.schema_UID.as_str()) {
+    // verify if the schema_uid is one of our supported SCHEMA_UIDS
+    if !SCHEMA_UIDS.contains(&cred_info.schema_uid.as_str()) {
         return "Unsupported schema UID".to_string();
     }
-    let cred_type = cred_type_from_schema(&cred_info.schema_UID).unwrap();
+    let cred_type = cred_type_from_schema(&cred_info.schema_uid).unwrap();
 
     let cred_uid = compute_cred_uid(&cred_info.cred);
     println!("Generated credential UID: {}", cred_uid);
@@ -145,7 +146,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     println!("Generated credential UID: {}", cred_uid);
 
     // Define schemaUID-specific base folder path and a child credential-specific folder path
-    let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, cred_info.schema_UID);
+    let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, cred_info.schema_uid);
     let shared_folder = format!("{}/{}", base_folder, CRESCENT_SHARED_DATA_SUFFIX);
     let cred_folder = format!("{}/{}", base_folder, cred_uid);
 
@@ -154,7 +155,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
 
     // Copy the base folder content to the new credential-specific folder
-    copy_with_symlinks(&shared_folder.as_ref(), &cred_folder.as_ref());
+    copy_with_symlinks(&shared_folder.as_ref(), &cred_folder.as_ref()).map_err(|_| "Failed to copy base folder").unwrap();
     println!("Copied base folder to credential-specific folder: {}", cred_folder);
 
     // Insert task with empty data (indicating "preparing")
@@ -166,7 +167,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     // Clone the state for async task
     let state = state.inner().0.clone();
     let cred_uid_clone = cred_uid.clone();
-    let issuer_url = cred_info.issuer_URL.clone();
+    let issuer_url = cred_info.issuer_url.clone();
 
     rocket::tokio::spawn(async move {
         let task_result: Result<(), String> = (|| async {
@@ -176,8 +177,8 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
                 fetch_and_save_jwk(&issuer_url, &cred_folder).await?;
 
                 // prepare the show data in a separate task using the per-credential folder
-                println!("got schema_UID = {}", &cred_info.schema_UID);
-                println!("got issuer_URL = {}", &cred_info.issuer_URL);
+                println!("got schema_uid = {}", &cred_info.schema_uid);
+                println!("got issuer_url = {}", &cred_info.issuer_url);
             }
 
             let paths = CachePaths::new_from_str(&cred_folder);
@@ -372,9 +373,9 @@ mod test {
     fn test_end_to_end() {
         let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
         let cred = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
-        let issuer_URL = "https://issuer.example.com".to_string();
-        let schema_UID = SCHEMA_UIDS[0].to_string();
-        let cred_info = CredInfo{cred, schema_UID, issuer_URL};
+        let issuer_url = "https://issuer.example.com".to_string();
+        let schema_uid = SCHEMA_UIDS[0].to_string();
+        let cred_info = CredInfo{cred, schema_uid, issuer_url};
 
          // Step 1: Call /prepare and get the cred_uid
         let client = Client::untracked(rocket()).expect("valid rocket instance");
