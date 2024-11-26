@@ -247,8 +247,7 @@ fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::
             for p in predicates {
                 let predicate = p.as_object().ok_or(format!("A predicate for entry {} is not an object", name))?;
                 // Some predicates might have additional inputs, and others do not
-                // E.g., AssertMicrosoftDomain has no extra inputs, but AssertEmailDomain needs the domain as special input. 
-                // TODO: we don't implement this for now in Rust (it's python though)
+                // TODO: we don't implement this for now (not required)
                 if predicate.contains_key("special_inputs") {
                     return_error!("Support for predicates with 'special_inputs' not implemented ");
                 }

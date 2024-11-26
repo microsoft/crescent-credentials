@@ -1,30 +1,24 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion};
-use ark_bn254::{Bn254, Fr};
-use crescent::{dlog::DLogPoK, rangeproof::{RangeProof, RangeProofPK}};
+use crescent::{dlog::DLogPoK, rangeproof::{RangeProof, RangeProofPK}, CrescentPairing, CrescentFr};
 use ark_ff::PrimeField;
+use ark_ec::AffineRepr;
 use rayon::ThreadPoolBuilder;
 
-type G1 = <Bn254 as ark_ec::pairing::Pairing>::G1;
+type G1 = <CrescentPairing as ark_ec::pairing::Pairing>::G1;
 
 pub fn range_proof_benchmark(c: &mut Criterion) {
 
     const N_BITS : usize = 32;
+    let token_exp_int = ark_ff::BigInt::from(1754434613 as u32);
+    let token_exp = CrescentFr::from_bigint(token_exp_int).unwrap();
 
-    let token_exp_int = ark_ff::BigInt::from(1754434613 as u32);        // TODO: change this to now + a day
-    let token_exp = Fr::from_bigint(token_exp_int).unwrap();
+    let (range_pk, range_vk) = RangeProofPK::<CrescentPairing>::setup(N_BITS);
 
-    let (range_pk, _range_vk) = RangeProofPK::<Bn254>::setup(N_BITS);
-
-    let cur_time = Fr::from(
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs(),
-    );
+    let cur_time = CrescentFr::from(1754434613 - 5);
     let bases = DLogPoK::<G1>::derive_pedersen_bases();
     let mut com_exp = DLogPoK::pedersen_commit(&token_exp, &bases);
     com_exp.m -= cur_time;
@@ -49,24 +43,23 @@ pub fn range_proof_benchmark(c: &mut Criterion) {
         })
     });
 
-    // TODO: Call to verifier is failing
-    // let mut ped_com_exp =com_exp.c;
-    // ped_com_exp -= com_exp.bases[0] * cur_time;
+    let mut ped_com_exp = com_exp.c;
+    ped_com_exp -= com_exp.bases[0] * cur_time;
 
-    // let bases_proj = [com_exp.bases[0].into_group(), com_exp.bases[1].into_group()];
+    let bases_proj = [com_exp.bases[0].into_group(), com_exp.bases[1].into_group()];
     
-    // c.bench_function(&format!("RangeProof verifier time, {}-bit secret", N_BITS), |b| {
-    //     b.iter(|| {    
-    //         range_proof.verify_n_bits(&ped_com_exp, &bases_proj, N_BITS, &range_vk);
-    //     })
-    // });
+    c.bench_function(&format!("RangeProof verifier time, {}-bit secret", N_BITS), |b| {
+        b.iter(|| {    
+            range_proof.verify_n_bits(&ped_com_exp, &bases_proj, N_BITS, &range_vk);
+        })
+    });
  
 }
 
 criterion_group!{
     name = benches;
     // This can be any expression that returns a `Criterion` object.
-    config = Criterion::default().significance_level(0.05).sample_size(1000).measurement_time(Duration::from_secs(50)).warm_up_time(Duration::from_secs(5));
+    config = Criterion::default().significance_level(0.05).sample_size(100).measurement_time(Duration::from_secs(50)).warm_up_time(Duration::from_secs(5));
     targets = range_proof_benchmark
 }
 

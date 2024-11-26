@@ -12,7 +12,7 @@ use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
-use prep_inputs::{parse_config, pem_to_inputs, prepare_prover_inputs, unpack_int_to_string_unquoted};
+use prep_inputs::{pem_to_inputs, unpack_int_to_string_unquoted};
 use utils::{read_from_file, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
@@ -32,10 +32,9 @@ pub mod daystamp;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
-const MDL_AGE_GREATER_THAN : usize = 18;         // mDL show proofs will prove that the holder is older than this value (in years)
 
 pub type CrescentPairing = ECPairing;
-
+pub type CrescentFr = Fr;
 
 /// Parameters required to create Groth16 proofs
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
@@ -68,11 +67,11 @@ impl<'b, E: Pairing> ShowParams<'b, E> {
 /// Parameters required to verify show/presentation proofs
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct VerifierParams<E: Pairing> {
-    vk : VerifyingKey<E>,
-    pvk : PreparedVerifyingKey<E>,
-    range_vk: RangeProofVK<E>,
-    io_locations_str: String, // Stored as String since IOLocations does not implement CanonicalSerialize
-    issuer_pem: String
+    pub vk : VerifyingKey<E>,
+    pub pvk : PreparedVerifyingKey<E>,
+    pub range_vk: RangeProofVK<E>,
+    pub io_locations_str: String, // Stored as String since IOLocations does not implement CanonicalSerialize
+    pub issuer_pem: String
 }
 impl<E: Pairing> VerifierParams<E> {
     pub fn new(paths : &CachePaths) -> Result<Self, SerializationError> {
@@ -189,8 +188,6 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     let (range_pk, range_vk) = RangeProofPK::<ECPairing>::setup(RANGE_PROOF_INTERVAL_BITS);
     end_timer!(range_setup_timer);
     
-    
-     
     let serialize_timer = start_timer!(|| "Writing everything to files");
     write_to_file(&range_pk, &paths.range_pk);
     write_to_file(&range_vk, &paths.range_vk);    
@@ -206,9 +203,8 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     return 0;
 }
 
-pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON) -> Result<ClientState<ECPairing>, SerializationError>
+pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON, credtype : &str) -> Result<ClientState<ECPairing>, SerializationError>
 {
-
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
     let cfg = CircomConfig::<ECPairing>::new(
         &paths.wasm,
@@ -240,46 +236,16 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     assert!(verified);
     end_timer!(verify_timer);
 
-    let client_state = ClientState::<ECPairing>::new(
+    let mut client_state = ClientState::<ECPairing>::new(
         inputs.clone(),
         proof.clone(),
         params.vk.clone(),
         pvk.clone(),
     );
+    client_state.credtype = credtype.to_string();
 
     Ok(client_state)
 }
-
-pub fn run_prover(
-    base_path: PathBuf,
-) {
-    let paths = CachePaths::new(base_path);
-    let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
-    let config = parse_config(config_str).expect("Failed to parse config");
-
-    let prover_inputs = 
-    if config.contains_key("credtype") && config.get("credtype").unwrap() == "mdl" {
-        GenericInputsJSON::new(&paths.mdl_prover_inputs)
-    }
-    else {
-        let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
-        let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
-        let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
-            prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
-        GenericInputsJSON{prover_inputs: prover_inputs_json}
-    };
-        
-    let mut client_state = create_client_state(&paths, &prover_inputs).unwrap();
-
-    if config.contains_key("credtype") && config.get("credtype").unwrap() == "mdl" {
-        client_state.credtype = "mdl".to_string();
-        println!("Set credtype to mdl");
-    }
-
-    write_to_file(&client_state, &paths.client_state);
-
-}
-
 
 pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
 {
@@ -350,67 +316,6 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let show_proof = ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
 
     show_proof
-}
-
-fn _show_groth16_proof_size(show_groth16: &ShowGroth16<ECPairing>) -> usize {
-    print!("Show_Groth16 proof size: ");
-    let rand_proof_size = show_groth16.rand_proof.compressed_size();
-    print!("{} (rand_proof) + ", rand_proof_size);
-    let com_hidden_inputs_size = show_groth16.com_hidden_inputs.compressed_size();
-    print!("{} (com_hidden_inputs) + ", com_hidden_inputs_size);
-    let pok_inputs_size = show_groth16.pok_inputs.compressed_size();
-    print!("{} (pok_inputs) + ", pok_inputs_size);
-    let committed_inputs_size = show_groth16.commited_inputs.compressed_size();
-    print!("{} (committed_inputs) ", committed_inputs_size);
-    let total = rand_proof_size + com_hidden_inputs_size + pok_inputs_size + committed_inputs_size;
-    println!(" = {} bytes total", total);
-    total
-}
-
-
-fn show_proof_size(show_proof: &ShowProof<ECPairing>) -> usize {
-
-    print!("Show proof size: ");
-    let groth16_size = show_proof.show_groth16.compressed_size();
-    print!("{} (Groth16 proof) + ", groth16_size);
-    let show_range_size = show_proof.show_range.compressed_size();
-    print!("{} (range proof) ", show_range_size);
-
-    let show_range2_size = 
-    if show_proof.show_range2.is_some() {
-        let tmp = show_proof.show_range2.compressed_size();
-        print!("{} + (range proof2) ", tmp);        
-        tmp
-    } else {
-        0
-    };
-
-    let total = groth16_size + show_range_size + show_range2_size;
-    println!(" = {} bytes total", total);
-
-    total
-}
-
-pub fn run_show(
-    base_path: PathBuf
-) {
-    let proof_timer = std::time::Instant::now();    
-    let paths = CachePaths::new(base_path);
-    let io_locations = IOLocations::new(&paths.io_locations);    
-    let mut client_state: ClientState<ECPairing> = read_from_file(&paths.client_state).unwrap();
-    let range_pk : RangeProofPK<ECPairing> = read_from_file(&paths.range_pk).unwrap();
-    
-    let show_proof = if client_state.credtype == "mdl" {
-        create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, MDL_AGE_GREATER_THAN)  
-    } else {
-        create_show_proof(&mut client_state, &range_pk, &io_locations)
-    };
-    println!("Proving time: {:?}", proof_timer.elapsed());
-
-    //let _ = show_groth16_proof_size(&show_proof.show_groth16);
-    let _ = show_proof_size(&show_proof);
-
-    write_to_file(&show_proof, &paths.show_proof);
 }
 
 pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>) -> (bool, String)
@@ -573,28 +478,83 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
     (true, "".to_string())
 }
 
-pub fn run_verifier(base_path: PathBuf) {
-    let paths = CachePaths::new(base_path);
-    let show_proof : ShowProof<ECPairing> = read_from_file(&paths.show_proof).unwrap();
-    let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk).unwrap();
-    let vk : VerifyingKey<ECPairing> = read_from_file(&paths.groth16_vk).unwrap();
-    let range_vk : RangeProofVK<ECPairing> = read_from_file(&paths.range_vk).unwrap();
-    let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
-    let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prep_inputs::{parse_config, prepare_prover_inputs};
+    use serial_test::serial;
 
-    let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
+    const MDL_AGE_GT : usize = 18;
 
-    let (verify_result, data) = if show_proof.show_range2.is_some() {
-        verify_show_mdl(&vp, &show_proof, MDL_AGE_GREATER_THAN)
-    } else {
-        verify_show(&vp, &show_proof)
-    };
+    // We run the end-to-end tests with [serial] because they use a lot of memory, 
+    // if two are run at the same time some machines do not have enough RAM
 
-    if verify_result {
-        println!("Verify succeeded, got data '{}'", data);
+    #[test]
+    #[serial]
+    pub fn end_to_end_test_rs256() {
+        run_test("rs256", "jwt");
     }
-    else {
-        println!("Verify failed")
+
+    #[test]
+    #[serial]
+    pub fn end_to_end_test_mdl1() {
+        run_test("mdl1", "mdl");
+    }
+
+    fn run_test(name: &str, cred_type: &str) {
+        let base_path = PathBuf::from(format!("test-vectors/{}", name));
+        let paths = CachePaths::new(base_path.clone());
+
+        println!("Runing end-to-end-test for {}, credential type {}", name, cred_type);
+        println!("Requires that `../setup/run_setup.sh {}` has already been run", name);
+        println!("These tests are slow; best run with the `--release` flag"); 
+
+        println!("Running zksetup");
+        let ret = run_zksetup(base_path);
+        assert!(ret == 0);
+
+        println!("Running prove (creating client state)");
+        let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
+        let config = parse_config(config_str).expect("Failed to parse config");
+    
+        let prover_inputs = 
+        if cred_type == "mdl" {
+            GenericInputsJSON::new(&paths.mdl_prover_inputs)
+        }
+        else {
+            let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
+            let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
+            let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
+                prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
+            GenericInputsJSON{prover_inputs: prover_inputs_json}
+        };
+            
+        let mut client_state = create_client_state(&paths, &prover_inputs, cred_type).unwrap();
+
+        println!("Running show");
+        let io_locations = IOLocations::new(&paths.io_locations);    
+        let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
+        let show_proof = if client_state.credtype == "mdl" {
+            create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, MDL_AGE_GT)  
+        } else {
+            create_show_proof(&mut client_state, &range_pk, &io_locations)
+        };
+
+        print!("Running verify");
+        let pvk : PreparedVerifyingKey<CrescentPairing> = read_from_file(&paths.groth16_pvk).unwrap();
+        let vk : VerifyingKey<CrescentPairing> = read_from_file(&paths.groth16_vk).unwrap();
+        let range_vk : RangeProofVK<CrescentPairing> = read_from_file(&paths.range_vk).unwrap();
+        let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
+        let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
+    
+        let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
+    
+        let (verify_result, _data) = if show_proof.show_range2.is_some() {
+            verify_show_mdl(&vp, &show_proof, MDL_AGE_GT)
+        } else {
+            verify_show(&vp, &show_proof)
+        };
+        assert!(verify_result);
     }
 
 }

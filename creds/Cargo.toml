@@ -57,6 +57,7 @@ ark-poly-commit = { path = "../forks/ark-poly-commit", default-features = false,
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+serial_test = "*"
 
 [build-dependencies]
 cargo-patch = "0.3"

@@ -207,7 +207,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
                 let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
 
                 println!("Creating client state... this is slow...");
-                let client_state = create_client_state(&paths, &prover_inputs).map_err(|_| "Failed to create client state")?;
+                let client_state = create_client_state(&paths, &prover_inputs, "jwt").map_err(|_| "Failed to create client state")?;
                 
                 client_state
             };
