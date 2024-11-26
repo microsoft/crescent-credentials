@@ -186,8 +186,6 @@ template RevealClaimValueBytes(msg_json_len, claim_byte_len, field_byte_len, is_
     match_substring.r <== r;
 }
 
-
-
 // Reveal the claim value as a single field element. 
 // The claim_byte_len must be less than 32 so that it fits in a 254-bit field element
 template RevealClaimValue(msg_json_len, claim_byte_len, field_byte_len, is_number) {
