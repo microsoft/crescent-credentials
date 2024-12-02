@@ -8,8 +8,6 @@ use num_bigint::BigUint;
 use num_traits::FromPrimitive;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, io::ErrorKind};
-pub mod demo;
-pub mod named_domain;
 
 pub trait ProverInput {
     fn new(path: &str) -> Self;
@@ -211,13 +209,3 @@ impl ProverAuxInputs {
         }
     }
 }
-
-// TODO: Need to generate this from crescent
-// Example prover aux file for the es256k-nohash example (test_vectors/es256k-spartan/prover_aux.json)
-// {
-//     "digest" : "AE1AB30CE075F12CADB7F66ED3C8FC0B0B203AC206F381C6E2BDC1498402BCEA",
-//     "signature_r" : "C6FBBDB372303F3B65CBFCF16FF7FC4DBF6ACD921E40C93DB8207A860DB41850",
-//     "signature_s" : "0C61995E52329CBC955A8B7891F461D8C5D1DD965E353BDF5214A1BAC9284AB2",
-//     "pk_x" : "BB8552F9F4B5EA4159EBFE9A42F8CC5B209E8CEDD3A2D0E36F1B7DB39FB45693",
-//     "pk_y" : "B4169332E1F00C8A10AA18806235295D2596F00D13EA2921B5A20C89ACEBC822"
-// }

@@ -157,7 +157,7 @@ impl<E: Pairing> ClientState<E> {
         self.input_com_randomness = Some(z);
 
         scalars.push(hidden_input_scalars);
-        bases.push(hidden_input_bases.iter().map(|x| x.into_group()).collect());    // TODO: can we avoid?
+        bases.push(hidden_input_bases.iter().map(|x| x.into_group()).collect());
         y.push(com_hidden_inputs.clone());
 
         rand_proof.c =

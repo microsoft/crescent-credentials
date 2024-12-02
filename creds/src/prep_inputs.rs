@@ -269,8 +269,7 @@ fn get_domain(s: &str) -> Result<&str, Box<std::io::Error>> {
 }
 
 fn pack_string_to_int(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Error>> {
-    // Must match function "RevealClaimValue" in match_claim.circom
-    // so we add quotes to the string TODO: maybe reveal the unquoted claim value instead?
+    // Must match function "RevealClaimValue" in match_claim.circom, so we add quotes to the string
 
     //First convert "s" to bytes and pad with zeros
     let s_quoted = format!("\"{}\"",s);

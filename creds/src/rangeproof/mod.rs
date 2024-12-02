@@ -30,7 +30,7 @@ impl<'a, E: Pairing> RangeProofPK<'a, E> {
     pub fn setup(n: usize) -> (Self, RangeProofVK<E>) {
         let mut rng = thread_rng();
         let params = ark_poly_commit::kzg10::KZG10::<E, DensePolynomial<E::ScalarField>>::setup(
-            4 * n,  // TODO: 3*n + 1 is always enough?
+            4 * n,
             true,
             &mut rng,
         )
