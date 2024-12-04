@@ -4,7 +4,6 @@ include "./utils/jwt.circom";
 include "./circomlib/circuits/comparators.circom";
 include "./circomlib/circuits/gates.circom";
 include "./match_claim.circom";
-include "./predicates.circom";
 
 template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
 

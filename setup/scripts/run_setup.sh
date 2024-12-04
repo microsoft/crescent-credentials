@@ -91,23 +91,10 @@ cp -r -L ${CIRCOM_SRC_DIR}/* ${CIRCOM_DIR}/
 
 # Compile the circom circuit.  First check if the hash of the circom files has changed, only re-compile if so. To force a re-build remove circom_files.sha256
 cd $CIRCOM_DIR
-
-set +e
-cat `find . -name "*.circom"` | sha256sum | diff circom_files.sha256 -
-if [[ $? -ne 0 ]] || [[ ! -e main_js ]] ;
-then 
-    echo "Circom files hash changed; re-compiling" >> ${LOG_FILE}
-
-    echo "Using Circom WASM witness generation" >> ${LOG_FILE}
-    circom main.circom --r1cs --wasm --O2 --sym --prime ${CURVE} | awk -v start=2 -v end=9 'NR>=start && NR<=end' >> ${LOG_FILE}
-    mv main.r1cs main_c.r1cs
-
-    mv main_c.r1cs ${OUTPUTS_DIR}
-    cat `find . -name "*.circom"` | sha256sum  > circom_files.sha256
-else
-    echo "Circom files did not change; not re-recompiling" >> ${LOG_FILE}
-fi
-set -e
+echo "Using Circom WASM witness generation" >> ${LOG_FILE}
+circom main.circom --r1cs --wasm --O2 --sym --prime ${CURVE} | awk -v start=2 -v end=9 'NR>=start && NR<=end' >> ${LOG_FILE}
+mv main.r1cs main_c.r1cs
+mv main_c.r1cs ${OUTPUTS_DIR}
 
 cd ${ROOT_DIR}
 

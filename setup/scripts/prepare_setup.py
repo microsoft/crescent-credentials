@@ -11,11 +11,9 @@ from crescent_helper import *
 ##### Helper functions #########
 
 def usage():
-    print("Python3 script to prepare setup")
+    print("Python3 script to prepare setup (used by run_setup.sh)")
     print("Usage:")
     print("\t./" + os.path.basename(sys.argv[0]) + " <config file> <circom output file>")
-    print("Example:")
-    print("\tpython3 " + os.path.basename(sys.argv[0]) + "../../inputs/config.json ../generated_files/demo_v4/circom/main.circom")
 
 def main_circom_header(config):
 
