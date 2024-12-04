@@ -32,7 +32,7 @@ impl<G: Group> DLogPoK<G> {
     /// proves knowledge of the representations of y1, y2, ... y_n
     /// in their respective bases -- bases[1], bases[2], ... bases[n]
     /// optionally, specify a set of positions to assert equality of in the form {(i1,j1), (i2,j2), ...}
-    /// TODO: shrink the proof size by compressing the responses since they're the same for all the equal positions
+    /// TODO (perf): shrink the proof size by compressing the responses since they're the same for all the equal positions
     pub fn prove(
         y: &Vec<G>,
         bases: &Vec<Vec<G>>,

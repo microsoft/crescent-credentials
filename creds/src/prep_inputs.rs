@@ -33,13 +33,10 @@ lazy_static! {
         let mut set = HashSet::new();
         set.insert("alg");
         set.insert("credtype");
-        set.insert("reveal_all_claims");
-        set.insert("defer_sig_ver");
         set.insert("max_jwt_len");
         set
     };
 }
-
 
 pub fn pem_key_type(key : &String) -> Result<&str, &str> {
 
@@ -241,20 +238,6 @@ fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::
                 }
             }
         }
-        
-        if entry.contains_key("predicates") {
-            let predicates = entry["predicates"].as_array().ok_or(format!("predicates for entry {} must be an array", name))?;
-            for p in predicates {
-                let predicate = p.as_object().ok_or(format!("A predicate for entry {} is not an object", name))?;
-                // Some predicates might have additional inputs, and others do not
-                // TODO: we don't implement this for now (not required)
-                if predicate.contains_key("special_inputs") {
-                    return_error!("Support for predicates with 'special_inputs' not implemented ");
-                }
-
-            }
-        }
-
     }
 
 
@@ -487,18 +470,6 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
     }
 
     // Set defaults
-    if !config.contains_key("reveal_all_claims") {
-        config.insert("reveal_all_claims".to_string(), json!(false));
-    }
-    else {
-        if !config["reveal_all_claims"].is_boolean() {
-            return_error!("reveal_all_claims must have boolean type");
-        }
-    }
-    if config.contains_key("defer_sig_ver") {
-        return_error!("The 'defer_sig_ver' option not supported");      
-    }
-
     if !config.contains_key("max_jwt_len") {
         config.insert("max_jwt_len".to_string(), json!(DEFAULT_MAX_TOKEN_LENGTH));
     }
