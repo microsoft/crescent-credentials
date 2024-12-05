@@ -9,39 +9,35 @@ that the revealed claims are correct and that the underlying credential is still
 This repository contains the Crescent library and a sample application consisting of a JWT issuer,
 a setup service, a browser extension client and client helper service, and a web server verifier.
 
-## Setup and demo cheat sheet
-Once the dev dependencies are installed, to run the end-to-end demo use these commands.
-From the root of the git repo
-```
-cd setup/scripts
-./run_setup.sh rs256
-cd ../../creds
-cargo run --release --features print-trace --example demo rs256 -- --nocapture
-```
-
 # Setting up
-
 To setup the library, see the instructions in [`/setup/README.md`](./setup/README.md);
 to setup the sample application, see [`sample/README.md`](./sample/README.md).
 
-## Running the example
-
-Once setup is done, to run the main example, from `creds`:
+To check that the library has been setup correctly, run
 ```
-cargo run --release --features print-trace --example demo rs256 -- --nocapture
+cd creds
+cargo test --release
 ```
 
-# Running the demo steps separately 
+# Running the demo steps from the command line
 There is a command line tool that can be used to run the individual parts of the demo separately.  This clearly separates the roles of prover and verifier, and shows what parameters are required by each.  The filesystem is used to store data between steps, and also to "communicate" show proofs from prover to verifier. 
 
-The steps are
+The circuit setup must be completed first, by running
+```
+cd setup/scripts
+./run_setup.sh rs256
+./run_setup.sh mdl1
+cd ../../creds
+```
+Circuit setup will copy data (parameters etc.) into `creds/test-vectors/`.
+
+The individual steps are
 * `zksetup` Generates the (circuit-specific) system parameters 
 * `prove` Generates the Groth16 proof for a credential.  Stored for future presentation proofs in the "client state"
 * `show` Creates a fresh and unlinkable presentation proof to be sent to the verifier
 * `verify` Checks that the show proof is valid
 
-After the circuit is setup and the data copied into, e.g., `test-vectors/rs256`, we can run each of the demo steps as follows.
-
+and we can run each step as follows
 ```
 cargo run --bin crescent --release --features print-trace zksetup --name rs256
 cargo run --bin crescent --release --features print-trace prove --name rs256
@@ -49,19 +45,9 @@ cargo run --bin crescent --release --features print-trace show --name rs256
 cargo run --bin crescent --release --features print-trace verify --name rs256
 ```
 
+The `--name` parameter, used in circuit setup and with the command-line tool, specifies which credential type is used, the two examples are `rs256`, a JWT signed with RSA256, and `mdl1` a sample mobile driver's license.
+
 Note that the steps have to be run in order, but once the client state is created by `prove`, the `show` and `verify` steps can be run repeatedly.
-
-# Project
-
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
-
-As the maintainer of this project, please make a few updates:
-
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
 
 ## Contributing
 
