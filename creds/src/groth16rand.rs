@@ -76,9 +76,9 @@ impl<E: Pairing> ClientState<E> {
         let f = File::open(path).unwrap();
         let buf_reader = BufReader::new(f);
 
-        let state = ClientState::<E>::deserialize_uncompressed_unchecked(buf_reader).unwrap();
+        
 
-        state
+        ClientState::<E>::deserialize_uncompressed_unchecked(buf_reader).unwrap()
     }
 
     pub fn write_to_file(&self, file: &str) {
@@ -119,7 +119,7 @@ impl<E: Pairing> ClientState<E> {
             match io_types[i] {
                 PublicIOType::Revealed => (), //ignore if input is revealed as it needs to be aggregated by the verifier
                 PublicIOType::Hidden => {
-                    hidden_input_bases.push(self.pvk.vk.gamma_abc_g1[i + 1].into());
+                    hidden_input_bases.push(self.pvk.vk.gamma_abc_g1[i + 1]);
                     hidden_input_scalars.push(self.inputs[i]);
                 }
                 PublicIOType::Committed => {
@@ -129,13 +129,13 @@ impl<E: Pairing> ClientState<E> {
                     let c : E::G1 = msm_select(&[self.vk.delta_g1, self.pvk.vk.gamma_abc_g1[i + 1]], &[r, self.inputs[i]]);
 
                     let ped_bases = vec![
-                        self.pvk.vk.gamma_abc_g1[i + 1].clone(),
-                        self.vk.delta_g1.clone(),
+                        self.pvk.vk.gamma_abc_g1[i + 1],
+                        self.vk.delta_g1,
                     ];
 
-                    bases.push(ped_bases.iter().map(|x| x.clone().into()).collect());
+                    bases.push(ped_bases.iter().map(|x| (*x).into()).collect());
                     scalars.push(vec![self.inputs[i], r]);
-                    y.push(c.clone());
+                    y.push(c);
 
                     committed_input_openings.push(PedersenOpening {
                         bases: ped_bases,
@@ -151,14 +151,14 @@ impl<E: Pairing> ClientState<E> {
 
         let z = E::ScalarField::rand(&mut rng);
         hidden_input_scalars.push(z);
-        hidden_input_bases.push(self.vk.delta_g1.into());
+        hidden_input_bases.push(self.vk.delta_g1);
 
         let com_hidden_inputs: E::G1 = msm_select(&hidden_input_bases, &hidden_input_scalars);
         self.input_com_randomness = Some(z);
 
         scalars.push(hidden_input_scalars);
         bases.push(hidden_input_bases.iter().map(|x| x.into_group()).collect());
-        y.push(com_hidden_inputs.clone());
+        y.push(com_hidden_inputs);
 
         rand_proof.c =
             (rand_proof.c.into_group() + E::G1::generator() * (-(acc_r + z))).into_affine();
@@ -177,7 +177,7 @@ impl<E: Pairing> ClientState<E> {
             pok_inputs,
             commited_inputs: committed_input_openings
                 .iter()
-                .map(|x| x.c.clone())
+                .map(|x| x.c)
                 .collect(),
         }
     }
@@ -201,7 +201,7 @@ impl<E: Pairing> ClientState<E> {
         // prove that input is in [0, 2^n)
         let mut range_proof = RangeProof::default();
         assert!(n < 64);
-        let bound = <E as Pairing>::ScalarField::try_from((1u64 << n) as u64).unwrap();
+        let bound = <E as Pairing>::ScalarField::from(1u64 << n);
         assert!(ped_open.m < bound);
 
         // Use the custom thread pool for parallel operations
@@ -230,7 +230,7 @@ impl<E: Pairing> ShowGroth16<E> {
         E::G1 : CurveGroup + VariableBaseMSM,      
     {
         let groth16_timer = start_timer!(||"Verify Groth16 show proof");
-        let mut com_inputs = self.com_hidden_inputs.clone() + pvk.vk.gamma_abc_g1[0];
+        let mut com_inputs = self.com_hidden_inputs + pvk.vk.gamma_abc_g1[0];
 
         let mut public_input_index = 0;
         let mut committed_input_index = 0;
@@ -257,8 +257,8 @@ impl<E: Pairing> ShowGroth16<E> {
                     committed_input_index += 1;
 
                     bases.push(vec![
-                        pvk.vk.gamma_abc_g1[i + 1].clone().into(),
-                        vk.delta_g1.clone().into(),
+                        pvk.vk.gamma_abc_g1[i + 1].into(),
+                        vk.delta_g1.into(),
                     ]);
                 }
             }
@@ -288,11 +288,7 @@ impl<E: Pairing> ShowGroth16<E> {
         
         end_timer!(groth16_timer);
 
-        if groth16_valid && dlog_pok_valid {
-            return true;
-        } else {
-            return false;
-        }
+        groth16_valid && dlog_pok_valid
 
     }
 }

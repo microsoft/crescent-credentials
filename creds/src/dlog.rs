@@ -180,7 +180,7 @@ impl<G: Group> DLogPoK<G> {
         assert!(bases.len() == 2);
         let mut rng = thread_rng();
         let r = G::ScalarField::rand(&mut rng);
-        let scalars = vec![m.clone(), r];
+        let scalars = vec![*m, r];
         let c = msm_select::<G>(bases, &scalars);
         PedersenOpening {
             bases: bases.to_vec(),

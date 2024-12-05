@@ -128,7 +128,7 @@ impl CachePaths {
             println!("base_path = {}", base_path_str);
             panic!("invalid path");
         }
-        print!("base_path_str = {}\n", base_path_str);
+        println!("base_path_str = {}", base_path_str);
         let cache_path = format!("{}cache/", base_path_str);
     
         if fs::metadata(&cache_path).is_ok() {
@@ -195,12 +195,12 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     write_to_file(&vk, &paths.groth16_vk);
     write_to_file(&pvk, &paths.groth16_pvk);
 
-    let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
+    let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
     let prover_params = ProverParams{groth16_params: params, groth16_pvk: pvk, config_str};
     write_to_file(&prover_params, &paths.prover_params);    
     end_timer!(serialize_timer);
 
-    return 0;
+    0
 }
 
 pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON, credtype : &str) -> Result<ClientState<ECPairing>, SerializationError>
@@ -271,12 +271,12 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     let mut com_exp_value = client_state.committed_input_openings[0].clone();
     com_exp_value.m -= cur_time;
     com_exp_value.c -= com_exp_value.bases[0] * cur_time;
-    let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
+    let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
 
     // Assemble proof
-    let show_proof = ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
+    
 
-    show_proof
+    ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
 }
 
 pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations, age: usize) -> ShowProof<ECPairing>
@@ -303,19 +303,19 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let mut com_valid_until_value = client_state.committed_input_openings[0].clone();
     com_valid_until_value.m -= cur_time;
     com_valid_until_value.c -= com_valid_until_value.bases[0] * cur_time;
-    let show_range = client_state.show_range(&com_valid_until_value, RANGE_PROOF_INTERVAL_BITS, &range_pk);
+    let show_range = client_state.show_range(&com_valid_until_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
 
     // Create fresh range proof for birth_date; prove age is over 21
     let days_in_21y = Fr::from(days_to_be_age(age) as u64);
     let mut com_dob = client_state.committed_input_openings[1].clone();
     com_dob.m -= days_in_21y;
     com_dob.c -= com_dob.bases[0] * days_in_21y;
-    let show_range2 = client_state.show_range(&com_dob, RANGE_PROOF_INTERVAL_BITS, &range_pk);       
+    let show_range2 = client_state.show_range(&com_dob, RANGE_PROOF_INTERVAL_BITS, range_pk);       
 
     // Asssemble proof and return
-    let show_proof = ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec};
+    
 
-    show_proof
+    ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
 }
 
 pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>) -> (bool, String)
@@ -363,7 +363,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         return (false, "".to_string());
     }
 
-    let mut ped_com_exp_value = show_proof.show_groth16.commited_inputs[0].clone();
+    let mut ped_com_exp_value = show_proof.show_groth16.commited_inputs[0];
     ped_com_exp_value -= vp.pvk.vk.gamma_abc_g1[exp_value_pos] * cur_time;
     let ret = show_proof.show_range.verify(
         &ped_com_exp_value,
@@ -436,7 +436,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         return (false, "".to_string());
     }  
 
-    let mut ped_com_valid_until_value = show_proof.show_groth16.commited_inputs[0].clone();
+    let mut ped_com_valid_until_value = show_proof.show_groth16.commited_inputs[0];
     ped_com_valid_until_value -= vp.pvk.vk.gamma_abc_g1[valid_until_value_pos] * cur_time;
     let ret = show_proof.show_range.verify(
         &ped_com_valid_until_value,
@@ -451,12 +451,12 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         return (false, "".to_string());
     }      
 
-    if !show_proof.show_range2.is_some() {
+    if show_proof.show_range2.is_none() {
         println!("mDL proof is invalid; missing second range proof");
         return (false, "".to_string());
     }
     let days_in_21y = Fr::from(days_to_be_age(age) as u64);
-    let mut ped_com_dob = show_proof.show_groth16.commited_inputs[1].clone();
+    let mut ped_com_dob = show_proof.show_groth16.commited_inputs[1];
     ped_com_dob -= vp.pvk.vk.gamma_abc_g1[dob_value_pos] * days_in_21y;
     let ret = show_proof.show_range2.as_ref().unwrap().verify(
         &ped_com_dob,

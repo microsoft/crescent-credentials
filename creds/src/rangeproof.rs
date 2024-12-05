@@ -40,10 +40,10 @@ impl<'a, E: Pairing> RangeProofPK<'a, E> {
             (0..=4 * n).map(|i| params.powers_of_gamma_g[&i]).collect();
 
         let com_f_basis: [E::G1; 4] = [
-            powers_of_gamma_g[0].clone().into(),
-            powers_of_gamma_g[1].clone().into(),
-            powers_of_gamma_g[2].clone().into(),
-            powers_of_g[0].clone().into(),
+            powers_of_gamma_g[0].into(),
+            powers_of_gamma_g[1].into(),
+            powers_of_gamma_g[2].into(),
+            powers_of_g[0].into(),
         ];
 
         let powers = ark_poly_commit::kzg10::Powers::<E> {
@@ -213,7 +213,7 @@ impl<E: Pairing> RangeProof<E> {
         debug_assert!(_rem3.is_zero());
 
         // create a commitment to f
-        let (com_f, rand_f) = KZG10::commit(&powers, &f, Some(1), Some(&mut rng)).unwrap(); // Opened once
+        let (com_f, rand_f) = KZG10::commit(powers, &f, Some(1), Some(&mut rng)).unwrap(); // Opened once
 
         let mut com_f_basis = powers
             .powers_of_gamma_g
@@ -221,13 +221,12 @@ impl<E: Pairing> RangeProof<E> {
             .take(3)
             .map(|&x| x.into())
             .collect::<Vec<E::G1>>();
-        com_f_basis.push(powers.powers_of_g[0].clone().into());
+        com_f_basis.push(powers.powers_of_g[0].into());
 
         let mut com_f_scalars = rand_f
             .blinding_polynomial
             .coeffs
-            .iter()
-            .map(|x| x.clone())
+            .iter().copied()
             .collect::<Vec<E::ScalarField>>();
         com_f_scalars.push(elem);
 
@@ -247,7 +246,7 @@ impl<E: Pairing> RangeProof<E> {
         );
 
         // create a commitment to g
-        let (com_g, rand_g) = KZG10::commit(&powers, &g_blinded, Some(2), Some(&mut rng)).unwrap(); // Opened twice
+        let (com_g, rand_g) = KZG10::commit(powers, &g_blinded, Some(2), Some(&mut rng)).unwrap(); // Opened twice
 
         let mut ts = Transcript::new(&[0u8]);
         add_to_transcript(&mut ts, b"com_f", &com_f);
@@ -267,7 +266,7 @@ impl<E: Pairing> RangeProof<E> {
 
         let q = &(&q1 + &q2_c) + &q3_c_sq;
 
-        let (com_q, rand_q) = KZG10::commit(&powers, &q, Some(1), Some(&mut rng)).unwrap(); // Opened once
+        let (com_q, rand_q) = KZG10::commit(powers, &q, Some(1), Some(&mut rng)).unwrap(); // Opened once
 
         add_to_transcript(&mut ts, b"com_q", &com_q);
         // get another challenge
@@ -278,12 +277,12 @@ impl<E: Pairing> RangeProof<E> {
         // open com_g at rho and rho*w
         let eval_g = g_blinded.evaluate(&rho);
         let proof_g =
-            KZG10::<E, DensePolynomial<E::ScalarField>>::open(&powers, &g_blinded, rho, &rand_g)
+            KZG10::<E, DensePolynomial<E::ScalarField>>::open(powers, &g_blinded, rho, &rand_g)
                 .unwrap();
 
         let eval_gw = g_blinded.evaluate(&(rho * domain.element(1)));
         let proof_gw = KZG10::<E, DensePolynomial<E::ScalarField>>::open(
-            &powers,
+            powers,
             &g_blinded,
             rho * domain.element(1),
             &rand_g,
@@ -291,7 +290,7 @@ impl<E: Pairing> RangeProof<E> {
         .unwrap();
 
         // Compute w_hat = f.(rho^n - 1)/(rho - 1) + q.(rho^n - 1)
-        let q_coeff = rho.pow(&[n as u64]) - E::ScalarField::one();
+        let q_coeff = rho.pow([n as u64]) - E::ScalarField::one();
         let f_coeff = q_coeff / (rho - E::ScalarField::one());
 
         let mut f_term = f.clone();
@@ -323,7 +322,7 @@ impl<E: Pairing> RangeProof<E> {
         // open com_w_hat at rho
         let eval_w_hat = w_hat.evaluate(&rho);
         let proof_w_hat =
-            KZG10::<E, DensePolynomial<E::ScalarField>>::open(&powers, &w_hat, rho, &rand_w_hat)
+            KZG10::<E, DensePolynomial<E::ScalarField>>::open(powers, &w_hat, rho, &rand_w_hat)
                 .unwrap();
 
         RangeProof {
@@ -368,11 +367,9 @@ impl<E: Pairing> RangeProof<E> {
         let rho = E::ScalarField::from_random_bytes(&rho_bytes).unwrap();
 
         // verify the openings
-        let q_coeff = rho.pow(&[n as u64]) - E::ScalarField::one();
+        let q_coeff = rho.pow([n as u64]) - E::ScalarField::one();
         let f_coeff = q_coeff / (rho - E::ScalarField::one());
-        let com_w_hat: Commitment<E> = Commitment {
-            0: (self.com_f.0 * f_coeff + self.com_q.0 * q_coeff).into(),
-        };
+        let com_w_hat: Commitment<E> = Commitment((self.com_f.0 * f_coeff + self.com_q.0 * q_coeff).into());
 
         let rng = &mut thread_rng();
         let ret = KZG10::<E, DensePolynomial<E::ScalarField>>::batch_check(
@@ -396,12 +393,12 @@ impl<E: Pairing> RangeProof<E> {
 
         // check that w1 + tau*w2 + t^2 * w3 - q * (X^n - 1) = 0
         // note: we don't have an opening of com_q. This will be accounted for in eval_w_hat
-        let partial_eval_w1 = (self.eval_g) * (rho.pow(&[n as u64]) - E::ScalarField::one())
+        let partial_eval_w1 = (self.eval_g) * (rho.pow([n as u64]) - E::ScalarField::one())
             / (rho - E::ScalarField::one());
 
         let eval_w2 = self.eval_g
             * (E::ScalarField::one() - self.eval_g)
-            * (rho.pow(&[n as u64]) - E::ScalarField::one())
+            * (rho.pow([n as u64]) - E::ScalarField::one())
             / (rho - domain.element(n - 1));
 
         let eval_w3 = (self.eval_g - self.eval_gw.double())
@@ -415,15 +412,15 @@ impl<E: Pairing> RangeProof<E> {
             return false;
         }
 
-        let ret = self
+        
+        
+        self
             .dleq_proof
             .verify(
                 &vec![bases.to_vec(), vk.com_f_basis.to_vec(),],
                 &vec![*ped_com, self.com_f.0.into()],
                 Some(vec![(0, 0), (1, 3)]),
-            );
-        
-        return ret;
+            )
     }
 }
 
