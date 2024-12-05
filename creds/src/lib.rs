@@ -379,7 +379,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     }    
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
-    // TODO: it's currently hacky how the verifier knows which revealed inputs correspond 
+    // TODO: it's currently ad-hoc how the verifier knows which revealed inputs correspond 
     // to what.  In this example we have to subtract 2 from email_value_pos to account for the committed attribute 
     // When we refactor revealed inputs and the modulus IOs we can address this.
     let domain = match unpack_int_to_string_unquoted( &inputs[email_value_pos - 2].into_bigint()) {

@@ -95,7 +95,7 @@ pub fn msm_select<G: CurveGroup>(bases: &[G::Affine], scalars: &[G::ScalarField]
     // For small number of bases (say n=2-5), we can probably do better much better with a handwritten 
     // implementation. n=2, the Pedersen case, should probably have a dedicated implementation since it's
     // very common.  For now we always call the arkworks msm code
-    if bases.len() > 2 {
+    if bases.len() >= 2 {
         G::msm(bases, scalars).unwrap()
     }
     else {

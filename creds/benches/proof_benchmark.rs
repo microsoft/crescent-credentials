@@ -95,16 +95,16 @@ pub fn show_bench(c: &mut Criterion) {
     let pvk = Groth16::<Bn254>::process_vk(&vk).unwrap();
     assert!(Groth16::<Bn254>::verify_with_processed_vk(&pvk, &public_inputs, &proof).unwrap());
 
-    // c.bench_function("Groth16 Verify", |b| {
-    //     b.iter(|| {
-    //         Groth16::<Bn254>::verify_with_processed_vk(
-    //             black_box(&pvk),
-    //             black_box(&public_inputs),
-    //             black_box(&proof),
-    //         )
-    //         .unwrap()
-    //     })
-    // });
+    c.bench_function("Groth16 Verify", |b| {
+        b.iter(|| {
+            Groth16::<Bn254>::verify_with_processed_vk(
+                black_box(&pvk),
+                black_box(&public_inputs),
+                black_box(&proof),
+            )
+            .unwrap()
+        })
+    });
 
     let mut client_state = ClientState::<Bn254>::new(
         public_inputs.clone(),
@@ -116,14 +116,14 @@ pub fn show_bench(c: &mut Criterion) {
     let io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
 
     let showing = client_state.show_groth16(&io_types);
-    c.bench_function("Show", |b| {
+    c.bench_function(&format!("Show with {} hidden inputs", NUM_INPUTS), |b| {
         b.iter(|| {
             client_state.show_groth16(&io_types);
         })
     });
 
     showing.verify(&vk, &pvk, &io_types, &vec![]);
-    c.bench_function("Verify", |b| {
+    c.bench_function(&format!("Verify with {} hidden inputs", NUM_INPUTS), |b| {
         b.iter(|| {
             ShowGroth16::<Bn254>::verify(
                 black_box(&showing),
