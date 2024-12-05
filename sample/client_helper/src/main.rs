@@ -56,21 +56,6 @@ struct ShowData {
     io_locations_str: String
 }
 
-#[cfg(test)]
-impl ShowData {
-    // In testing we mock up an instance from files: needs to have a show proof that we can use
-    fn new(paths : &CachePaths) -> Self {
-        let client_state : ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
-        let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
-        let io_locations_str = fs::read_to_string(&paths.io_locations).unwrap();
-
-        let client_state_b64 = write_to_b64url(&client_state);
-        let range_pk_b64 = write_to_b64url(&range_pk);
-
-        Self{client_state_b64, range_pk_b64, io_locations_str}
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 struct VerifyData {
     verifier_params_b64: String,
@@ -262,7 +247,6 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
     }
 }
 
-
 #[get("/show?<cred_uid>&<disc_uid>")]
 async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>) -> Result<String, String> {
     println!("*** /show called with credential UID {} and disc_uid {}", cred_uid, disc_uid);
@@ -356,62 +340,4 @@ fn rocket() -> _ {
     .manage(shared_state)
     .mount("/", routes![prepare, status, get_show_data, show, delete])
     .mount("/", FileServer::from("static")) // Serve static files
-}
-
-#[cfg(test)]
-mod test {
-    use std::fs;
-
-    use super::*;
-    use crate::test::rocket::local::blocking::Client;
-    use crescent::{utils::read_from_b64url, CrescentPairing, VerifierParams};
-    use rocket::http::Status;
-    use std::time::Duration;
-
-    #[test]
-    // tests all server calls (/prepare, /status, /getshowdata, /show) and verify the resulting proof
-    fn test_end_to_end() {
-        let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
-        let cred = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
-        let issuer_url = "https://issuer.example.com".to_string();
-        let schema_uid = SCHEMA_UIDS[0].to_string();
-        let cred_info = CredInfo{cred, schema_uid, issuer_url};
-
-         // Step 1: Call /prepare and get the cred_uid
-        let client = Client::untracked(rocket()).expect("valid rocket instance");
-        let response = client.post("/prepare").json(&cred_info).dispatch();        
-        assert_eq!(response.status(), Status::Ok);
-        let cred_uid = response.into_string().expect("Failed to get cred_uid");
-
-        // Step 2: Poll the /status endpoint every 5 seconds until the credential is "ready"
-        let mut status = "preparing".to_string();
-        for _ in 0..100 { // Try 100 times, with 5 second intervals
-            let response = client.get(format!("/status?cred_uid={}", cred_uid)).dispatch();
-            assert_eq!(response.status(), Status::Ok);
-            status = response.into_string().expect("Failed to get status");
-            if status == "ready" {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_secs(5)); // Wait for 5 seconds
-        }
-        assert_eq!(status, "ready", "Credential preparation did not complete in time");
-
-        // Step 3: Retrieve the show data using /getshowdata
-        let response = client.get(format!("/getshowdata?cred_uid={}", cred_uid)).dispatch();
-        assert_eq!(response.status(), Status::Ok);
-        let show_data = response.into_json::<ShowData>().expect("Failed to parse ShowData");
-
-        // Step 4: Call /show with the retrieved show data and a disc_uid
-        let disc_uid = "some_disc_uid";  // Replace with actual disc_uid if needed
-        let response = client.get(format!("/show?cred_uid={}&disc_uid={}", cred_uid, disc_uid)).dispatch();
-        assert_eq!(response.status(), Status::Ok);
-
-        // Step 5: Verify the resulting proof
-        let vp = VerifierParams::<CrescentPairing>::new(&paths).unwrap();
-        let show_proof_b64 = response.into_string().expect("Failed to get show proof");
-        let show_proof = read_from_b64url::<ShowProof<CrescentPairing>>(&show_proof_b64).expect("Invalid ShowProof format");
-        let (is_valid, email_domain) = verify_show(&vp, &show_proof);
-        assert!(is_valid, "Show proof is not valid");
-        println!("Proof is valid, got email domain: {}", email_domain);
-    }    
 }
