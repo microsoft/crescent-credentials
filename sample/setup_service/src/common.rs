@@ -15,38 +15,30 @@ pub const SCHEMA_UIDS: [&str; 2] = ["jwt_corporate_1", "mdl_1"];
 
 // TODO: this is not quite right; we need to also use the Schema ID. It assumes that all JWTs support the email_domain predicate
 // This is needed during show, in the client_helper, to check if we can actually create the proof with the cred we have.
-pub fn is_disc_uid_supported(disc_uid : &String, cred_type: &String) -> bool {
-    match cred_type.as_str() {
+pub fn is_disc_uid_supported(disc_uid : &str, cred_type: &str) -> bool {
+    match cred_type {
         "jwt" => {
-            match disc_uid.as_str() {
-                "crescent://email_domain" => true,
-                _ => false,
-            }
+            matches!(disc_uid, "crescent://email_domain")
         }
         "mdl" => {
-            match disc_uid.as_str() {
-                "crescent://over_18" => true,
-                "crescent://over_21" => true,
-                "crescent://over_65" => true,
-                _ => false,
-            }
+            matches!(disc_uid, "crescent://over_18" | "crescent://over_21" | "crescent://over_65")
         }
         _ => false  // unknown cred type
     }
 }
 
-pub fn is_disc_supported_by_schema(disc : &String, schema : &String) -> bool {
-    match (schema.as_str(), disc.as_str()) {
-        ("jwt_corporate_1", "crescent://email_domain") => true,
-        ("mdl_1", "crescent://over_18") => true,
-        ("mdl_1", "crescent://over_21") => true,
-        ("mdl_1", "crescent://over_65") => true,
-        _ => false
-    }
+pub fn is_disc_supported_by_schema(disc : &str, schema : &str) -> bool {
+
+    matches!( (schema, disc),
+        ("jwt_corporate_1", "crescent://email_domain") | 
+        ("mdl_1", "crescent://over_18") |
+        ("mdl_1", "crescent://over_21") |
+        ("mdl_1", "crescent://over_65")
+    )
 }
 
-pub fn disc_uid_to_age(disc_uid : &String) -> Result<usize, &'static str> {
-    match disc_uid.as_str() {
+pub fn disc_uid_to_age(disc_uid : &str) -> Result<usize, &'static str> {
+    match disc_uid {
         "crescent://over_18" => Ok(18),
         "crescent://over_21" => Ok(21),
         "crescent://over_65" => Ok(65),
@@ -55,8 +47,8 @@ pub fn disc_uid_to_age(disc_uid : &String) -> Result<usize, &'static str> {
 }
 
 
-pub fn cred_type_from_schema(schema_uid : &String) -> Result<&'static str, &'static str> {
-    match schema_uid.as_str() {
+pub fn cred_type_from_schema(schema_uid : &str) -> Result<&'static str, &'static str> {
+    match schema_uid {
         "jwt_corporate_1" => Ok("jwt"), 
         "mdl_1" => Ok("mdl"),
         _ => Err("cred_type_from_schema: Unknown schema UID"),

@@ -49,7 +49,7 @@ fn check_for_stored_params(paths :&CachePaths) -> bool {
         }        
     }
 
-    return true;
+    true
 }
 
 // Get the parameters required to generate the one-time proofs (the Groth16 proofs)
@@ -67,9 +67,9 @@ async fn files(file: PathBuf) -> Option<NamedFile> {
 fn show_params() -> String {
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
     let show_params = ShowParams::<CrescentPairing>::new(&paths).expect("Failed to create ShowParams instance");
-    let show_params_b64 = write_to_b64url(&show_params);
     
-    show_params_b64
+    
+    write_to_b64url(&show_params)
 }
 
 // Get the parameters required to verify presentation proofs // TODO: add schema_uid to the path (as documented)
@@ -77,9 +77,9 @@ fn show_params() -> String {
 fn verifier_params() -> String {
     let paths = CachePaths::new_from_str(CRESCENT_DATA_BASE_PATH);
     let verifier_params = VerifierParams::<CrescentPairing>::new(&paths).expect("Failed to create VerifierParams instance");
-    let verifier_params_b64 = write_to_b64url(&verifier_params);
     
-    verifier_params_b64
+    
+    write_to_b64url(&verifier_params)
 }
 
 #[launch]
