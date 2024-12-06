@@ -93,7 +93,7 @@ impl<E: Pairing> ClientState<E> {
         self.serialize_uncompressed(buf_writer).unwrap();
     }
 
-    pub fn show_groth16(&mut self, io_types: &Vec<PublicIOType>) -> ShowGroth16<E> 
+    pub fn show_groth16(&mut self, io_types: &[PublicIOType]) -> ShowGroth16<E> 
     where
         <E as Pairing>::G1: CurveGroup + VariableBaseMSM,  
     {
@@ -222,8 +222,8 @@ impl<E: Pairing> ShowGroth16<E> {
         &self,
         vk: &VerifyingKey<E>,
         pvk: &PreparedVerifyingKey<E>,
-        io_types: &Vec<PublicIOType>,
-        public_inputs: &Vec<E::ScalarField>,
+        io_types: &[PublicIOType],
+        public_inputs: &[E::ScalarField],
     ) -> bool
     where
         E: Pairing,

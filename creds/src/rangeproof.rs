@@ -230,8 +230,8 @@ impl<E: Pairing> RangeProof<E> {
 
         // Link com_f to ped_open via a DLEQ proof
         let dleq_proof = DLogPoK::<E::G1>::prove(
-            &vec![ped_open.c, com_f.0.into()],
-            &vec![
+            &[ped_open.c, com_f.0.into()],
+            &[
                 ped_open
                     .bases
                     .iter()
@@ -239,7 +239,7 @@ impl<E: Pairing> RangeProof<E> {
                     .collect::<Vec<E::G1>>(),
                 com_f_basis.clone(),
             ],
-            &vec![vec![ped_open.m, ped_open.r], com_f_scalars],
+            &[vec![ped_open.m, ped_open.r], com_f_scalars],
             Some(vec![(0, 0), (1, 3)]),
         );
 
@@ -415,8 +415,8 @@ impl<E: Pairing> RangeProof<E> {
         self
             .dleq_proof
             .verify(
-                &vec![bases.to_vec(), vk.com_f_basis.to_vec(),],
-                &vec![*ped_com, self.com_f.0.into()],
+                &[bases.to_vec(), vk.com_f_basis.to_vec(),],
+                &[*ped_com, self.com_f.0.into()],
                 Some(vec![(0, 0), (1, 3)]),
             )
     }

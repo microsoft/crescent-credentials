@@ -51,8 +51,8 @@ where
         let digest = hasher.finalize();
 
         let point = G::Affine::from_random_bytes(&digest);
-        if point.is_some() {
-            return point.unwrap();
+        if let Some(pt) = point {
+            return pt;
         }
         counter += 1;
     }

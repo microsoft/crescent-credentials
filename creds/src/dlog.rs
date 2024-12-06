@@ -34,9 +34,9 @@ impl<G: Group> DLogPoK<G> {
     /// optionally, specify a set of positions to assert equality of in the form {(i1,j1), (i2,j2), ...}
     /// TODO (perf): shrink the proof size by compressing the responses since they're the same for all the equal positions
     pub fn prove(
-        y: &Vec<G>,
-        bases: &Vec<Vec<G>>,
-        scalars: &Vec<Vec<G::ScalarField>>,
+        y: &[G],
+        bases: &[Vec<G>],
+        scalars: &[Vec<G::ScalarField>],
         eq_pos: Option<Vec<(usize, usize)>>,
     ) -> Self
     where
@@ -112,8 +112,8 @@ impl<G: Group> DLogPoK<G> {
 
     pub fn verify(
         &self,
-        bases: &Vec<Vec<G>>,
-        y: &Vec<G>,
+        bases: &[Vec<G>],
+        y: &[G],
         eq_pos: Option<Vec<(usize, usize)>>,
     ) -> bool
     where
@@ -172,7 +172,7 @@ impl<G: Group> DLogPoK<G> {
     // Computes Pedersen commitments
     pub fn pedersen_commit(
         m: &G::ScalarField,
-        bases: &Vec<<G as CurveGroup>::Affine>,
+        bases: &[<G as CurveGroup>::Affine],
     ) -> PedersenOpening<G>
     where
         G: CurveGroup + VariableBaseMSM,

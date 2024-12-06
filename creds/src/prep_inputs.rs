@@ -38,7 +38,7 @@ lazy_static! {
     };
 }
 
-pub fn pem_key_type(key : &String) -> Result<&str, &str> {
+pub fn pem_key_type(key : &str) -> Result<&str, &str> {
 
         if RS256PublicKey::from_pem(key).is_ok() {
             Ok("RS256")
@@ -51,7 +51,7 @@ pub fn pem_key_type(key : &String) -> Result<&str, &str> {
         }
 }
 
-pub fn pem_to_inputs<F>(issuer_pem : &String) -> Result<Vec<F>, Box<dyn std::error::Error>>
+pub fn pem_to_inputs<F>(issuer_pem : &str) -> Result<Vec<F>, Box<dyn std::error::Error>>
     where F: PrimeField 
 {
     
@@ -85,10 +85,10 @@ pub fn pem_to_inputs<F>(issuer_pem : &String) -> Result<Vec<F>, Box<dyn std::err
 
 }
 
-pub fn prepare_prover_inputs(config : &serde_json::Map<String, Value>, token_str : &String, issuer_pem : &String ) -> 
-Result<(serde_json::Map<String, Value>, 
-    serde_json::Map<String, Value>, 
-    serde_json::Map<String, Value>), Box<dyn Error>>
+type JsonMap = serde_json::Map<String, Value>;
+
+pub fn prepare_prover_inputs(config : &serde_json::Map<String, Value>, token_str : &str, issuer_pem : &str) -> 
+Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 {
 
     let issuer_pub = match config["alg"].as_str().unwrap() {
