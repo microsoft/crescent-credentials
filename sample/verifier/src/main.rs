@@ -253,7 +253,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         fs::create_dir_all(&issuer_folder).expect("Failed to create credential folder");
 
         // Copy the base folder content to the new credential-specific folder
-        match copy_with_symlinks(&shared_folder.as_ref(), &issuer_folder.as_ref()) {
+        match copy_with_symlinks(shared_folder.as_ref(), issuer_folder.as_ref()) {
             Ok(_) => println!("Copied base folder to credential-specific folder: {}", issuer_folder),
             Err(_) => error_template!("Failed to copy base folder to credential-specific folder", verifier_config),
         };
