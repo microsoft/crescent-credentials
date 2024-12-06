@@ -225,9 +225,7 @@ impl<E: Pairing> RangeProof<E> {
 
         let mut com_f_scalars = rand_f
             .blinding_polynomial
-            .coeffs
-            .iter().copied()
-            .collect::<Vec<E::ScalarField>>();
+            .coeffs.to_vec();
         com_f_scalars.push(elem);
 
         // Link com_f to ped_open via a DLEQ proof

@@ -65,8 +65,8 @@ pub fn pem_to_inputs<F>(issuer_pem : &String) -> Result<Vec<F>, Box<dyn std::err
             let issuer_pub = ES256PublicKey::from_pem(issuer_pem).unwrap();
             let x = &issuer_pub.public_key().to_bytes_uncompressed()[1..33];    // byte 1 is 0x04, per SEC1 `Elliptic-Curve-Point-to-Octet-String` 
             let y = &issuer_pub.public_key().to_bytes_uncompressed()[33..65];
-            let limbs_x = to_circom_ints(&x.to_vec(), CIRCOM_ES256_LIMB_BITS)?;
-            let limbs_y = to_circom_ints(&y.to_vec(), CIRCOM_ES256_LIMB_BITS)?;
+            let limbs_x = to_circom_ints(x, CIRCOM_ES256_LIMB_BITS)?;
+            let limbs_y = to_circom_ints(y, CIRCOM_ES256_LIMB_BITS)?;
             let limbs_x_fe = limbs_x.into_iter().map(|a| F::from_le_bytes_mod_order(&a.to_bytes_le().1)).collect::<Vec<F>>();
             let limbs_y_fe = limbs_y.into_iter().map(|a| F::from_le_bytes_mod_order(&a.to_bytes_le().1)).collect::<Vec<F>>();
             let mut limbs = limbs_x_fe;
