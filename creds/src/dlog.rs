@@ -228,19 +228,19 @@ mod tests {
             y += bases[i] * scalars[i];
         }
         let pok = DLogPoK::<G1>::prove(
-            &vec![y.clone(), y.clone()],
-            &vec![bases.clone(), bases.clone()],
-            &vec![scalars.clone(), scalars.clone()],
+            &[y, y],
+            &[bases.clone(), bases.clone()],
+            &[scalars.clone(), scalars.clone()],
             Some(vec![(0, 1), (1, 1)]),
         );
 
         let result = pok.verify(
-            &vec![bases.clone(), bases.clone()],
-            &vec![y.clone(), y.clone()],
+            &[bases.clone(), bases.clone()],
+            &[y, y],
             Some(vec![(0, 1), (1, 1)]),
         );
 
-        assert!(result == true);
+        assert!(result);
     }
 
 }

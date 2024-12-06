@@ -175,7 +175,7 @@ mod tests {
     use ark_ec::short_weierstrass::{Affine, SWCurveConfig};
     use ark_std::{end_timer, start_timer};
 
-    fn test_hash_to_curve_vartime_with<E: Pairing, P1: SWCurveConfig, P2: SWCurveConfig>()
+    fn test_hash_to_curve_vartime_with<E, P1: SWCurveConfig, P2: SWCurveConfig>()
     where
         E: Pairing<G1Affine = Affine<P1>> + Pairing<G2Affine = Affine<P2>>,
     {

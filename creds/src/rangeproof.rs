@@ -451,15 +451,7 @@ mod tests {
     }
     
     impl<F: PrimeField> Clone for DummyCircuit<F> {
-        fn clone(&self) -> Self {
-            DummyCircuit {
-                a: self.a.clone(),
-                b: self.b.clone(),
-                num_variables: self.num_variables.clone(),
-                num_constraints: self.num_constraints.clone(),
-                num_inputs: self.num_inputs.clone(),
-            }
-        }
+        fn clone(&self) -> Self { *self }
     }
     
     impl<F: PrimeField> ConstraintSynthesizer<F> for DummyCircuit<F> {
@@ -511,7 +503,7 @@ mod tests {
         }
     
         let proof =
-            Groth16::<CrescentPairing>::create_proof_with_reduction(circuit.clone(), &pk, CrescentFr::zero(), CrescentFr::zero())
+            Groth16::<CrescentPairing>::create_proof_with_reduction(circuit, &pk, CrescentFr::zero(), CrescentFr::zero())
                 .unwrap();
         let pvk = Groth16::<CrescentPairing>::process_vk(&vk).unwrap();
         assert!(Groth16::<CrescentPairing>::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap());
@@ -526,7 +518,7 @@ mod tests {
         io_types[1] = PublicIOType::Committed;
     
         let showing = client_state.show_groth16(&io_types);
-        showing.verify(&vk, &pvk, &io_types, &vec![inputs[0]]);
+        showing.verify(&vk, &pvk, &io_types, &[inputs[0]]);
     
         println!(
             "Committed to input: {}",
@@ -540,9 +532,9 @@ mod tests {
     
         let now = std::time::Instant::now();
         let mut io_locations_map = BTreeMap::default();
-        io_locations_map.insert(String::from("reserved_value"), 0 as usize);    // part of the Groth16 system
-        io_locations_map.insert(String::from("revealed_value"), 1 as usize);
-        io_locations_map.insert(String::from("committed_value"), 2 as usize);
+        io_locations_map.insert(String::from("reserved_value"), 0_usize);    // part of the Groth16 system
+        io_locations_map.insert(String::from("revealed_value"), 1_usize);
+        io_locations_map.insert(String::from("committed_value"), 2_usize);
         let io_locations = IOLocations{public_io_locations: io_locations_map.clone()};
     
         show_range.verify(
