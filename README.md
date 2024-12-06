@@ -7,9 +7,12 @@ to keep some of the claims in the credential private, while still providing the 
 that the revealed claims are correct and that the underlying credential is still valid.
 
 This repository contains the Crescent library and a sample application consisting of a JWT issuer,
-a setup service, a browser extension client and client helper service, and a web server verifier.
+a setup service, a browser extension client and client helper service, and a web server verifier. some
+external dependencies have been forked into this project; see the [NOTICE](./NOTICE.md) file for details
 
-## Setup and demo cheat sheet
+*Disclaimer: This code has not beeen carefully audited for security and should not be used in a production environment.*
+
+## Setup and demo cheat sheet.
 Once the dev dependencies are installed, to run the end-to-end demo use these commands.
 From the root of the git repo
 ```
@@ -50,18 +53,6 @@ cargo run --bin crescent --release --features print-trace verify --name rs256
 ```
 
 Note that the steps have to be run in order, but once the client state is created by `prove`, the `show` and `verify` steps can be run repeatedly.
-
-# Project
-
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
-
-As the maintainer of this project, please make a few updates:
-
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
 
 ## Contributing
 

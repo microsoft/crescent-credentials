@@ -1,3 +1,0 @@
-Pre-release TO-DOs
-* Add Microsoft copyright to each source file
-* Delete this file
