@@ -26,7 +26,7 @@ pub struct RangeProofPK<'b, E: Pairing> {
     pub powers: Powers<'b, E>,
 }
 
-impl<'a, E: Pairing> RangeProofPK<'a, E> {
+impl<E: Pairing> RangeProofPK<'_, E> {
     pub fn setup(n: usize) -> (Self, RangeProofVK<E>) {
         let mut rng = thread_rng();
         let params = ark_poly_commit::kzg10::KZG10::<E, DensePolynomial<E::ScalarField>>::setup(

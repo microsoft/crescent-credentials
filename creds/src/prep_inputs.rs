@@ -400,7 +400,7 @@ fn to_circom_limbs(n_bytes: &[u8], limb_size: usize)-> Result<Vec<String>, Box<d
 // Convert integer n to limbs
 fn to_circom_ints(n_bytes: &[u8], limb_size: usize)-> Result<Vec<BigInt>, Box<dyn std::error::Error>> {
     let n = BigInt::from_bytes_be(num_bigint::Sign::Plus, n_bytes);    
-    let num_limbs = (n.bits() as usize + limb_size - 1) / limb_size;
+    let num_limbs = (n.bits() as usize).div_ceil(limb_size);
 
     // Extract the limbs
     let one = BigInt::from_u32(1).unwrap();
