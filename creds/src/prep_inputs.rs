@@ -354,7 +354,7 @@ fn find_value_interval(msg: &str, claim_name: &str, type_string: &str) -> Result
     Ok((l,r))
 }
 
-fn is_minified(msg: &String) -> bool {
+fn is_minified(msg: &str) -> bool {
     // Check for extra spaces, e.g.,
     //     "exp" : 123456789
     // is not sufficiently minified, but
@@ -392,13 +392,13 @@ fn base_64_decoded_header_padding(header_len: usize) -> Result<String, Box<dyn s
 }
 
 // Convert integer n to limbs, encoded as strings
-fn to_circom_limbs(n_bytes: &Vec<u8>, limb_size: usize)-> Result<Vec<String>, Box<dyn std::error::Error>> {
+fn to_circom_limbs(n_bytes: &[u8], limb_size: usize)-> Result<Vec<String>, Box<dyn std::error::Error>> {
     let limbs = to_circom_ints(n_bytes, limb_size)?;
     Ok(limbs.into_iter().map(|l| l.to_str_radix(10)).collect())
 }
 
 // Convert integer n to limbs
-fn to_circom_ints(n_bytes: &Vec<u8>, limb_size: usize)-> Result<Vec<BigInt>, Box<dyn std::error::Error>> {
+fn to_circom_ints(n_bytes: &[u8], limb_size: usize)-> Result<Vec<BigInt>, Box<dyn std::error::Error>> {
     let n = BigInt::from_bytes_be(num_bigint::Sign::Plus, n_bytes);    
     let num_limbs = (n.bits() as usize + limb_size - 1) / limb_size;
 
