@@ -2,7 +2,7 @@
 
 # Invoke clippy with this command to allow some lints
 
-cargo clippy --tests -- \
+RUSTFLAGS="--deny warnings" cargo clippy --release --tests -- \
     -A clippy::needless_range_loop \
     -A clippy::same_item_push \
     -A clippy::should_implement_trait \
