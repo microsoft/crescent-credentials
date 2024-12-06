@@ -51,18 +51,18 @@ where
         let digest = hasher.finalize();
 
         let point = G::Affine::from_random_bytes(&digest);
-        if point.is_some() {
-            return point.unwrap();
+        if let Some(pt) = point {
+            return pt;
         }
-        counter = counter + 1;
+        counter += 1;
     }
 }
 
 pub fn biguint_to_scalar<F: PrimeField>(a: &BigUint) -> F {
     let a_bigint = F::BigInt::try_from(a.clone()).unwrap();
-    let a_scalar = F::from_bigint(a_bigint).unwrap();
+    
 
-    a_scalar
+    F::from_bigint(a_bigint).unwrap()
 }
 
 pub fn random_vec<F: PrimeField>(n: usize) -> Vec<F> {
@@ -124,9 +124,9 @@ where
     let buf = Vec::new();
     let mut buf_writer = BufWriter::new(buf);
     obj.serialize_uncompressed(buf_writer.by_ref()).unwrap();
-    let s = base64_url::encode(&buf_writer.into_inner().unwrap());
+    
 
-    s
+    base64_url::encode(&buf_writer.into_inner().unwrap())
 }
 pub fn read_from_b64url<T>(s : &String) -> Result<T, SerializationError>
 where 
@@ -175,7 +175,7 @@ mod tests {
     use ark_ec::short_weierstrass::{Affine, SWCurveConfig};
     use ark_std::{end_timer, start_timer};
 
-    fn test_hash_to_curve_vartime_with<E: Pairing, P1: SWCurveConfig, P2: SWCurveConfig>()
+    fn test_hash_to_curve_vartime_with<E, P1: SWCurveConfig, P2: SWCurveConfig>()
     where
         E: Pairing<G1Affine = Affine<P1>> + Pairing<G2Affine = Affine<P2>>,
     {

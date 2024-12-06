@@ -38,12 +38,12 @@ lazy_static! {
     };
 }
 
-pub fn pem_key_type(key : &String) -> Result<&str, &str> {
+pub fn pem_key_type(key : &str) -> Result<&str, &str> {
 
-        if RS256PublicKey::from_pem(&key).is_ok() {
+        if RS256PublicKey::from_pem(key).is_ok() {
             Ok("RS256")
         } 
-        else if ES256PublicKey::from_pem(&key).is_ok() {
+        else if ES256PublicKey::from_pem(key).is_ok() {
             Ok("ES256")
         }
         else {
@@ -51,22 +51,22 @@ pub fn pem_key_type(key : &String) -> Result<&str, &str> {
         }
 }
 
-pub fn pem_to_inputs<F>(issuer_pem : &String) -> Result<Vec<F>, Box<dyn std::error::Error>>
+pub fn pem_to_inputs<F>(issuer_pem : &str) -> Result<Vec<F>, Box<dyn std::error::Error>>
     where F: PrimeField 
 {
     
-    let inputs = match pem_key_type(&issuer_pem) {
+    let inputs = match pem_key_type(issuer_pem) {
         Ok("RS256") => {
-            let issuer_pub = RS256PublicKey::from_pem(&issuer_pem).unwrap();
+            let issuer_pub = RS256PublicKey::from_pem(issuer_pem).unwrap();
             let limbs = to_circom_ints(&issuer_pub.to_components().n, CIRCOM_RS256_LIMB_BITS)?;
             limbs.into_iter().map(|x| F::from_le_bytes_mod_order(&x.to_bytes_le().1)).collect::<Vec<F>>()
         }
         Ok("ES256") =>  {
-            let issuer_pub = ES256PublicKey::from_pem(&issuer_pem).unwrap();
+            let issuer_pub = ES256PublicKey::from_pem(issuer_pem).unwrap();
             let x = &issuer_pub.public_key().to_bytes_uncompressed()[1..33];    // byte 1 is 0x04, per SEC1 `Elliptic-Curve-Point-to-Octet-String` 
             let y = &issuer_pub.public_key().to_bytes_uncompressed()[33..65];
-            let limbs_x = to_circom_ints(&x.to_vec(), CIRCOM_ES256_LIMB_BITS)?;
-            let limbs_y = to_circom_ints(&y.to_vec(), CIRCOM_ES256_LIMB_BITS)?;
+            let limbs_x = to_circom_ints(x, CIRCOM_ES256_LIMB_BITS)?;
+            let limbs_y = to_circom_ints(y, CIRCOM_ES256_LIMB_BITS)?;
             let limbs_x_fe = limbs_x.into_iter().map(|a| F::from_le_bytes_mod_order(&a.to_bytes_le().1)).collect::<Vec<F>>();
             let limbs_y_fe = limbs_y.into_iter().map(|a| F::from_le_bytes_mod_order(&a.to_bytes_le().1)).collect::<Vec<F>>();
             let mut limbs = limbs_x_fe;
@@ -85,19 +85,19 @@ pub fn pem_to_inputs<F>(issuer_pem : &String) -> Result<Vec<F>, Box<dyn std::err
 
 }
 
-pub fn prepare_prover_inputs(config : &serde_json::Map<String, Value>, token_str : &String, issuer_pem : &String ) -> 
-Result<(serde_json::Map<String, Value>, 
-    serde_json::Map<String, Value>, 
-    serde_json::Map<String, Value>), Box<dyn Error>>
+type JsonMap = serde_json::Map<String, Value>;
+
+pub fn prepare_prover_inputs(config : &serde_json::Map<String, Value>, token_str : &str, issuer_pem : &str) -> 
+Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 {
 
     let issuer_pub = match config["alg"].as_str().unwrap() {
-        "RS256" => RS256PublicKey::from_pem(&issuer_pem)?,
+        "RS256" => RS256PublicKey::from_pem(issuer_pem)?,
         _ => return_error!("Unsupported algorithm"),
     };    
 
-    let claims_limited_set = issuer_pub.verify_token::<NoCustomClaims>(&token_str, None);
-    if !claims_limited_set.is_ok() {
+    let claims_limited_set = issuer_pub.verify_token::<NoCustomClaims>(token_str, None);
+    if claims_limited_set.is_err() {
         return_error!("Token failed to verify");
     }
 
@@ -175,7 +175,7 @@ Result<(serde_json::Map<String, Value>,
 
     let header_pad = base_64_decoded_header_padding(period_idx)?;
     let header_and_payload = format!("{}{}{}", jwt_header_decoded, header_pad, claims_decoded);
-    prepare_prover_claim_inputs(header_and_payload, &config, &claims, &mut prover_inputs_json)?;
+    prepare_prover_claim_inputs(header_and_payload, config, &claims, &mut prover_inputs_json)?;
 
     Ok((prover_inputs_json, prover_aux_json, public_ios_json))
 
@@ -354,13 +354,13 @@ fn find_value_interval(msg: &str, claim_name: &str, type_string: &str) -> Result
     Ok((l,r))
 }
 
-fn is_minified(msg: &String) -> bool {
+fn is_minified(msg: &str) -> bool {
     // Check for extra spaces, e.g.,
     //     "exp" : 123456789
     // is not sufficiently minified, but
     //     "exp":123456789
     // is minified. Our Circom circuit currently does not support extra space(s).
-    if msg.find("\": ").is_some() {
+    if msg.contains("\": ") {
         return false;
     }
     true
@@ -392,15 +392,15 @@ fn base_64_decoded_header_padding(header_len: usize) -> Result<String, Box<dyn s
 }
 
 // Convert integer n to limbs, encoded as strings
-fn to_circom_limbs(n_bytes: &Vec<u8>, limb_size: usize)-> Result<Vec<String>, Box<dyn std::error::Error>> {
+fn to_circom_limbs(n_bytes: &[u8], limb_size: usize)-> Result<Vec<String>, Box<dyn std::error::Error>> {
     let limbs = to_circom_ints(n_bytes, limb_size)?;
     Ok(limbs.into_iter().map(|l| l.to_str_radix(10)).collect())
 }
 
 // Convert integer n to limbs
-fn to_circom_ints(n_bytes: &Vec<u8>, limb_size: usize)-> Result<Vec<BigInt>, Box<dyn std::error::Error>> {
-    let n = BigInt::from_bytes_be(num_bigint::Sign::Plus, &n_bytes);    
-    let num_limbs = (n.bits() as usize + limb_size - 1) / limb_size;
+fn to_circom_ints(n_bytes: &[u8], limb_size: usize)-> Result<Vec<BigInt>, Box<dyn std::error::Error>> {
+    let n = BigInt::from_bytes_be(num_bigint::Sign::Plus, n_bytes);    
+    let num_limbs = (n.bits() as usize).div_ceil(limb_size);
 
     // Extract the limbs
     let one = BigInt::from_u32(1).unwrap();
@@ -490,10 +490,8 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
     for (key, _) in config.clone() {
         if !CRESCENT_CONFIG_KEYS.contains(key.as_str()) {
             let claim_entry = config.get(key.as_str()).unwrap().as_object().ok_or("expected object type")?.clone();
-            if claim_entry.contains_key("reveal") && claim_entry["reveal"].as_bool().unwrap_or(false) {
-                if !claim_entry.contains_key("max_claim_byte_len") {
-                    return_error!(format!("Config entry for claim {} has reveal flag set but is missing 'max_claim_byte_len'", key));
-                }
+            if claim_entry.contains_key("reveal") && claim_entry["reveal"].as_bool().unwrap_or(false) && !claim_entry.contains_key("max_claim_byte_len") {
+                return_error!(format!("Config entry for claim {} has reveal flag set but is missing 'max_claim_byte_len'", key));
             }
         }
     }

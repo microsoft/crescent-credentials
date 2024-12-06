@@ -58,6 +58,11 @@ jobs:
           cd setup/scripts
           ./run_setup.sh mdl1
 
+      - name: Run clippy for /creds
+        run: |
+          cd creds
+          ../clippy_command.sh
+
       - name: Run cargo test for /creds
         run: |
           cd creds

@@ -92,7 +92,7 @@ impl ProverInput for GenericInputsJSON {
         for (key, value) in &self.prover_inputs {
             match value {
                 serde_json::Value::String(s) => {
-                    builder.push_input(key, bigint_from_str(&s));
+                    builder.push_input(key, bigint_from_str(s));
                 }
                 serde_json::Value::Array(arr) => {
                     for v in arr.iter() {
@@ -128,13 +128,13 @@ impl GenericInputsJSON {
     pub fn get(&self, key: &str) -> Result<BigUint, std::io::Error> {
         match &self.prover_inputs[key] {
             serde_json::Value::String(s) => {
-                return Ok(bigint_from_str(&s));
+                Ok(bigint_from_str(s))
             }
             _ => {
-                return Err(std::io::Error::new(
+                Err(std::io::Error::new(
                     ErrorKind::Other,
                     "Key not found or is not a string",
-                ));
+                ))
             }
         }
     }
@@ -147,13 +147,13 @@ impl GenericInputsJSON {
                         vec.push(bigint_from_str(s));
                     }
                 }
-                return Ok(vec);
+                Ok(vec)
             }
             _ => {
-                return Err(std::io::Error::new(
+                Err(std::io::Error::new(
                     ErrorKind::Other,
                     "Key not found or is not an array",
-                ));
+                ))
             }
         }
     }

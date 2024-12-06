@@ -34,9 +34,9 @@ impl<G: Group> DLogPoK<G> {
     /// optionally, specify a set of positions to assert equality of in the form {(i1,j1), (i2,j2), ...}
     /// TODO (perf): shrink the proof size by compressing the responses since they're the same for all the equal positions
     pub fn prove(
-        y: &Vec<G>,
-        bases: &Vec<Vec<G>>,
-        scalars: &Vec<Vec<G::ScalarField>>,
+        y: &[G],
+        bases: &[Vec<G>],
+        scalars: &[Vec<G::ScalarField>],
         eq_pos: Option<Vec<(usize, usize)>>,
     ) -> Self
     where
@@ -112,8 +112,8 @@ impl<G: Group> DLogPoK<G> {
 
     pub fn verify(
         &self,
-        bases: &Vec<Vec<G>>,
-        y: &Vec<G>,
+        bases: &[Vec<G>],
+        y: &[G],
         eq_pos: Option<Vec<(usize, usize)>>,
     ) -> bool
     where
@@ -172,7 +172,7 @@ impl<G: Group> DLogPoK<G> {
     // Computes Pedersen commitments
     pub fn pedersen_commit(
         m: &G::ScalarField,
-        bases: &Vec<<G as CurveGroup>::Affine>,
+        bases: &[<G as CurveGroup>::Affine],
     ) -> PedersenOpening<G>
     where
         G: CurveGroup + VariableBaseMSM,
@@ -180,7 +180,7 @@ impl<G: Group> DLogPoK<G> {
         assert!(bases.len() == 2);
         let mut rng = thread_rng();
         let r = G::ScalarField::rand(&mut rng);
-        let scalars = vec![m.clone(), r];
+        let scalars = vec![*m, r];
         let c = msm_select::<G>(bases, &scalars);
         PedersenOpening {
             bases: bases.to_vec(),
@@ -228,19 +228,19 @@ mod tests {
             y += bases[i] * scalars[i];
         }
         let pok = DLogPoK::<G1>::prove(
-            &vec![y.clone(), y.clone()],
-            &vec![bases.clone(), bases.clone()],
-            &vec![scalars.clone(), scalars.clone()],
+            &[y, y],
+            &[bases.clone(), bases.clone()],
+            &[scalars.clone(), scalars.clone()],
             Some(vec![(0, 1), (1, 1)]),
         );
 
         let result = pok.verify(
-            &vec![bases.clone(), bases.clone()],
-            &vec![y.clone(), y.clone()],
+            &[bases.clone(), bases.clone()],
+            &[y, y],
             Some(vec![(0, 1), (1, 1)]),
         );
 
-        assert!(result == true);
+        assert!(result);
     }
 
 }

@@ -103,11 +103,11 @@ async fn fetch_and_save_jwk(issuer_url: &str, cred_folder: &str) -> Result<(), S
     Ok(())
 }
 
-fn compute_cred_uid(_cred : &String) -> String {
+fn compute_cred_uid(_cred : &str) -> String {
     // for now, we just generate a random UUID as the cred_uid
-    let cred_uid = Uuid::new_v4().to_string();
+    
 
-    cred_uid
+    Uuid::new_v4().to_string()
 }
 
 #[post("/prepare", format = "json", data = "<cred_info>")]
@@ -140,7 +140,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     fs::create_dir_all(&cred_folder).expect("Failed to create credential folder");
 
     // Copy the base folder content to the new credential-specific folder
-    copy_with_symlinks(&shared_folder.as_ref(), &cred_folder.as_ref()).map_err(|_| "Failed to copy base folder").unwrap();
+    copy_with_symlinks(shared_folder.as_ref(), cred_folder.as_ref()).map_err(|_| "Failed to copy base folder").unwrap();
     println!("Copied base folder to credential-specific folder: {}", cred_folder);
 
     // Insert task with empty data (indicating "preparing")
@@ -155,7 +155,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let issuer_url = cred_info.issuer_url.clone();
 
     rocket::tokio::spawn(async move {
-        let task_result: Result<(), String> = (|| async {
+        let task_result: Result<(), String> = async {
             let start_time = std::time::SystemTime::now();
             if cred_type == "jwt" {
                 // fetch the issuer's JWK
@@ -192,9 +192,9 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
                 let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
 
                 println!("Creating client state... this is slow...");
-                let client_state = create_client_state(&paths, &prover_inputs, "jwt").map_err(|_| "Failed to create client state")?;
                 
-                client_state
+                
+                create_client_state(&paths, &prover_inputs, "jwt").map_err(|_| "Failed to create client state")?
             };
 
             let client_state_b64 = write_to_b64url(&client_state);
@@ -209,7 +209,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
             tasks.insert(cred_uid_clone.clone(), Some(show_data));
             
             Ok(())
-        })().await;
+        }.await;
 
         // Handle any error by removing the `cred_uid` entry from the state
         if task_result.is_err() {
