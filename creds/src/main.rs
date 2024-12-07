@@ -27,7 +27,7 @@ fn main() {
             let base_path = root.join(name_path);
             let ret = run_zksetup(base_path);
             if ret == 0 {
-                return ();
+                
             }
         }
         Command::Prove { name } => {
@@ -87,7 +87,7 @@ pub fn run_prover(
     base_path: PathBuf,
 ) {
     let paths = CachePaths::new(base_path);
-    let config_str = fs::read_to_string(&paths.config).expect(&format!("Unable to read config from {} ", paths.config));
+    let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
     let config = parse_config(config_str).expect("Failed to parse config");
 
     let prover_inputs = 
@@ -95,8 +95,8 @@ pub fn run_prover(
         GenericInputsJSON::new(&paths.mdl_prover_inputs)
     }
     else {
-        let jwt = fs::read_to_string(&paths.jwt).expect(&format!("Unable to read JWT file from {}", paths.jwt));
-        let issuer_pem = fs::read_to_string(&paths.issuer_pem).expect(&format!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
+        let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
+        let issuer_pem = fs::read_to_string(&paths.issuer_pem).unwrap_or_else(|_| panic!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
         let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
             prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
         GenericInputsJSON{prover_inputs: prover_inputs_json}

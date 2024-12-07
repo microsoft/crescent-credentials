@@ -1,3 +1,10 @@
 trigger: none
+jobs:
+  - job: ComponentGovernance
+    steps:
+      - task: ComponentGovernanceComponentDetection@0
+        inputs:
+          scanType: 'Register'
+          verbosity: 'Verbose'
+          alertWarningLevel: 'High'
 
-stages: []

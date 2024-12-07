@@ -7,7 +7,10 @@ to keep some of the claims in the credential private, while still providing the 
 that the revealed claims are correct and that the underlying credential is still valid.
 
 This repository contains the Crescent library and a sample application consisting of a JWT issuer,
-a setup service, a browser extension client and client helper service, and a web server verifier.
+a setup service, a browser extension client and client helper service, and a web server verifier. some
+external dependencies have been forked into this project; see the [NOTICE](./NOTICE.md) file for details
+
+*Disclaimer: This code has not beeen carefully audited for security and should not be used in a production environment.*
 
 # Setting up
 To setup the library, see the instructions in [`/setup/README.md`](./setup/README.md);
