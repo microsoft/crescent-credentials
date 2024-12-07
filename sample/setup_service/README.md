@@ -5,7 +5,7 @@ This folder contains a sample Crescent Setup Server. This entity sets up the ZK 
 ## Setup
 
 The Crescent library must have been built and the ZK setup must have been run before setting up the server, specifically:
-* From `../../setup/scripts`, run `./run_setup.sh rs256`, and 
+* From `../../circuit_setup/scripts`, run `./run_setup.sh rs256`, and 
 * From `../../creds`, run `cargo run --bin crescent --release --features print-trace zksetup --name rs256`
 
  ***NOTE: the instructions below are not currently valid. The current setup directly uses the sample files in the parent Crescent folders. This might change in the future, so keeping this text until we land the code.***

@@ -125,7 +125,6 @@ where
     let mut buf_writer = BufWriter::new(buf);
     obj.serialize_uncompressed(buf_writer.by_ref()).unwrap();
     
-
     base64_url::encode(&buf_writer.into_inner().unwrap())
 }
 pub fn read_from_b64url<T>(s : &String) -> Result<T, SerializationError>
