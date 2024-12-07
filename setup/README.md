@@ -55,37 +55,28 @@ git submodule update --init --recursive
 pip install git+https://github.com/peppelinux/pyMDOC-CBOR.git
 ```
 
-## Sample JWT
+## Sample JWT and mDL
 To work with Crescent, the prover and verifier both need the issuer's public key, and the prover needs a JWT. 
-We provide sample files in `inputs/rs256`.
+The setup script will generate a sample JWT in `inputs/rs256`.
 ```
     inputs/rs256/token.jwt
     inputs/rs256/issuer.pub
 ```
 
+We provide a sample mDL credential in `/inputs/mdl1/`.
+
 ## Running Setup
-We describe how to run setup for the sample token provided in `inputs/rs256/`.  This is a JWT, with similar claims to those issued by Microsoft Entra for enterprise users, but created with the sample keypair `inputs/rs256/issuer.prv`, `inputs/rs256/issuer.pub`.
-All of the artifacts created by Crescent for the instance  `rs256` will be written to `generated_files/rs256/`. 
+We describe how to run setup for the sample token provided in `inputs/rs256/`.  This is a JWT, with similar claims to those issued by Microsoft Entra for enterprise users, but created with a freshly generated keypair.
+All of the artifacts created by Crescent for the instance `rs256` will be written to `generated_files/rs256/`. 
 
-The *proof specification* (a description of what to prove) is in the file `inputs/rs256/config.json`, 
-this is considered public information, and always present.  
-Basically this file lists which claims are revealed, or have a predicate applied to them.
-
-Before running the script for setup, you can optionally watch the log file that will get created:
-```
-tail -f --follow=name --retry generated_files/rs256/rs256.log
-```
-
-During setup, the directory `rs256` must contain three files: `config.json`, `token.jwt`, and `issuer.pub`. 
-At this point, `token.jwt` would be a "sample" token created by the issuer, i.e., it must have the same schema as tokens that will
-be used later by provers.  Setup uses the token to check that the proof specification is applicable.  
+The file `inputs/rs256/config.json` contains a "proof specification", some basic information necessary to create the proof, such as the token length and which claims are to be revealed.
 To run setup, change to the `scripts` directory and run the command
 ```
 ./run_setup.sh rs256
 ```
-Setup runs Circom and creates the R1CS instance to verify the JWT and prove the predicates from the proof spec, as well
+Setup runs Circom and creates the R1CS instance to verify the JWT and reaveal some of the outputs, as well
 as the setup steps of the ZK proof system to get the prover and verifier parameters (output as files in `generated_files/rs256`). 
-Overall this is slow, but need only be run once for a given token issuer and proof specification. 
+Overall this is slow, but only needs to be run once for a given token issuer and proof specification. 
 
 Once this script completes, all files required for showing and verifying proofs will have copied to `creds/test-vectors/rs256`.
 
