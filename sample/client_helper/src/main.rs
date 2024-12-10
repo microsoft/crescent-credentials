@@ -259,7 +259,7 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
             let mut client_state = read_from_b64url::<ClientState<CrescentPairing>>(&show_data.client_state_b64)
                 .map_err(|_| "Failed to parse client state".to_string())?;
             let io_locations = IOLocations::new_from_str(&show_data.io_locations_str);
-            let range_pk = read_from_b64url::<RangeProofPK<'a, CrescentPairing>>(&show_data.range_pk_b64)
+            let range_pk = read_from_b64url::<RangeProofPK<CrescentPairing>>(&show_data.range_pk_b64)
                 .map_err(|_| "Failed to parse range proof public key".to_string())?;
 
             // Check that the cred stored at cred_uid supports the disclosure type disc_uid

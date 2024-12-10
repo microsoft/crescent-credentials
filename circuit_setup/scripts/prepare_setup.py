@@ -19,17 +19,9 @@ def main_circom_header(config):
 
     template_filename = ''
     if config['alg'] == 'RS256':
-        if config['reveal_all_claims']:
-            template_filename = "circom/main_header_rs256_nohash.circom.template"
-        else :
-            template_filename = "circom/main_header_rs256.circom.template"
+        template_filename = "circuits/main_header_rs256.circom.template"
     elif config['alg'] == 'ES256K':
-        if config['reveal_all_claims']:
-            template_filename = "circom/main_header_es256k_nohash.circom.template"
-        elif config['defer_sig_ver']:
-            template_filename = "circom/main_header_es256k_hashonly.circom.template"
-        else :
-            template_filename = "circom/main_header_es256k.circom.template"
+        template_filename = "circuits/main_header_es256k.circom.template"
     else :
         print("Error: Unsupported algorithm")
         sys.exit(-1)

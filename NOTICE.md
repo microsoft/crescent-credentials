@@ -111,7 +111,7 @@ arkworks contributors
 ### Component
 circom-ecdsa-p256  
 https://github.com/privacy-scaling-explorations/circom-ecdsa-p256  
-Path: setup/circom-mdl/ecdsa-p256  
+Path: circuit_setup/circuits-mdl/ecdsa-p256  
 
 ### Open Source License/Copyright Notice
      GNU GENERAL PUBLIC LICENSE
@@ -797,7 +797,7 @@ None
 ### Component
 circom-pairing  
 https://github.com/yi-sun/circom-pairing  
-Path: setup/circom-mdl/ecdsa-p256/  
+Path: circuit_setup/circuits-mdl/ecdsa-p256/  
 
 ### Open Source License/Copyright Notice
                     GNU GENERAL PUBLIC LICENSE
@@ -1484,7 +1484,7 @@ None
 ZK-Email (RSA circuit)  
 https://github.com/zkemail/zk-email-verify  
 https://github.com/zkemail/zk-email-verify/tree/main/packages/circuits  
-Path: setup/circom/utils  
+Path: circuit_setup/circuits/utils  
 
 ### Open Source License/Copyright Notice
 MIT License
@@ -1521,7 +1521,7 @@ Nozee
 https://github.com/emmaguo13/nozee  
 https://github.com/emmaguo13/nozee/tree/7ec078bf55cb8934f1396f730035d5c558c79938/circuits  
 Note: Early circuits, from zk-email  
-Path: setup/circom/  
+Path: circuit_setup/circuits/  
 
 ### Open Source License/Copyright Notice
                                  Apache License
@@ -1736,7 +1736,7 @@ zk-jwt/circuits
 https://github.com/zkemail/jwt-tx-builder/tree/main/packages/circuits  
 https://github.com/zkemail/jwt-tx-builder  
 Note: Nozee is derived from an early version of this project  
-Path: setup/circom/  
+Path: circuit_setup/circuits/  
 
 ### Open Source License/Copyright Notice
 MIT License
