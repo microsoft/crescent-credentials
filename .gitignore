@@ -16,7 +16,7 @@ sample/client_helper/data
 sample/verifier/data
 
 # sample credentials that are generated
-setup/inputs/*/issuer.prv
-setup/inputs/*/issuer.pub
-setup/inputs/*/token.jwt
+circuit_setup/inputs/*/issuer.prv
+circuit_setup/inputs/*/issuer.pub
+circuit_setup/inputs/*/token.jwt
 

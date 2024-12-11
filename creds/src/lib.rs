@@ -312,9 +312,7 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     com_dob.c -= com_dob.bases[0] * days_in_21y;
     let show_range2 = client_state.show_range(&com_dob, RANGE_PROOF_INTERVAL_BITS, range_pk);       
 
-    // Asssemble proof and return
-    
-
+    // Assemble proof and return
     ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
 }
 
@@ -455,9 +453,9 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         println!("mDL proof is invalid; missing second range proof");
         return (false, "".to_string());
     }
-    let days_in_21y = Fr::from(days_to_be_age(age) as u64);
+    let days_in_age = Fr::from(days_to_be_age(age) as u64);
     let mut ped_com_dob = show_proof.show_groth16.commited_inputs[1];
-    ped_com_dob -= vp.pvk.vk.gamma_abc_g1[dob_value_pos] * days_in_21y;
+    ped_com_dob -= vp.pvk.vk.gamma_abc_g1[dob_value_pos] * days_in_age;
     let ret = show_proof.show_range2.as_ref().unwrap().verify(
         &ped_com_dob,
         RANGE_PROOF_INTERVAL_BITS,
@@ -529,7 +527,10 @@ mod tests {
             GenericInputsJSON{prover_inputs: prover_inputs_json}
         };
             
-        let mut client_state = create_client_state(&paths, &prover_inputs, cred_type).unwrap();
+        let client_state = create_client_state(&paths, &prover_inputs, cred_type).unwrap();
+        // We read and write the client state and proof to disk for testing, to be consistent with the command-line tool
+        write_to_file(&client_state, &paths.client_state);
+        let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
 
         println!("Running show");
         let io_locations = IOLocations::new(&paths.io_locations);    
@@ -539,6 +540,9 @@ mod tests {
         } else {
             create_show_proof(&mut client_state, &range_pk, &io_locations)
         };
+
+        write_to_file(&show_proof, &paths.show_proof);
+        let show_proof : ShowProof<CrescentPairing> = read_from_file(&paths.show_proof).unwrap();
 
         print!("Running verify");
         let pvk : PreparedVerifyingKey<CrescentPairing> = read_from_file(&paths.groth16_pvk).unwrap();

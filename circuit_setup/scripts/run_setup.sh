@@ -44,9 +44,9 @@ else
 fi
 
 if [ $CREDTYPE == 'mdl' ]; then 
-    CIRCOM_SRC_DIR="${ROOT_DIR}/circom-mdl"
+    CIRCOM_SRC_DIR="${ROOT_DIR}/circuits-mdl"
 else
-    CIRCOM_SRC_DIR="${ROOT_DIR}/circom"
+    CIRCOM_SRC_DIR="${ROOT_DIR}/circuits"
 fi
 
 

@@ -15,7 +15,7 @@ external dependencies have been forked into this project; see the [NOTICE](./NOT
 *Disclaimer: This code has not beeen carefully audited for security and should not be used in a production environment.*
 
 # Setting up
-To setup the library, see the instructions in [`/setup/README.md`](./setup/README.md);
+To setup the library, see the instructions in [`/circuit_setup/README.md`](./circuit_setup/README.md);
 to setup the sample application, see [`sample/README.md`](./sample/README.md).
 
 To check that the library has been setup correctly, run
@@ -29,7 +29,7 @@ There is a command line tool that can be used to run the individual parts of the
 
 The circuit setup must be completed first, by running
 ```
-cd setup/scripts
+cd circuit_setup/scripts
 ./run_setup.sh rs256
 ./run_setup.sh mdl1
 cd ../../creds

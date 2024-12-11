@@ -1,0 +1,66 @@
+{
+    "$schema": "https://json.schemastore.org/component-detection-manifest.json",
+    "version": 1,
+    "registrations":[
+        {
+            "component": {
+                "type": "git",
+                "git" : { 
+                    "repositoryUrl": "https://github.com/arkworks-rs/poly-commit", 
+                    "commitHash": "32badb304b60be67df4cf2510af87d3f9083ace4", 
+                    "tag": "0.4.0" }
+            },
+            "developmentDependency" : false
+        },
+        {
+            "component": {
+                "type": "git",
+                "git" : { 
+                    "repositoryUrl": "https://github.com/arkworks-rs/circom-compat", 
+                    "commitHash": "170b10fc9ed182b5f72ecf379033dda023d0bf07"
+                }
+            },
+            "developmentDependency" : false
+        },
+        {
+            "component": {
+                "type": "git",
+                "git" : { 
+                    "repositoryUrl": "https://github.com/arkworks-rs/groth16/", 
+                    "commitHash": "8e5c347bd8776645e046ca7ec1e4b9ff4b97c054"
+                }
+            },
+            "developmentDependency" : false
+        },       
+        {
+            "component": {
+                "type": "git",
+                "git" : { 
+                    "repositoryUrl": "https://github.com/privacy-scaling-explorations/circom-ecdsa-p256", 
+                    "commitHash": "5b916ea5241d07c5b5953dd5724d7fb771ad76d8"
+                }
+            },
+            "developmentDependency" : false
+        },   
+        {
+            "component": {
+                "type": "git",
+                "git" : { 
+                    "repositoryUrl": "https://github.com/yi-sun/circom-pairing", 
+                    "commitHash": "107c316223a08ac577522c54edd81f0fc4c03130"
+                }
+            },
+            "developmentDependency" : false
+        },   
+        {
+            "component": {
+                "type": "git",
+                "git" : { 
+                    "repositoryUrl": "https://github.com/zkemail/zk-email-verify", 
+                    "commitHash": "d0e6f7ff9bc5723dbb8f4607b9f9892177b6cafb"
+                }
+            },
+            "developmentDependency" : false
+        }                       
+    ]
+}

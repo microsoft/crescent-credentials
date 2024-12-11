@@ -7,7 +7,7 @@ on:
     paths:
       - 'creds/**'
       - 'forks/**'
-      - 'setup/**'
+      - 'circuit_setup/**'
       - 'samples/**'
   pull_request:
     branches:
@@ -15,7 +15,7 @@ on:
     paths:
       - 'creds/**'
       - 'forks/**'
-      - 'setup/**'
+      - 'circuit_setup/**'
       - 'samples/**'
 
 jobs:
@@ -50,12 +50,12 @@ jobs:
 
       - name: Run circuit setup for rs256
         run: |
-          cd setup/scripts
+          cd circuit_setup/scripts
           ./run_setup.sh rs256
 
       - name: Run circuit setup for mDL
         run: |
-          cd setup/scripts
+          cd circuit_setup/scripts
           ./run_setup.sh mdl1
 
       - name: Run clippy for /creds
