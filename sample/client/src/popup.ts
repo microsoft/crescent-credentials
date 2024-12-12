@@ -86,6 +86,30 @@ async function init (): Promise<void> {
       })
 
       /*
+        Display/Hide browser specific items
+      */
+      if (navigator.userAgent.includes('Firefox')) {
+        // Display the note about Firefox auto-close issue
+        const firefoxNote = getElementById<HTMLDivElement>('firefox-note')
+        firefoxNote.style.display = 'block'
+        // Set the base font size to 12px for Firefox as it renders larger
+        document.documentElement.style.fontSize = '12px'
+      }
+      else {
+        // The auto-open only works on Chrome/Edge. Firefox cannot open the popup programmatically
+        const autoOpenSection = getElementById<HTMLDivElement>('toggle-auto-open')
+        autoOpenSection.style.display = 'block'
+      }
+
+      /*
+        Click handler for the popup close button
+      */
+      const closePopupButton = getElementById<HTMLInputElement>('close-popup')
+      closePopupButton.addEventListener('click', () => {
+        window.close()
+      })
+
+      /*
         Add the schemas to the dropdown
       */
       const schemaDropDown = getElementById<HTMLSelectElement>('dropdown-import-schema')
@@ -230,10 +254,11 @@ function closeOverlay (): void {
   pick.style.display = 'none'
 }
 
+const domainPattern = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/
+
 getElementById<HTMLInputElement>('text-import-domain').addEventListener('input', function (event) {
   const value = (event.target as HTMLInputElement).value
   const buttonImportFile = getElementById<HTMLInputElement>('button-import-card')
-  const domainPattern = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/
 
   const validDomain = domainPattern.test(value)
   if (validDomain) {

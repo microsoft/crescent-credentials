@@ -58,13 +58,12 @@ export class CardElement extends LitElement {
 
         #info {
           font-size: 26px;
-          letter-spacing: 0.8px;
-          color: #E8E8E8;
+          color: #EEEEEE;
           font-weight: bold;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
         }
 
         #error {
@@ -139,7 +138,7 @@ export class CardElement extends LitElement {
         <div id="info">
           <span>${credRecord.issuer.name}</span>
           <button id="buttonDelete" @click=${this._credential.delete.bind(this._credential)}>
-            <img src="../icons/trash.svg" width="15" alt="trashcan icon"/>
+            <img src="../icons/x.svg" width="15" alt="delete card"/>
           </button>
         </div>
 
