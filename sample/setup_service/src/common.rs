@@ -5,6 +5,9 @@ use std::path::Path;
 use std::fs;
 use std::io;
 
+#[cfg(windows)]
+use junction;
+
 // TODO: Encode this information in a json config file containing, e.g,. 
 //   schema_uid: jwt_corporate_1
 //   cred_type : jwt
@@ -46,7 +49,6 @@ pub fn disc_uid_to_age(disc_uid : &str) -> Result<usize, &'static str> {
     }
 }
 
-
 pub fn cred_type_from_schema(schema_uid : &str) -> Result<&'static str, &'static str> {
     match schema_uid {
         "jwt_corporate_1" => Ok("jwt"), 
@@ -59,7 +61,6 @@ pub fn cred_type_from_schema(schema_uid : &str) -> Result<&'static str, &'static
 use std::os::unix::fs::symlink as symlink_any;
 
 #[cfg(windows)]
-use junction;
 fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
     if src.is_file() {
         // Create a 'hard link' as Windows requires admin privileges to create symlinks
