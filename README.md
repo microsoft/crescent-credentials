@@ -1,6 +1,6 @@
 # Crescent
 
-*THIS IS A RESEARCH PROJECT. THIS CODE SHOULDN'T BE USED IN A PRODUCTION ENVIRONEMNT.*
+_version 0.4_
 
 Crescent is a library to generate proofs of possession of JSON Web Tokens (JWT) and
 mobile Driver's Licenses (mDL) credentials. 
@@ -12,7 +12,7 @@ This repository contains the Crescent library and a sample application consistin
 a setup service, a browser extension client and client helper service, and a web server verifier. some
 external dependencies have been forked into this project; see the [NOTICE](./NOTICE.md) file for details
 
-*Disclaimer: This code has not beeen carefully audited for security and should not be used in a production environment.*
+*Disclaimer: This code has not been carefully audited for security and should not be used in a production environment.*
 
 # Setting up
 To setup the library, see the instructions in [`/circuit_setup/README.md`](./circuit_setup/README.md);

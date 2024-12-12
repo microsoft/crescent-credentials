@@ -20,3 +20,4 @@ circuit_setup/inputs/*/issuer.prv
 circuit_setup/inputs/*/issuer.pub
 circuit_setup/inputs/*/token.jwt
 
+setup/generated_files/
