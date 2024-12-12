@@ -10,8 +10,6 @@ Run the install script:
 
 `npm install`
 
-&nbsp;
-
 ## Build
 
 Build the extension (3 modes):
@@ -24,8 +22,6 @@ Build the extension (3 modes):
 
 * watch build (watches files and does debug build on save)  
 `npm run build:watch`
-
-&nbsp;
 
 ## Installation
 
