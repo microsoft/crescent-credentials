@@ -9,15 +9,15 @@
 }
 
 html {
-    width: 450px;
-    height: 600px;
     margin: 0;
     padding: 0;
     scrollbar-gutter: stable;
+    font-size: 16px;
 }
 
 body {
-    height: 100%;
+    width: 450px;
+    height: 600px;
     margin: 0px;
     padding: 5px;
     display: flex;
@@ -45,12 +45,10 @@ body {
 
 .tab:first-child {
     border-top-left-radius: 5px;
-    /* Round top left corner */
 }
 
 .tab:last-child {
     border-top-right-radius: 5px;
-    /* Round top right corner */
 }
 
 .active {
@@ -58,7 +56,6 @@ body {
     border-bottom: 1px solid #FFF;
 }
 
-/* Tab content styles */
 .tab-content {
     display: none;
     padding: 10px;
@@ -71,7 +68,6 @@ body {
     display: block;
 }
 
-/* Style for the tooltip container */
 .info-tooltip {
     position: relative;
     display: inline-block;
@@ -83,16 +79,12 @@ body {
     text-align: center;
     line-height: 20px;
     cursor: help;
-    /* changes the mouse cursor when hovered over the tooltip */
     margin-left: 5px;
-    /* space between the tooltip and the adjacent content */
 }
 
-/* Hide the tooltip text by default */
 .info-tooltip .tooltip-text {
     visibility: hidden;
     width: 200px;
-    /* adjust as needed */
     background-color: #555;
     color: #FFF;
     text-align: center;
@@ -100,20 +92,14 @@ body {
     border-radius: 6px;
     position: absolute;
     z-index: 9999;
-    /* Make sure tooltip is above everything */
     top: -5px;
-    /* position above the tooltip */
     left: 105%;
     transform: translateX(-50%);
-    /* center the tooltip */
     opacity: 0;
     transition: opacity 0.3s;
-    /* smooth fade-in effect */
     overflow: visible;
-    /* Ensure content is not clipped */
 }
 
-/* Show the tooltip text when hovering over the tooltip container */
 .info-tooltip:hover .tooltip-text {
     visibility: visible;
     opacity: 1;
@@ -173,7 +159,6 @@ input[type="text"] {
     color: grey;
 }
 
-/* Style for the overlay */
 #overlay {
     position: fixed;
     top: 0;
@@ -182,7 +167,6 @@ input[type="text"] {
     height: 100%;
     backdrop-filter: blur(5px);
     background-color: rgba(0, 0, 0, 0.3);
-    /* Hide initially; display as flex */
     display: none;
     justify-content: center;
     align-items: center;
@@ -191,10 +175,8 @@ input[type="text"] {
 
 .dialog {
     text-align: left;
-    /* Align text elements left */
     padding: 30px;
     min-width: 300px;
-    /* Adjust width as needed */
     border-radius: 8px;
     background-color: white;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
@@ -212,6 +194,12 @@ input[type="text"] {
     margin-top: 15px;
 }
 
+#firefox-note {
+    font-size: 1.0em;
+    color: grey;
+    margin-top: 10px;
+    padding: 5px;
+}
 
 #overlay .error {
     background-color: rgb(187, 187, 187);
@@ -226,4 +214,16 @@ input[type="text"] {
 
 #overlay #pick-dialog {
     display: none;
+}
+
+#close-popup {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    width: 15px;
+    z-index: 10;
+}
+
+#close-popup:hover {
+    cursor: pointer;
 }
