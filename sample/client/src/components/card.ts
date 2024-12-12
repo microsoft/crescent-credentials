@@ -58,7 +58,6 @@ export class CardElement extends LitElement {
 
         #info {
           font-size: 26px;
-          letter-spacing: 0.8px;
           color: #EEEEEE;
           font-weight: bold;
           display: flex;
