@@ -230,10 +230,11 @@ function closeOverlay (): void {
   pick.style.display = 'none'
 }
 
+const domainPattern = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/
+
 getElementById<HTMLInputElement>('text-import-domain').addEventListener('input', function (event) {
   const value = (event.target as HTMLInputElement).value
   const buttonImportFile = getElementById<HTMLInputElement>('button-import-card')
-  const domainPattern = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?::\d{1,5})?$/
 
   const validDomain = domainPattern.test(value)
   if (validDomain) {

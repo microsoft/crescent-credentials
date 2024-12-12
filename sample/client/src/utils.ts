@@ -139,7 +139,7 @@ export async function acctiveTabId (): Promise<number> {
 
 export function isBackground (): boolean {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  return (chrome.runtime.getBackgroundPage == null)
+  return (window == null || window.location.pathname.includes('background'))
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
