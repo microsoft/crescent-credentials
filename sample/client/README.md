@@ -10,6 +10,8 @@ Run the install script:
 
 `npm install`
 
+&nbsp;
+
 ## Build
 
 Build the extension (3 modes):
@@ -23,29 +25,32 @@ Build the extension (3 modes):
 * watch build (watches files and does debug build on save)  
 `npm run build:watch`
 
+&nbsp;
+
 ## Installation
 
-<div style="padding-left: 2em">
 Follow the side-loading instruction for your browser to load the extension:
 
 [Edge](https://learn.microsoft.com/en-us/microsoft-edge/extensions-chromium/getting-started/extension-sideloading)  
 [Chrome](https://developer.chrome.com/docs/extensions/mv3/getstarted/development-basics/#load-unpacked)  
-[Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/) 
+[Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/)
 
 The Edge/Chrome `manifest.json` file is located at `samples/browser-extension/dist/chrome`  
 The Firefox `manifest.json` file is located at `samples/browser-extension/dist/firefox`  
 
-Firefox requires additional extension permissions to download manifests from external sites
-1) In the Firefox address bar go to `about:addons` to see the installed extensions
-2) Find **Crescent Browser Extension** and click the `...` button to the right
-3) Select **Manage** from the pop-up menu
-4) Click the **Permission** tab
-5) Enable **Access your data for all websites**
-</div>
+### Firefox
+
+There is a known issue when using the client extension on Firefox where the extension popup window closes immediately after opening the filepicker when importing a credential from file, preventing the import from succeeding. To work around this:  
+
+1. Open a new tab and navigate to `about:config`.
+2. Search for `ui.popup.disable_autohide` and set it to `true`.
+
+**Note**: This change keeps the popup window open until you press the [esc] key instead of it auto-closing when it loses focus.
 
 ## Usage
 
 The browser extension's pop-up menu contains three tabs:
+
 * Wallet: displays credentials that can be displayed to a verifier
 * About: displays information about the project
 * Config: contains settings to reset the extension, configure the client helper service, and import a credential
