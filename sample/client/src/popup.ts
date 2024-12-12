@@ -92,12 +92,22 @@ async function init (): Promise<void> {
         // Display the note about Firefox auto-close issue
         const firefoxNote = getElementById<HTMLDivElement>('firefox-note')
         firefoxNote.style.display = 'block'
+        // Set the base font size to 12px for Firefox as it renders larger
+        document.documentElement.style.fontSize = '12px'
       }
       else {
         // The auto-open only works on Chrome/Edge. Firefox cannot open the popup programmatically
         const autoOpenSection = getElementById<HTMLDivElement>('toggle-auto-open')
         autoOpenSection.style.display = 'block'
       }
+
+      /*
+        Click handler for the popup close button
+      */
+      const closePopupButton = getElementById<HTMLInputElement>('close-popup')
+      closePopupButton.addEventListener('click', () => {
+        window.close()
+      })
 
       /*
         Add the schemas to the dropdown
