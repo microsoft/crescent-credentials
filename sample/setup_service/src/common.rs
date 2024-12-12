@@ -5,6 +5,12 @@ use std::path::Path;
 use std::fs;
 use std::io;
 
+#[cfg(unix)]
+use std::os::unix::fs::symlink as symlink_any;
+
+#[cfg(windows)]
+use junction;
+
 // TODO: Encode this information in a json config file containing, e.g,. 
 //   schema_uid: jwt_corporate_1
 //   cred_type : jwt
@@ -46,7 +52,6 @@ pub fn disc_uid_to_age(disc_uid : &str) -> Result<usize, &'static str> {
     }
 }
 
-
 pub fn cred_type_from_schema(schema_uid : &str) -> Result<&'static str, &'static str> {
     match schema_uid {
         "jwt_corporate_1" => Ok("jwt"), 
@@ -55,15 +60,18 @@ pub fn cred_type_from_schema(schema_uid : &str) -> Result<&'static str, &'static
     }
 }
 
-#[cfg(unix)]
-use std::os::unix::fs::symlink as symlink_any;
 
 #[cfg(windows)]
 fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
     if src.is_file() {
-        std::os::windows::fs::symlink_file(src, dst)
+        // Create a 'hard link' as Windows requires admin privileges to create symlinks
+        std::fs::hard_link(src, dst)
     } else if src.is_dir() {
-        std::os::windows::fs::symlink_dir(src, dst)
+        // Trim \\?\ prefix from file paths or junction::create will mangle the prefix creating an invalid junction
+        let trimmed_src = Path::new(src.to_str().expect("Invalid UTF-8 in path").trim_start_matches(r"\\?\"));
+        let trimmed_dst = Path::new(dst.to_str().expect("Invalid UTF-8 in path").trim_start_matches(r"\\?\"));
+        // Create a 'junction' as Windows requires admin privileges to create symlinks
+        junction::create(trimmed_src, trimmed_dst)
     } else {
         Err(io::Error::new(io::ErrorKind::Other, "Source path is neither file nor directory"))
     }
