@@ -5,6 +5,9 @@ use std::path::Path;
 use std::fs;
 use std::io;
 
+#[cfg(unix)]
+use std::os::unix::fs::symlink as symlink_any;
+
 #[cfg(windows)]
 use junction;
 
@@ -57,8 +60,6 @@ pub fn cred_type_from_schema(schema_uid : &str) -> Result<&'static str, &'static
     }
 }
 
-#[cfg(unix)]
-use std::os::unix::fs::symlink as symlink_any;
 
 #[cfg(windows)]
 fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {
