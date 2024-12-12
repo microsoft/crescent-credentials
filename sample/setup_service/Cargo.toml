@@ -8,4 +8,5 @@ default-run = "crescent-sample-setup-service"
 rocket = { version = "0.5.1", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+junction = "1.2.0"
 crescent = {path="../../creds"}
