@@ -193,6 +193,12 @@ input[type="text"] {
     margin-top: 15px;
 }
 
+#firefox-note {
+    font-size: 0.8em;
+    color: grey;
+    margin-top: 10px;
+    padding: 5px;
+}
 
 #overlay .error {
     background-color: rgb(187, 187, 187);

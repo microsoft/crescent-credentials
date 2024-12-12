@@ -86,6 +86,20 @@ async function init (): Promise<void> {
       })
 
       /*
+        Display/Hide browser specific items
+      */
+      if (navigator.userAgent.includes('Firefox')) {
+        // Display the note about Firefox auto-close issue
+        const firefoxNote = getElementById<HTMLDivElement>('firefox-note')
+        firefoxNote.style.display = 'block'
+      }
+      else {
+        // The auto-open only works on Chrome/Edge. Firefox cannot open the popup programmatically
+        const autoOpenSection = getElementById<HTMLDivElement>('toggle-auto-open')
+        autoOpenSection.style.display = 'block'
+      }
+
+      /*
         Add the schemas to the dropdown
       */
       const schemaDropDown = getElementById<HTMLSelectElement>('dropdown-import-schema')

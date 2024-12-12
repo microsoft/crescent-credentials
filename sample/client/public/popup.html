@@ -69,12 +69,21 @@
                 <input type="button" class="config-button config-button-disabled" id="button-import-card"
                     value="File ..." title="Enter Domain URL before picking file" disabled>
             </div>
+            <div id="firefox-note" style="display: none;">
+                <span>
+                    * Firefox has a known issue where opening the file picker control (File ... button) auto-closes
+                    this popup window which prevents the selected file from being processed. See /client/README.md for
+                    workaround to prevent auto-close.
+                </span>
+            </div>
             <input type="file" id="file-import-file" style="display: none;">
 
             <br>
             <hr>
-            <span class="config-section-header">Options</span>
-            <toggle-switch label="Auto open on disclosure request" id="toggleAutoOpenOnDisclosure"></toggle-switch>
+            <div id="toggle-auto-open" style="display: none;">
+                <span class="config-section-header">Options</span>
+                <toggle-switch label="Auto open on disclosure request" id="toggleAutoOpenOnDisclosure"></toggle-switch>
+            </div>
 
         </div>
     </div>
