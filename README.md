@@ -23,7 +23,17 @@ December 2024
 
 ## Setting up
 
-### Windows: Enable symlinks with git
+To setup the library, see the instructions in [`/circuit_setup/README.md`](./circuit_setup/README.md);
+to setup the sample application, see [`sample/README.md`](./sample/README.md).
+
+To check that the library has been setup correctly, run
+
+```bash
+cd creds
+cargo test --release
+```
+
+### Enabling symlinks with git on Windows
 
 This project uses symlinks to share directories within the project. On Windows, symlinks require administrator privileges. Git can be configured to create project symlinks when cloning the repository.
 To enable symlinks with git, run the following command:
@@ -39,16 +49,6 @@ mklink /J circuit_setup\circuits-mdl\circomlib circuit_setup\circuits\circomlib
 ```
 
 Verify `circuit_setup\circuits-mdl\circomlib` is now a directory.
-
-To setup the library, see the instructions in [`/circuit_setup/README.md`](./circuit_setup/README.md);
-to setup the sample application, see [`sample/README.md`](./sample/README.md).
-
-To check that the library has been setup correctly, run
-
-```bash
-cd creds
-cargo test --release
-```
 
 ## Running the demo steps from the command line
 
