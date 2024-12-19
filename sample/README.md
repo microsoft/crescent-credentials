@@ -6,36 +6,36 @@ The sample currently supports two credential types: JSON Web Tokens (JWT) and mo
 
 The sample is composed of the following components:
 * Issuer: a Rocket server that issues JWT tokens; see [`issuer/README.md`](./issuer/README.md).
-* Setup Service: a Rocket server that sets up the ZK parameters for all issuers using the same JWT schema; see [setup_service/README.md](./setup_service/README.md).
+* Setup Service: a Rocket server that sets up the ZK parameters for all issuers using the same JWT/mDL schema and cryptographic algorithms; see [setup_service/README.md](./setup_service/README.md).
 * Client: a browser extension that stores JWT tokens and presents ZK proofs; see [`client/README.md`](./client/README.md).
 * Client Helper: a Rocket server that assists the Client; see [client_helper/README.md](./client_helper/README.md).
 * Verifier: a web application that verifies ZK proofs; see [`verifier/README.md`](./verifier/README.md).
 
 Two scripts help with managing the sample projects:
-* `./setup-sample.sh`: runs the setup script for (using a default config) and builds the issuer, client_helper, and verifier projects; each must then be started in their own console with `cargo run --release`. The client must be setup and installed separately. 
-* `./clean-sample.sh [--data-and-build]`: cleans the data (if the build files too, if the `--data-and-build` flag is passed) for the issuer, client_helper, and verifier projects.
+* `./setup-sample.sh`: runs the setup script for (using a default config) and builds the `issuer`, `client_helper`, and `verifier` projects; each must then be started in their own console with `cargo run --release`. The client must be setup and installed separately. 
+* `./clean-sample.sh [--data-and-build]`: cleans the data (if the build files too, if the `--data-and-build` flag is passed) for the `issuer`, `client_helper`, and `verifier` projects.
 
 Each component must be setup and modified individually; see their respective README for details. Once setup, follow the instructions from <a href="sample.html">this page</a> to go through the sample demo steps.
 
 # Sample Overview
 
-The sample application illustrates the setup of a Crescent system, and the proof generation and verification from a standard JWT of mDL, mimicking a real-life scenario. Note that security aspects have been overly simplified (e.g., using HTTP over localhost instead of HTTPS, simple username/password user authentication, etc.)
+The sample application illustrates the setup of a Crescent system, and the proof generation and verification from a standard JWT or mDL, mimicking a real-life scenario. Note that security aspects have been overly simplified (e.g., using HTTP over localhost instead of HTTPS, simple username/password user authentication, etc.).
 
-The sample JWT lifecycle is described below, the numeral steps reference this diagram.
+The sample lifecycle is described below, the numeral steps reference this diagram.
 
 <img src="sample_arch.png" alt="Sample Architecture" width="50%">
 
-The *Issuer* is an "unmodified" conventional JWT issuer. It generates a RSA key pair and publishes the public key in a JSON Web Key set at its `.well-known/jwks.json` location. It offers a login and token issuance page (the sample offers two demo users, "alice" and "bob", sharing a password "password").
+The *Issuer* is an "unmodified" conventional JWT issuer (we don't have a mDL issuer, as these are not typically issued from web endpoints). It generates a RSA key pair and publishes the public key in a JSON Web Key set at its `.well-known/jwks.json` location. It offers a login and token issuance page (the sample offers two demo users, "alice" and "bob", sharing a password "password").
 
-The *Setup Service* sets up the Crescent parameters. These can be shared by all *Issuers* using the same credential type and schema (identified by a schema UID). The Setup Service calls the `zksetup` library function using an existing JWT or by creating one using dummy claim and signature values (as is the case in our sample [TODO: not up to date, revise]). The resulting parameters are made available at a public endpoint.
+The *Setup Service* sets up the Crescent parameters. These parameters, identified by a schema UID, can be shared by all *Issuers* using the same signing algorithm, and the same credential type and schema. The Setup Service calls the `zksetup` library function using an existing JWT or by creating one using dummy claim and signature values. The resulting parameters are made available at a public endpoint.
 
-Alice visits the Issuer welcome page using a browser with the *Browser Extension* and *Client Helper* installed. She logs in using her username and password, and clicks "Issue token" to get issued a JWT. The browser extension reads the JWT from the HTML page and sends it to the Client Helper which 1) retrieves the corresponding Crescent parameters from the Setup Service, and 2) runs the `prove` library function preparing the JWT for later showing. The proving parameters are stored in the Client Helper and associated with the JWT. A mDL can also be loaded directly into the Browser Extension, in absence of a sample issuance workflow.
+To obtain a JWT, Alice visits the Issuer welcome page using a browser with the *Browser Extension* installed and the *Client Helper* running. She logs in using her username and password, and clicks "Issue" to get issued a JWT. The browser extension reads the JWT from the HTML page and sends it to the Client Helper which 1) retrieves the corresponding Crescent parameters from the Setup Service, and 2) runs the `prove` library function preparing the JWT for later showing. The proving parameters are stored in the Client Helper and associated with the JWT. A mDL can be loaded directly into the Browser Extension, in absence of a sample issuance workflow; the same preparation steps are performed by the Client Helper.
 
-Later, Alice visits the *Verifier* page. Her browser extension detects a meta tag indicating a Crescent proof request. She open the extensions and selects the credential to use (matching the requesting type (JWT or mDL) and disclosure capabilities). The Client then generates a showing by calling the `show` library function and sends it to the specified Verifier endpoint. Upon reception, the Verifier downloads the validation parameters from the Setup Service (the first time it sees a presentation for the schema UID) and the Issuer's public key (the first time it sees credential from this Issuer) and calls the `verify` library function. Upon successful proof validation, Alice is granted access. 
+Later, Alice visits a *Verifier* page. Her browser extension detects a meta tag indicating a Crescent proof request requesting a specific disclosure UID (see below). She opens the extensions and selects the credential to use (matching the requesting type (JWT or mDL) and disclosure capabilities). The Client then generates a showing by calling the `show` library function and sends it to the Verifier endpoint specified in a meta tag. Upon reception, the Verifier downloads the validation parameters from the Setup Service (the first time it sees a presentation for the schema UID) and, for JWTs, the Issuer's public key (the first time it sees credential from this Issuer), and calls the `verify` library function. Upon successful proof validation, Alice is granted access. 
 
 # Sample details
 
-The sample defines the following *schema UIDs* expressing the credential type and proof capabilities. (TODO: the client helper should return these values to the browser extension when /prepare is called)
+The sample defines the following *schema UIDs* expressing the credential type and proof capabilities.
 
 ### jwt_corporate_1
 
