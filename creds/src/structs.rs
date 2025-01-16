@@ -72,6 +72,17 @@ impl IOLocations {
             )),
         }
     }
+
+    pub fn get_public_key_indices(&self) -> Vec<usize> {
+        let mut indices = vec![];
+        for key in self.public_io_locations.keys() {
+            if key.starts_with("modulus") || key.starts_with("pubkey") {
+                indices.push(*self.public_io_locations.get(key).unwrap() - 1);
+            }
+        }
+        
+        indices
+    }
 }
 
 impl ProverInput for GenericInputsJSON {

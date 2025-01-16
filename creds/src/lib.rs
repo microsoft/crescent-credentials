@@ -224,6 +224,11 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     end_timer!(build_timer);    
     let inputs = circom.get_public_inputs().unwrap();
 
+    println!("Inputs for groth16 proof: ");
+    for (i, input) in inputs.clone().into_iter().enumerate() {
+        println!("input {}  =  {:?}", i, input.into_bigint().to_string());
+    }
+
     let mut rng = thread_rng();
     let prove_timer = start_timer!(|| "Groth16 prove");    
     let proof = Groth16::<ECPairing>::prove(&params, circom, &mut rng).unwrap();    
@@ -278,6 +283,48 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
 
     ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
 }
+
+pub fn create_show_proof_sd(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
+{
+    // Create Groth16 rerandomized proof for showing
+    let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
+    // The IOs are exp, email, family_name, given_name, tenant_ctry, tenant_region_scope.  Hidden by default
+    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
+    io_types[exp_value_pos - 1] = PublicIOType::Committed;
+
+    let indices = io_locations.get_public_key_indices();
+    println!("public key indices: {:?}", indices);
+    for i in io_locations.get_public_key_indices() {
+        io_types[i] = PublicIOType::Revealed;
+    }
+    
+    // Reveal the family name and tenant_ctry
+    io_types[io_locations.get_io_location("family_name_value").unwrap() - 1] = PublicIOType::Revealed;
+    io_types[io_locations.get_io_location("tenant_ctry_value").unwrap() - 1] = PublicIOType::Revealed;
+
+    let revealed_inputs = vec![
+        client_state.inputs[io_locations.get_io_location("family_name_value").unwrap() - 1],
+        client_state.inputs[io_locations.get_io_location("tenant_ctry_value").unwrap() - 1]
+    ];
+
+    let show_groth16 = client_state.show_groth16(&io_types);
+    
+    // Create fresh range proof 
+    let time_sec = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap()
+    .as_secs();
+    let cur_time = Fr::from( time_sec );
+
+    let mut com_exp_value = client_state.committed_input_openings[0].clone();
+    com_exp_value.m -= cur_time;
+    com_exp_value.c -= com_exp_value.bases[0] * cur_time;
+    let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
+
+    // Assemble proof
+    ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
+}
+
 
 pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations, age: usize) -> ShowProof<ECPairing>
 {
@@ -390,6 +437,88 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     println!("Token is valid, Prover revealed email domain: {}", domain);
 
     (true, domain)
+}
+
+pub fn verify_show_sd(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>) -> (bool, String)
+{
+    let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
+    let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
+    let mut io_types = vec![PublicIOType::Hidden; show_proof.inputs_len];
+    io_types[exp_value_pos - 1] = PublicIOType::Committed;
+    for i in io_locations.get_public_key_indices() {
+        io_types[i] = PublicIOType::Revealed;
+    }    
+    io_types[io_locations.get_io_location("family_name_value").unwrap() - 1] = PublicIOType::Revealed;
+    io_types[io_locations.get_io_location("tenant_ctry_value").unwrap() - 1] = PublicIOType::Revealed;
+
+    // Create an inputs vector with the inputs from the prover, and the issuer's public key
+    let public_key_inputs = pem_to_inputs::<<ECPairing as Pairing>::ScalarField>(&vp.issuer_pem);
+    if public_key_inputs.is_err() {
+        print!("Error: Failed to convert issuer public key to input values");
+        return (false, "".to_string());
+    }
+    let mut inputs = public_key_inputs.unwrap();
+    inputs.extend(show_proof.revealed_inputs.clone()); 
+    
+    println!("Verifier got revealed inputs  : {:?}", &show_proof.revealed_inputs);
+    println!("Created inputs: ");
+    for (i, input) in inputs.clone().into_iter().enumerate() {
+        println!("input {}  =  {:?}", i, input.into_bigint().to_string());
+    }
+
+    let verify_timer = std::time::Instant::now();
+    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &inputs);
+    if !ret {
+        println!("show_groth16.verify failed");
+        return (false, "".to_string());
+    }
+    let cur_time = Fr::from(show_proof.cur_time);
+    let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let delta = 
+        if show_proof.cur_time < now_seconds {
+            now_seconds - show_proof.cur_time
+        } else {
+            0
+    };
+    println!("Proof created {} seconds ago", delta);    
+
+    if delta > SHOW_PROOF_VALIDITY_SECONDS {
+        println!("Invalid show proof -- older than {} seconds", SHOW_PROOF_VALIDITY_SECONDS);
+        return (false, "".to_string());
+    }
+
+    let mut ped_com_exp_value = show_proof.show_groth16.commited_inputs[0];
+    ped_com_exp_value -= vp.pvk.vk.gamma_abc_g1[exp_value_pos] * cur_time;
+    let ret = show_proof.show_range.verify(
+        &ped_com_exp_value,
+        RANGE_PROOF_INTERVAL_BITS,
+        &vp.range_vk,
+        &io_locations,
+        &vp.pvk,
+        "exp_value",
+    );
+    if !ret {
+        println!("show_range.verify failed");
+        return (false, "".to_string());
+    }    
+    println!("Verification time: {:?}", verify_timer.elapsed());  
+
+    // TODO: it's currently ad-hoc how the verifier knows which revealed inputs correspond 
+    // to what.  In this example we have to subtract 2 from attr_name_pos to account for the committed attribute 
+    let mut revealed_idx = 0;
+    for attr_name in ["family_name_value", "tenant_ctry_value"] {
+        let attr_value = match unpack_int_to_string_unquoted( &show_proof.revealed_inputs[revealed_idx].into_bigint()) {
+            Ok(attr_value) => attr_value,
+            Err(e) => {
+                println!("Proof was valid, but failed to unpack '{}' attribute, {:?}", attr_name, e);
+                return (false, "".to_string());
+            }
+        };
+        println!("Token is valid, Prover revealed attribute '{}' with value : {}", attr_name, attr_value);
+        revealed_idx += 1;
+    }
+
+    (true, "TODO".to_string())
 }
 
 pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, age: usize) -> (bool, String)

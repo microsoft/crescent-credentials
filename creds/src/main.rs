@@ -6,7 +6,7 @@ use ark_serialize::CanonicalSerialize;
 use crescent::groth16rand::{ClientState, ShowGroth16};
 use crescent::rangeproof::{RangeProofPK, RangeProofVK};
 use crescent::utils::{read_from_file, write_to_file};
-use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, run_zksetup, verify_show, verify_show_mdl, CachePaths, ShowProof, VerifierParams};
+use crescent::{create_client_state, create_show_proof_sd, create_show_proof_mdl, run_zksetup, verify_show_sd, verify_show_mdl, CachePaths, ShowProof, VerifierParams};
 use crescent::CrescentPairing;
 use crescent::prep_inputs::{prepare_prover_inputs, parse_config};
 use crescent::structs::{GenericInputsJSON, IOLocations, ProverInput};
@@ -163,7 +163,7 @@ pub fn run_show(
     let show_proof = if client_state.credtype == "mdl" {
         create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
-        create_show_proof(&mut client_state, &range_pk, &io_locations)
+        create_show_proof_sd(&mut client_state, &range_pk, &io_locations)
     };
     println!("Proving time: {:?}", proof_timer.elapsed());
 
@@ -187,7 +187,7 @@ pub fn run_verifier(base_path: PathBuf) {
     let (verify_result, data) = if show_proof.show_range2.is_some() {
         verify_show_mdl(&vp, &show_proof, MDL_AGE_GREATER_THAN)
     } else {
-        verify_show(&vp, &show_proof)
+        verify_show_sd(&vp, &show_proof)
     };
 
     if verify_result {
