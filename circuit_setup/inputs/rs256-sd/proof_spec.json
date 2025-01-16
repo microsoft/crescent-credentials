@@ -1,0 +1,3 @@
+{
+    "revealed" : ["family_name", "tenant_ctry", "auth_time", "aud"]
+}

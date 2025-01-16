@@ -52,10 +52,12 @@ def prepare_circom(config, circom_output_file):
             name = keys[i]
             if name in CRESCENT_CONFIG_KEYS:
                 continue
+
             typ_string = config[name].get("type")
             if typ_string is None:
                 print("Missing 'type' field in config file for claim '{}'".format(name))
                 sys.exit(-1)
+
             typ = claim_type_as_int(typ_string)
             claim = '"' + keys[i] + '":'
             claims.append(claim)
@@ -72,7 +74,8 @@ def prepare_circom(config, circom_output_file):
     match_{name}_name.r <== {name}_r;
     match_{name}_name.object_nested_level <== object_nested_level;
 '''.format(name = name, claim_template_len = len(claim_template), claim_template = str(claim_template)))
-            
+
+### begin reveal bytes (currently unused)            
             if config[name].get("reveal_bytes") is not None and config[name]["reveal_bytes"] == True:
                 if config[name].get("max_claim_byte_len") is not None:
                     if (config[name]["max_claim_byte_len"] % MAX_FIELD_BYTE_LEN) != 0:
@@ -102,8 +105,10 @@ def prepare_circom(config, circom_output_file):
         {name}_value[i] <== reveal_bytes_{name}.value[i];
     {name}_value_len <== reveal_bytes_{name}.value_len;
 '''.format(name = name, is_number = is_number))
-                
-            elif config[name].get("reveal") is not None and config[name]["reveal"] == True:
+### end reveal bytes
+
+### begin reveal unhashed                 
+            elif claim_reveal_unhashed(config[name]): 
                 if config[name].get("max_claim_byte_len") is not None:
                     if (config[name]["max_claim_byte_len"] % MAX_FIELD_BYTE_LEN) != 0:
                         print("max_claim_byte_len must be a multiple of MAX_FIELD_BYTE_LEN")
@@ -113,9 +118,8 @@ def prepare_circom(config, circom_output_file):
     var {}_max_claim_byte_len = {};
                             '''.format(name, config[name]["max_claim_byte_len"]))
                 else:
-                    f.write('''
-    var {}_max_claim_byte_len = max_json_bytes;
-                            '''.format(name))
+                    print("max_claim_byte_len must be set")
+                    sys.exit(-1)
                 
                 reveal_function = "RevealClaimValue"
                 dom_only = config[name].get("reveal_domain_only");
@@ -137,26 +141,18 @@ def prepare_circom(config, circom_output_file):
     {name}_value === reveal_{name}.value;
 
 '''.format(name = name, reveal_function = reveal_function, is_number = is_number))                
-            
-            elif config[name].get("hashed_reveal") is not None and config[name]["hashed_reveal"] == True:
-                if config[name].get("max_claim_byte_len") is not None:
-                    if (config[name]["max_claim_byte_len"] % MAX_FIELD_BYTE_LEN) != 0:
-                        print("max_claim_byte_len must be a multiple of MAX_FIELD_BYTE_LEN")
-                        sys.exit(-1)
+###  end reveal unhashed
 
-                    f.write('''
-    var {}_max_claim_byte_len = {};
-                            '''.format(name, config[name]["max_claim_byte_len"]))
-                else:
-                    f.write('''
-    var {}_max_claim_byte_len = max_json_bytes;
-                            '''.format(name))
+###  begin reveal hashed          
+            elif claim_reveal_hashed(config[name]):
+                f.write('''var {}_max_claim_byte_len = {};'''.format(name, config[name]["max_claim_byte_len"]))
                 
                 is_number = 0
                 if typ == 1:
                     is_number = 1
+                
                 f.write('''
-    component hash_reveal_{name} = HashRevealClaimValueBytes(max_json_bytes, {name}_max_claim_byte_len, field_byte_len, {is_number});
+    component hash_reveal_{name} = HashRevealClaimValue(max_json_bytes, {name}_max_claim_byte_len, field_byte_len, {is_number});
     hash_reveal_{name}.json_bytes <== jwt_bytes;
     hash_reveal_{name}.l <== match_{name}_name.value_l;
     hash_reveal_{name}.r <== match_{name}_name.value_r;
@@ -164,6 +160,7 @@ def prepare_circom(config, circom_output_file):
     signal output {name}_digest;
     {name}_digest <== hash_reveal_{name}.digest;
 '''.format(name = name, is_number = is_number))
+### end reveal hashed
 
             else:
                 f.write('''

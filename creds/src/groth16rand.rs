@@ -5,7 +5,7 @@ use crate::{
     dlog::{DLogPoK, PedersenOpening},
     rangeproof::{RangeProof, RangeProofPK, RangeProofVK},
     structs::{IOLocations, PublicIOType},
-    utils::msm_select,
+    utils::msm_select
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, Group, VariableBaseMSM};
 use ark_groth16::{Groth16, PreparedVerifyingKey, Proof, VerifyingKey};
@@ -25,12 +25,14 @@ use std::fs::OpenOptions;
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ClientState<E: Pairing> {
     pub inputs: Vec<E::ScalarField>, // public inputs parsed into field elements.
+    pub aux: Option<String>, // Auxiliary data required by the prover
     pub proof: Proof<E>,
     pub vk: VerifyingKey<E>,
     pub pvk: PreparedVerifyingKey<E>,
     input_com_randomness: Option<E::ScalarField>,
     pub committed_input_openings: Vec<PedersenOpening<E::G1>>, //TODO: make this into a hashmap
     pub credtype : String,
+    pub config_str: String
 }
 
 /// An unlinkable showing of a valid groth16 proof satisfying a particular NP relation
@@ -57,27 +59,29 @@ pub struct ShowECDSA<E: Pairing> {
 impl<E: Pairing> ClientState<E> {
     pub fn new(
         inputs: Vec<E::ScalarField>,
+        aux: Option<String>,
         proof: Proof<E>,
         vk: VerifyingKey<E>,
         pvk: PreparedVerifyingKey<E>,
+        config_str: String
     ) -> Self {
         Self {
             inputs,
             proof,
+            aux,
             vk,
             pvk,
             input_com_randomness: None,
             committed_input_openings: Vec::new(),
-            credtype : "jwt".to_string()
+            credtype : "jwt".to_string(), 
+            config_str
         }
     }
 
     pub fn new_from_file(path: &str) -> Self {
         let f = File::open(path).unwrap();
         let buf_reader = BufReader::new(f);
-
         
-
         ClientState::<E>::deserialize_uncompressed_unchecked(buf_reader).unwrap()
     }
 

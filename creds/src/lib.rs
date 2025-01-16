@@ -12,8 +12,11 @@ use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
-use prep_inputs::{pem_to_inputs, unpack_int_to_string_unquoted};
-use utils::{read_from_file, write_to_file};
+use prep_inputs::{create_proof_spec_internal, pem_to_inputs, unpack_int_to_string_unquoted};
+use serde::{Deserialize, Serialize};
+use serde_json::{json,Value};
+use sha2::{Digest, Sha256};
+use utils::{read_from_file, strip_quotes, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
 use crate::{
@@ -32,6 +35,7 @@ pub mod daystamp;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
+pub const DEFAULT_PROOF_SPEC : &str = r#"{"revealed" : ["email"]}"#;
 
 pub type CrescentPairing = ECPairing;
 pub type CrescentFr = Fr;
@@ -71,7 +75,8 @@ pub struct VerifierParams<E: Pairing> {
     pub pvk : PreparedVerifyingKey<E>,
     pub range_vk: RangeProofVK<E>,
     pub io_locations_str: String, // Stored as String since IOLocations does not implement CanonicalSerialize
-    pub issuer_pem: String
+    pub issuer_pem: String, 
+    pub config_str: String
 }
 impl<E: Pairing> VerifierParams<E> {
     pub fn new(paths : &CachePaths) -> Result<Self, SerializationError> {
@@ -80,8 +85,21 @@ impl<E: Pairing> VerifierParams<E> {
         let range_vk : RangeProofVK<E> = read_from_file(&paths.range_vk)?;
         let io_locations_str = std::fs::read_to_string(&paths.io_locations)?;
         let issuer_pem = std::fs::read_to_string(&paths.issuer_pem)?;
-        Ok(Self{vk, pvk, range_vk, io_locations_str, issuer_pem})
+        let config_str = std::fs::read_to_string(&paths.config)?;
+        Ok(Self{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str})
     }
+}
+
+// Proof specification describing what is to be proven during a Show proof.  Currently supporting selective disclosure
+// of attributes as field elements or hashed values.  Will likely be extended in the future to support other predicates.
+// The range proof that "exp" is in the future is always done.
+#[derive(Serialize, Deserialize)]
+pub struct ProofSpec {
+    pub revealed: Vec<String>,
+}
+pub(crate) struct ProofSpecInternal {
+    pub revealed: Vec<String>,
+    pub hashed: Vec<String>
 }
 
 /// Structure to hold all the parts of a show/presentation proof
@@ -91,6 +109,7 @@ pub struct ShowProof<E: Pairing> {
     pub show_range: ShowRange<E>,
     pub show_range2: Option<ShowRange<E>>, 
     pub revealed_inputs: Vec<E::ScalarField>, 
+    pub revealed_preimages: Option<String>,
     pub inputs_len: usize, 
     pub cur_time: u64
 }
@@ -113,7 +132,8 @@ pub struct CachePaths {
    pub prover_params: String,   
    pub client_state: String, 
    pub show_proof: String,
-   pub mdl_prover_inputs: String
+   pub mdl_prover_inputs: String, 
+   pub proof_spec: String
 }
 
 impl CachePaths {
@@ -156,6 +176,7 @@ impl CachePaths {
             client_state: format!("{}client_state.bin", &cache_path),
             show_proof: format!("{}show_proof.bin", &cache_path),
             mdl_prover_inputs: format!("{}prover_inputs.json", &base_path_str),
+            proof_spec: format!("{}proof_spec.json", &base_path_str),
         }             
     }
 }
@@ -191,7 +212,6 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     let serialize_timer = start_timer!(|| "Writing everything to files");
     write_to_file(&range_pk, &paths.range_pk);
     write_to_file(&range_vk, &paths.range_vk);    
-    write_to_file(&params, &paths.groth16_params);
     write_to_file(&vk, &paths.groth16_vk);
     write_to_file(&pvk, &paths.groth16_pvk);
 
@@ -203,7 +223,7 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     0
 }
 
-pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON, credtype : &str) -> Result<ClientState<ECPairing>, SerializationError>
+pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON, prover_aux: Option<&String>, credtype : &str) -> Result<ClientState<ECPairing>, SerializationError>
 {
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
     let cfg = CircomConfig::<ECPairing>::new(
@@ -215,8 +235,8 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     prover_inputs.push_inputs(&mut builder);
     end_timer!(circom_timer);
 
-    let load_params_timer = start_timer!(||"Reading Groth16 params from file");
-    let params : ProvingKey<ECPairing> = read_from_file(&paths.groth16_params)?;
+    let load_params_timer = start_timer!(||"Reading ProverParams params from file");
+    let prover_params : ProverParams<ECPairing> = read_from_file(&paths.prover_params)?;
     end_timer!(load_params_timer);
     
     let build_timer = start_timer!(|| "Witness Generation");
@@ -224,9 +244,14 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     end_timer!(build_timer);    
     let inputs = circom.get_public_inputs().unwrap();
 
+    // println!("Inputs for groth16 proof: ");
+    // for (i, input) in inputs.clone().into_iter().enumerate() {
+    //     println!("input {}  =  {:?}", i, input.into_bigint().to_string());
+    // }
+
     let mut rng = thread_rng();
     let prove_timer = start_timer!(|| "Groth16 prove");    
-    let proof = Groth16::<ECPairing>::prove(&params, circom, &mut rng).unwrap();    
+    let proof = Groth16::<ECPairing>::prove(&prover_params.groth16_params, circom, &mut rng).unwrap();    
     end_timer!(prove_timer);
 
     let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk)?;
@@ -238,26 +263,67 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
 
     let mut client_state = ClientState::<ECPairing>::new(
         inputs.clone(),
+        prover_aux.cloned(),
         proof.clone(),
-        params.vk.clone(),
+        prover_params.groth16_params.vk.clone(),
         pvk.clone(),
+        prover_params.config_str.clone()
     );
     client_state.credtype = credtype.to_string();
 
     Ok(client_state)
 }
 
-pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, pm: Option<&[u8]>, io_locations: &IOLocations) -> ShowProof<ECPairing>
+pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, pm: Option<&[u8]>, io_locations: &IOLocations, proof_spec: &ProofSpec) -> ShowProof<ECPairing>
 {
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    let email_value_pos = io_locations.get_io_location("email_value").unwrap();
-    // The IOs are exp, email_domain 
-    let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
+    // The IOs are exp, email, family_name, given_name, tenant_ctry, tenant_region_scope.  Hidden by default
+    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
-    io_types[email_value_pos -1] = PublicIOType::Revealed;
 
-    let revealed_inputs = vec![client_state.inputs[email_value_pos-1]];
+    for i in io_locations.get_public_key_indices() {
+        io_types[i] = PublicIOType::Revealed;
+    }
+
+    let proof_spec = create_proof_spec_internal(&proof_spec, &client_state.config_str).expect("Failed to create internal proof spec");  // TODO: return error
+    println!("Proof spec internal: revealed: {:?}, hashed: {:?}", proof_spec.revealed, proof_spec.hashed);
+    // For the attributes revealed as field elements, we set the position to Revealed and send the value
+    let mut revealed_inputs = vec![];
+    for attr in &proof_spec.revealed {
+        let io_loc = io_locations.get_io_location(&format!("{}_value", &attr));
+        if io_loc.is_err() {
+            println!("Asked to reveal attribute {}, but did not find it in io_locations", attr);
+            println!("IO locations: {:?}", io_locations.get_all_names());
+            panic!(); // TODO: return error
+        }
+        let io_loc = io_loc.unwrap();
+
+        io_types[io_loc - 1] = PublicIOType::Revealed;
+        revealed_inputs.push(client_state.inputs[io_loc - 1]);
+    }
+
+    // For the attributes revealed as digests, we provide the preimage, the verifier will hash it to get the field element
+    let mut revealed_preimages = serde_json::Map::new();
+    for attr in &proof_spec.hashed {
+        let io_loc = io_locations.get_io_location(&format!("{}_digest", &attr));
+        if io_loc.is_err() {
+            println!("Asked to reveal hashed attribute {}, but did not find it in io_locations", attr);
+            println!("IO locations: {:?}", io_locations.get_all_names());
+            panic!(); // TODO: return error
+        }
+        let io_loc = io_loc.unwrap();
+
+        io_types[io_loc - 1] = PublicIOType::Revealed;
+
+        if client_state.aux.is_none() {
+            println!("Proof spec asked to reveaal hashed attribute {}, but client state is missing aux data", attr);
+            panic!(); // TODO: return error
+        }
+        let aux = serde_json::from_str::<Value>(client_state.aux.as_ref().unwrap()).unwrap();
+        let aux = aux.as_object().unwrap();
+        revealed_preimages.insert(attr.clone(), json!(aux[attr].clone().to_string()));
+    }
 
     let show_groth16 = client_state.show_groth16(pm, &io_types);
     
@@ -274,9 +340,13 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
 
     // Assemble proof
-    
-
-    ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
+    let revealed_preimages = if proof_spec.hashed.len() == 0 { 
+        assert!(revealed_preimages.is_empty());
+        None 
+    } else {
+        Some(serde_json::to_string(&revealed_preimages).unwrap())
+    };
+    ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, revealed_preimages, inputs_len: client_state.inputs.len(), cur_time: time_sec}
 }
 
 pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, pm: Option<&[u8]>, io_locations: &IOLocations, age: usize) -> ShowProof<ECPairing>
@@ -313,33 +383,110 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let show_range2 = client_state.show_range(&com_dob, RANGE_PROOF_INTERVAL_BITS, range_pk);       
 
     // Assemble proof and return
-    ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
+    ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, revealed_preimages: None, inputs_len: client_state.inputs.len(), cur_time: time_sec}
 }
 
-pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, pm: Option<&[u8]>) -> (bool, String)
+fn sort_by_io_location(attrs: &[String], io_locations: &IOLocations) -> Vec<String> {
+    let mut attrs_with_locs: Vec<(usize, String)> = attrs
+        .iter()
+        .map(|attr| {
+            let io_loc = io_locations.get_io_location(&format!("{}_digest", attr)).unwrap();
+            (io_loc, attr.clone())
+        })
+        .collect();
+    attrs_with_locs.sort_by_key(|k| k.0);
+    attrs_with_locs.into_iter().map(|(_, attr)| attr).collect()
+}
+
+pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, pm: Option<&[u8]>, proof_spec: &ProofSpec) -> (bool, String)
 {
     let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    let email_value_pos = io_locations.get_io_location("email_value").unwrap();
-    let mut io_types = vec![PublicIOType::Revealed; show_proof.inputs_len];
+    let mut io_types = vec![PublicIOType::Hidden; show_proof.inputs_len];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
-    io_types[email_value_pos - 1] = PublicIOType::Revealed;
+    for i in io_locations.get_public_key_indices() {
+        io_types[i] = PublicIOType::Revealed;
+    }
 
-    // Create an inputs vector with the inputs from the prover, and the issuer's public key
+    let proof_spec = create_proof_spec_internal(&proof_spec, &vp.config_str).expect("Failed to create internal proof spec");  // TODO: return error
+
+    // Set attributes to Revealed
+    for attr in &proof_spec.revealed {
+        let io_loc = io_locations.get_io_location(&format!("{}_value", &attr));
+        if io_loc.is_err() {
+            println!("Asked to reveal attribute {}, but did not find it in io_locations", attr);
+            println!("IO locations: {:?}", io_locations.get_all_names());
+            return (false, "".to_string());
+        }
+        let io_loc = io_loc.unwrap();
+        io_types[io_loc - 1] = PublicIOType::Revealed;
+    }
+
+    // For the attributes revealed as digests, we hash the provided preimage to get the field element
+    let mut revealed_hashed = vec![];
+    let mut preimages = json!(serde_json::Value::Null);
+    if proof_spec.hashed.len() > 0 {
+        assert!(show_proof.revealed_preimages.is_some());
+        let preimages0 = serde_json::from_str::<Value>(&show_proof.revealed_preimages.as_ref().unwrap());
+        if preimages0.is_err() {
+            println!("Failed to deserialize revealed_preimages");
+            return (false, "".to_string());
+        }
+        preimages = preimages0.unwrap();
+
+        let hashed_attributes = sort_by_io_location(&proof_spec.hashed, &io_locations);
+    
+        for attr in &hashed_attributes {
+            let io_loc = io_locations.get_io_location(&format!("{}_digest", &attr));
+            if io_loc.is_err() {
+                println!("Asked to reveal hashed attribute {}, but did not find it in io_locations", attr);
+                println!("IO locations: {:?}", io_locations.get_all_names());
+                return (false, "".to_string());
+            }
+            let io_loc = io_loc.unwrap();
+            io_types[io_loc - 1] = PublicIOType::Revealed;
+
+            let preimage = preimages.get(attr);
+            if preimage.is_none() {
+                println!("Error: preimage for hashed attribute {} not provided by prover", attr);
+                return(false, "".to_string());
+            }
+            
+            let data = match preimage.unwrap() {
+                Value::String(s) =>  {
+                    s.as_bytes()
+                },     
+                _ =>  {
+                    println!("Error: preimage has unsupported type");
+                    return(false, "".to_string());
+                }
+            };
+            let digest = Sha256::digest(data);
+            let digest248 = &digest[0..digest.len()-1];
+            let digest_uint = utils::bits_to_num(&digest248);
+            let digest_scalar = utils::biguint_to_scalar::<CrescentFr>(&digest_uint);
+            revealed_hashed.push(digest_scalar);
+        }
+    }
+
+    // Create an inputs vector with the revealed inputs and the issuer's public key
     let public_key_inputs = pem_to_inputs::<<ECPairing as Pairing>::ScalarField>(&vp.issuer_pem);
     if public_key_inputs.is_err() {
         print!("Error: Failed to convert issuer public key to input values");
         return (false, "".to_string());
     }
-    let mut inputs = public_key_inputs.unwrap();
-    inputs.extend(show_proof.revealed_inputs.clone()); 
+
+    let mut inputs = vec![];
+    inputs.extend(revealed_hashed);
+    inputs.extend(public_key_inputs.unwrap());
+    inputs.extend(show_proof.revealed_inputs.clone());
     
     // println!("Verifier got revealed inputs  : {:?}", &show_proof.revealed_inputs);
     // println!("Created inputs: ");
-    // for (i, input) in show_proof.revealed_inputs.clone().into_iter().enumerate() {
+    // for (i, input) in inputs.clone().into_iter().enumerate() {
     //     println!("input {}  =  {:?}", i, input.into_bigint().to_string());
     // }
-
+    
     let verify_timer = std::time::Instant::now();
     let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, pm, &io_types, &inputs);
     if !ret {
@@ -377,19 +524,40 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     }    
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
-    // TODO: it's currently ad-hoc how the verifier knows which revealed inputs correspond 
-    // to what.  In this example we have to subtract 2 from email_value_pos to account for the committed attribute 
-    // When we refactor revealed inputs and the modulus IOs we can address this.
-    let domain = match unpack_int_to_string_unquoted( &inputs[email_value_pos - 2].into_bigint()) {
-        Ok(domain) => domain,
-        Err(e) => {
-            println!("Proof was valid, but failed to unpack domain string, {:?}", e);
+    // Add the revealed attributes to the output, after converting from field elt to string
+    let mut revealed_idx = 0;
+    let mut revealed = serde_json::Map::<String, Value>::new();
+    for attr_name in &proof_spec.revealed {
+        let attr_name = attr_name.clone() + "_value";
+        let unpacked = unpack_int_to_string_unquoted( &show_proof.revealed_inputs[revealed_idx].into_bigint());
+        if unpacked.is_err() {
+            println!("Error: Proof was valid, but failed to unpack '{}' attribute, {:?}", attr_name, unpacked.err().unwrap());
             return (false, "".to_string());
         }
-    };
-    println!("Token is valid, Prover revealed email domain: {}", domain);
+        let attr_value = &unpacked.unwrap().clone();
+        revealed.insert(attr_name.clone(), json!(attr_value));
+        
+        revealed_idx += 1;
+    }
 
-    (true, domain)
+    // Add the hashed revealed attributes to the output
+    for attr_name in &proof_spec.hashed {
+        let attr_value = preimages.get(attr_name);
+        if attr_value.is_none() {
+            println!("Error: Proof was valid, but failed to find hashed attribute '{}'", attr_name);
+            return(false, "".to_string());
+        }
+        let value = match attr_value.unwrap() {
+            Value::String(s) => {
+                json!(strip_quotes(s))
+            },
+            _ => attr_value.unwrap().clone()
+        };
+        revealed.insert(attr_name.clone(), value);
+    }
+
+
+    (true, serde_json::to_string(&revealed).unwrap())
 }
 
 pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, pm: Option<&[u8]>, age: usize) -> (bool, String)
@@ -488,6 +656,16 @@ mod tests {
     use serial_test::serial;
 
     const MDL_AGE_GT : usize = 18;
+    pub const DEFAULT_CONFIG : &str = r#"{
+        "alg": "RS256",
+        "email": {
+            "type" : "string",
+            "reveal": true,
+            "max_claim_byte_len": 31,
+            "reveal_domain_only": true
+        }
+    }
+    "#;    
 
     // We run the end-to-end tests with [serial] because they use a lot of memory, 
     // if two are run at the same time some machines do not have enough RAM
@@ -532,7 +710,7 @@ mod tests {
             GenericInputsJSON{prover_inputs: prover_inputs_json}
         };
             
-        let client_state = create_client_state(&paths, &prover_inputs, cred_type).unwrap();
+        let client_state = create_client_state(&paths, &prover_inputs, None, cred_type).unwrap();
         // We read and write the client state and proof to disk for testing, to be consistent with the command-line tool
         write_to_file(&client_state, &paths.client_state);
         let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
@@ -544,7 +722,8 @@ mod tests {
         let show_proof = if client_state.credtype == "mdl" {
             create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, MDL_AGE_GT)  
         } else {
-            create_show_proof(&mut client_state, &range_pk, Some(pm), &io_locations)
+            let proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
+            create_show_proof(&mut client_state, &range_pk, Some(pm), &io_locations, &proof_spec)
         };
 
         write_to_file(&show_proof, &paths.show_proof);
@@ -557,12 +736,13 @@ mod tests {
         let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
         let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     
-        let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
+        let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str: DEFAULT_CONFIG.to_string()};
     
         let (verify_result, _data) = if show_proof.show_range2.is_some() {
             verify_show_mdl(&vp, &show_proof, Some(pm), MDL_AGE_GT)
         } else {
-            verify_show(&vp, &show_proof, Some(pm))
+            let proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
+            verify_show(&vp, &show_proof, Some(pm), &proof_spec)
         };
         assert!(verify_result);
     }
