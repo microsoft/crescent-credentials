@@ -31,9 +31,11 @@ pub struct PedersenOpening<G: CurveGroup> {
 impl<G: Group> DLogPoK<G> {
     /// proves knowledge of the representations of y1, y2, ... y_n
     /// in their respective bases -- bases[1], bases[2], ... bases[n]
+    /// binding the proof to a presentation message pm
     /// optionally, specify a set of positions to assert equality of in the form {(i1,j1), (i2,j2), ...}
     /// TODO (perf): shrink the proof size by compressing the responses since they're the same for all the equal positions
     pub fn prove(
+        pm: Option<&[u8]>,
         y: &[G],
         bases: &[Vec<G>],
         scalars: &[Vec<G::ScalarField>],
@@ -50,6 +52,8 @@ impl<G: Group> DLogPoK<G> {
         let mut r = Vec::new();
 
         let mut ts: Transcript = Transcript::new(&[0u8]);
+        let pm = pm.unwrap_or(b"null");
+        add_to_transcript(&mut ts, b"presentation_message", &pm);
 
         for i in 0..y.len() {
             let mut ri = Vec::new();
@@ -112,8 +116,10 @@ impl<G: Group> DLogPoK<G> {
 
     pub fn verify(
         &self,
+        pm: Option<&[u8]>,
         bases: &[Vec<G>],
         y: &[G],
+        // TODO: add presentation message
         eq_pos: Option<Vec<(usize, usize)>>,
     ) -> bool
     where
@@ -123,6 +129,8 @@ impl<G: Group> DLogPoK<G> {
         // serialize and hash the bases, k and y
         let dl_verify_timer = start_timer!(|| format!("DlogPoK verify y.len = {}", y.len()));
         let mut ts: Transcript = Transcript::new(&[0u8]);
+        let pm = pm.unwrap_or(b"null");
+        add_to_transcript(&mut ts, b"presentation_message", &pm);
 
         let mut recomputed_k = Vec::new();
         for i in 0..y.len() {
@@ -227,14 +235,40 @@ mod tests {
             scalars[i] = F::rand(rng);
             y += bases[i] * scalars[i];
         }
+
+        let pm = "some presentation message".as_bytes();
+
         let pok = DLogPoK::<G1>::prove(
+            Some(pm),
             &[y, y],
             &[bases.clone(), bases.clone()],
             &[scalars.clone(), scalars.clone()],
             Some(vec![(0, 1), (1, 1)]),
         );
 
+        // verify with the wrong bases
+        let wrong_bases = vec![G1::zero(); num_terms];
+        let wrong_bases_result = pok.verify(
+            Some(pm),
+            &[wrong_bases.clone(), wrong_bases.clone()],
+            &[y, y],
+            Some(vec![(0, 1), (1, 1)]),
+        );
+        assert!(!wrong_bases_result, "Verification should fail with the wrong bases");
+
+        // verify with the wrong pm
+        let wrong_pm = "wrong presentation message".as_bytes();
+        let wrong_pm_result = pok.verify(
+            Some(wrong_pm),
+            &[bases.clone(), bases.clone()],
+            &[y, y],
+            Some(vec![(0, 1), (1, 1)]),
+        );
+        assert!(!wrong_pm_result, "Verification should fail with the wrong presentation message");
+
+        // successful verification
         let result = pok.verify(
+            Some(pm),
             &[bases.clone(), bases.clone()],
             &[y, y],
             Some(vec![(0, 1), (1, 1)]),
@@ -242,5 +276,4 @@ mod tests {
 
         assert!(result);
     }
-
 }

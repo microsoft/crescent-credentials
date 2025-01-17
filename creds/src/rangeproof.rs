@@ -230,6 +230,7 @@ impl<E: Pairing> RangeProof<E> {
 
         // Link com_f to ped_open via a DLEQ proof
         let dleq_proof = DLogPoK::<E::G1>::prove(
+            None, // TODO (FIXME): should we add a presentation message here?
             &[ped_open.c, com_f.0.into()],
             &[
                 ped_open
@@ -415,6 +416,7 @@ impl<E: Pairing> RangeProof<E> {
         self
             .dleq_proof
             .verify(
+                None, // TODO (FIXME): should we add a presentation message here?
                 &[bases.to_vec(), vk.com_f_basis.to_vec(),],
                 &[*ped_com, self.com_f.0.into()],
                 Some(vec![(0, 0), (1, 3)]),
@@ -517,8 +519,9 @@ mod tests {
         io_types[0] = PublicIOType::Revealed;
         io_types[1] = PublicIOType::Committed;
     
-        let showing = client_state.show_groth16(&io_types);
-        showing.verify(&vk, &pvk, &io_types, &[inputs[0]]);
+        let pm = "some presentation message".as_bytes();
+        let showing = client_state.show_groth16(Some(pm), &io_types);
+        showing.verify(&vk, &pvk, Some(pm), &io_types, &[inputs[0]]);
     
         println!(
             "Committed to input: {}",

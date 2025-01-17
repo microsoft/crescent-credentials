@@ -159,11 +159,12 @@ pub fn run_show(
     let io_locations = IOLocations::new(&paths.io_locations);    
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
-    
+
+    // TODO (FIXME): what should be the presentation message pm?
     let show_proof = if client_state.credtype == "mdl" {
-        create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, MDL_AGE_GREATER_THAN)  
+        create_show_proof_mdl(&mut client_state, &range_pk, None, &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
-        create_show_proof(&mut client_state, &range_pk, &io_locations)
+        create_show_proof(&mut client_state, &range_pk, None, &io_locations)
     };
     println!("Proving time: {:?}", proof_timer.elapsed());
 
@@ -184,10 +185,11 @@ pub fn run_verifier(base_path: PathBuf) {
 
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
 
+    // TODO (FIXME): what should be the presentation message pm?
     let (verify_result, data) = if show_proof.show_range2.is_some() {
-        verify_show_mdl(&vp, &show_proof, MDL_AGE_GREATER_THAN)
+        verify_show_mdl(&vp, &show_proof, None, MDL_AGE_GREATER_THAN)
     } else {
-        verify_show(&vp, &show_proof)
+        verify_show(&vp, &show_proof, None)
     };
 
     if verify_result {

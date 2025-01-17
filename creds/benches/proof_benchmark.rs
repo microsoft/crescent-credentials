@@ -114,21 +114,23 @@ pub fn show_bench(c: &mut Criterion) {
     );
 
     let io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
+    let pm = "some presentation message".as_bytes();
 
-    let showing = client_state.show_groth16(&io_types);
+    let showing = client_state.show_groth16(Some(pm), &io_types);
     c.bench_function(&format!("Show with {} hidden inputs", NUM_INPUTS), |b| {
         b.iter(|| {
-            client_state.show_groth16(&io_types);
+            client_state.show_groth16(Some(pm), &io_types);
         })
     });
 
-    showing.verify(&vk, &pvk, &io_types, &vec![]);
+    showing.verify(&vk, &pvk, Some(pm), &io_types, &vec![]);
     c.bench_function(&format!("Verify with {} hidden inputs", NUM_INPUTS), |b| {
         b.iter(|| {
             ShowGroth16::<Bn254>::verify(
                 black_box(&showing),
                 black_box(&vk),
                 black_box(&pvk),
+                Some(pm), 
                 &io_types,
                 &vec![],
             );

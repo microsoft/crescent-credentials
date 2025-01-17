@@ -247,7 +247,7 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     Ok(client_state)
 }
 
-pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations) -> ShowProof<ECPairing>
+pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, pm: Option<&[u8]>, io_locations: &IOLocations) -> ShowProof<ECPairing>
 {
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
@@ -259,7 +259,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
 
     let revealed_inputs = vec![client_state.inputs[email_value_pos-1]];
 
-    let show_groth16 = client_state.show_groth16(&io_types);
+    let show_groth16 = client_state.show_groth16(pm, &io_types);
     
     // Create fresh range proof 
     let time_sec = SystemTime::now()
@@ -279,7 +279,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
 }
 
-pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations, age: usize) -> ShowProof<ECPairing>
+pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, pm: Option<&[u8]>, io_locations: &IOLocations, age: usize) -> ShowProof<ECPairing>
 {
     // Create Groth16 rerandomized proof for showing
     let valid_until_value_pos = io_locations.get_io_location("valid_until_value").unwrap();
@@ -291,7 +291,7 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
 
     let revealed_inputs : Vec<<ECPairing as Pairing>::ScalarField> = vec![];
 
-    let show_groth16 = client_state.show_groth16(&io_types);    
+    let show_groth16 = client_state.show_groth16(pm, &io_types);    
     
     // Create fresh range proof for validUntil
     let time_sec = SystemTime::now()
@@ -316,7 +316,7 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, inputs_len: client_state.inputs.len(), cur_time: time_sec}
 }
 
-pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>) -> (bool, String)
+pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, pm: Option<&[u8]>) -> (bool, String)
 {
     let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
@@ -341,7 +341,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     // }
 
     let verify_timer = std::time::Instant::now();
-    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &inputs);
+    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, pm, &io_types, &inputs);
     if !ret {
         println!("show_groth16.verify failed");
         return (false, "".to_string());
@@ -392,7 +392,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     (true, domain)
 }
 
-pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, age: usize) -> (bool, String)
+pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, pm: Option<&[u8]>, age: usize) -> (bool, String)
 {
     let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
     let valid_until_value_pos = io_locations.get_io_location("valid_until_value").unwrap();
@@ -418,7 +418,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
     // }
 
     let verify_timer = std::time::Instant::now();
-    show_proof.show_groth16.verify(&vp.vk, &vp.pvk, &io_types, &inputs);
+    show_proof.show_groth16.verify(&vp.vk, &vp.pvk, pm, &io_types, &inputs);
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     let delta = 
@@ -533,12 +533,13 @@ mod tests {
         let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
 
         println!("Running show");
+        let pm = "some presentation message".as_bytes();
         let io_locations = IOLocations::new(&paths.io_locations);    
         let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
         let show_proof = if client_state.credtype == "mdl" {
-            create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, MDL_AGE_GT)  
+            create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, MDL_AGE_GT)  
         } else {
-            create_show_proof(&mut client_state, &range_pk, &io_locations)
+            create_show_proof(&mut client_state, &range_pk, Some(pm), &io_locations)
         };
 
         write_to_file(&show_proof, &paths.show_proof);
@@ -554,9 +555,9 @@ mod tests {
         let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
     
         let (verify_result, _data) = if show_proof.show_range2.is_some() {
-            verify_show_mdl(&vp, &show_proof, MDL_AGE_GT)
+            verify_show_mdl(&vp, &show_proof, Some(pm), MDL_AGE_GT)
         } else {
-            verify_show(&vp, &show_proof)
+            verify_show(&vp, &show_proof, Some(pm))
         };
         assert!(verify_result);
     }

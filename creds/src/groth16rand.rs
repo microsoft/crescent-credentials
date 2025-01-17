@@ -93,7 +93,7 @@ impl<E: Pairing> ClientState<E> {
         self.serialize_uncompressed(buf_writer).unwrap();
     }
 
-    pub fn show_groth16(&mut self, io_types: &[PublicIOType]) -> ShowGroth16<E> 
+    pub fn show_groth16(&mut self, pm: Option<&[u8]>, io_types: &[PublicIOType]) -> ShowGroth16<E> 
     where
         <E as Pairing>::G1: CurveGroup + VariableBaseMSM,  
     {
@@ -167,7 +167,7 @@ impl<E: Pairing> ClientState<E> {
         // com_l = l1^input1 l2^input2 ... ln^input_n g^z
         // optimized to ignore public inputs
 
-        let pok_inputs = DLogPoK::<E::G1>::prove(&y, &bases, &scalars, None);
+        let pok_inputs = DLogPoK::<E::G1>::prove(pm, &y, &bases, &scalars, None);
         
         end_timer!(groth16_timer);
 
@@ -222,6 +222,7 @@ impl<E: Pairing> ShowGroth16<E> {
         &self,
         vk: &VerifyingKey<E>,
         pvk: &PreparedVerifyingKey<E>,
+        pm: Option<&[u8]>,
         io_types: &[PublicIOType],
         public_inputs: &[E::ScalarField],
     ) -> bool
@@ -284,7 +285,7 @@ impl<E: Pairing> ShowGroth16<E> {
         };
         end_timer!(t);
 
-        let dlog_pok_valid = self.pok_inputs.verify(&bases, &y, None);
+        let dlog_pok_valid = self.pok_inputs.verify(pm, &bases, &y, None);
         
         end_timer!(groth16_timer);
 
