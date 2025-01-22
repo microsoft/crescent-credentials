@@ -160,7 +160,7 @@ pub fn run_show(
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
 
-    // TODO (FIXME): what should be the presentation message pm?
+    // TODO: add command line option to pass in a presentation message
     let show_proof = if client_state.credtype == "mdl" {
         create_show_proof_mdl(&mut client_state, &range_pk, None, &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
@@ -185,7 +185,7 @@ pub fn run_verifier(base_path: PathBuf) {
 
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
 
-    // TODO (FIXME): what should be the presentation message pm?
+    // TODO: add command line option to pass in a presentation message
     let (verify_result, data) = if show_proof.show_range2.is_some() {
         verify_show_mdl(&vp, &show_proof, None, MDL_AGE_GREATER_THAN)
     } else {

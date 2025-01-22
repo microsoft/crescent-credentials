@@ -52,7 +52,7 @@ impl<G: Group> DLogPoK<G> {
         let mut r = Vec::new();
 
         let mut ts: Transcript = Transcript::new(&[0u8]);
-        let pm = pm.unwrap_or(b"null");
+        let pm = pm.unwrap_or(b"");
         add_to_transcript(&mut ts, b"presentation_message", &pm);
 
         for i in 0..y.len() {
@@ -119,7 +119,6 @@ impl<G: Group> DLogPoK<G> {
         pm: Option<&[u8]>,
         bases: &[Vec<G>],
         y: &[G],
-        // TODO: add presentation message
         eq_pos: Option<Vec<(usize, usize)>>,
     ) -> bool
     where
@@ -129,7 +128,7 @@ impl<G: Group> DLogPoK<G> {
         // serialize and hash the bases, k and y
         let dl_verify_timer = start_timer!(|| format!("DlogPoK verify y.len = {}", y.len()));
         let mut ts: Transcript = Transcript::new(&[0u8]);
-        let pm = pm.unwrap_or(b"null");
+        let pm = pm.unwrap_or(b"");
         add_to_transcript(&mut ts, b"presentation_message", &pm);
 
         let mut recomputed_k = Vec::new();
