@@ -419,6 +419,11 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 
     let verify_timer = std::time::Instant::now();
     show_proof.show_groth16.verify(&vp.vk, &vp.pvk, pm, &io_types, &inputs);
+    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, pm, &io_types, &inputs);
+    if !ret {
+        println!("show_groth16.verify failed");
+        return (false, "".to_string());
+    }
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     let delta = 
