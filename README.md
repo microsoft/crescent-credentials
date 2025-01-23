@@ -77,11 +77,11 @@ and we can run each step as follows
 ```bash
 cargo run --bin crescent --release --features print-trace zksetup --name rs256
 cargo run --bin crescent --release --features print-trace prove --name rs256
-cargo run --bin crescent --release --features print-trace show --name rs256
-cargo run --bin crescent --release --features print-trace verify --name rs256
+cargo run --bin crescent --release --features print-trace show --name rs256 [--presentation-message "..."]
+cargo run --bin crescent --release --features print-trace verify --name rs256 [--presentation-message "..."]
 ```
 
-The `--name` parameter, used in circuit setup and with the command-line tool, specifies which credential type is used, the two examples are `rs256`, a JWT signed with RSA256, and `mdl1` a sample mobile driver's license.
+The `--name` parameter, used in circuit setup and with the command-line tool, specifies which credential type is used, the two examples are `rs256`, a JWT signed with RSA256, and `mdl1` a sample mobile driver's license. An optional text presentation message can be passed to the `show` and `prove` steps to bind the presentation to some application data (e.g., a verifier challenge, some data to sign).
 
 Note that the steps have to be run in order, but once the client state is created by `prove`, the `show` and `verify` steps can be run repeatedly.
 
