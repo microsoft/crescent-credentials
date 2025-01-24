@@ -38,13 +38,11 @@ fn main() {
         Command::Show { name, presentation_message } => {
             let name_path = format!("test-vectors/{}", name);
             let base_path = root.join(name_path);
-            println!("presentation_message: {:?}", presentation_message);
             run_show(base_path, presentation_message);
         }        
         Command::Verify { name, presentation_message } => {
             let name_path = format!("test-vectors/{}", name);
             let base_path = root.join(name_path);
-            println!("presentation_message: {:?}", presentation_message);
             run_verifier(base_path, presentation_message);
         }
     }
@@ -171,7 +169,7 @@ pub fn run_show(
     let show_proof = if client_state.credtype == "mdl" {
         create_show_proof_mdl(&mut client_state, &range_pk, pm, &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
-        create_show_proof(&mut client_state, &range_pk, None, &io_locations)
+        create_show_proof(&mut client_state, &range_pk, pm, &io_locations)
     };
     println!("Proving time: {:?}", proof_timer.elapsed());
 
