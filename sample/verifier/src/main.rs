@@ -275,12 +275,12 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     let is_valid;
     let disclosed_info;
     if cred_type == "jwt" {
-        let (valid, info) = verify_show(&vp, &show_proof);
+        let (valid, info) = verify_show(&vp, &show_proof, None);
         is_valid = valid;
         disclosed_info = Some(info);
     } else {
         let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap(); // disclosure UID validated, so unwrap should be safe
-        let (valid, info) = verify_show_mdl(&vp, &show_proof, age);
+        let (valid, info) = verify_show_mdl(&vp, &show_proof, None, age);
         is_valid = valid;
         disclosed_info = Some(info);
     }

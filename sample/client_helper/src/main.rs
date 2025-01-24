@@ -273,10 +273,10 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
             let show_proof =
             if &client_state.credtype == "mdl" {
                 let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())?;
-                create_show_proof_mdl(&mut client_state, &range_pk, &io_locations, age)
+                create_show_proof_mdl(&mut client_state, &range_pk, None, &io_locations, age)
             }
             else {
-                create_show_proof(&mut client_state, &range_pk, &io_locations)            
+                create_show_proof(&mut client_state, &range_pk, None, &io_locations)            
             };
             
             // Return the show proof as a base64-url encoded string
