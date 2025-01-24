@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]  // Disable warnings emitted by use of cfg_iter*
+
 use ark_ff::PrimeField;
 use ark_groth16::r1cs_to_qap::{evaluate_constraint, LibsnarkReduction, R1CSToQAP};
 use ark_poly::EvaluationDomain;
