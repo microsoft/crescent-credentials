@@ -119,6 +119,7 @@ impl<G: Group> DLogPoK<G> {
         pm: Option<&[u8]>,
         bases: &[Vec<G>],
         y: &[G],
+        // TODO: add presentation message
         eq_pos: Option<Vec<(usize, usize)>>,
     ) -> bool
     where

@@ -230,7 +230,11 @@ impl<E: Pairing> RangeProof<E> {
 
         // Link com_f to ped_open via a DLEQ proof
         let dleq_proof = DLogPoK::<E::G1>::prove(
+<<<<<<< HEAD
             None, // TODO: should we add a presentation message here? (use the c from the dlog proof?)
+=======
+            None, // TODO (FIXME): should we add a presentation message here?
+>>>>>>> 2003376 (Added presentation message to DL proof generation and validation)
             &[ped_open.c, com_f.0.into()],
             &[
                 ped_open

@@ -190,10 +190,17 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
     let pm = presentation_message.as_deref().map(|s| s.as_bytes());
 
+    // TODO (FIXME): what should be the presentation message pm?
     let (verify_result, data) = if show_proof.show_range2.is_some() {
+<<<<<<< HEAD
         verify_show_mdl(&vp, &show_proof, pm, MDL_AGE_GREATER_THAN)
     } else {
         verify_show(&vp, &show_proof, pm)
+=======
+        verify_show_mdl(&vp, &show_proof, None, MDL_AGE_GREATER_THAN)
+    } else {
+        verify_show(&vp, &show_proof, None)
+>>>>>>> 2003376 (Added presentation message to DL proof generation and validation)
     };
 
     if verify_result {
