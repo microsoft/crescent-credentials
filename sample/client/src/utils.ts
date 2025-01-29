@@ -91,6 +91,7 @@ export function base64Decode (base64: string): Uint8Array {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/max-params
+// TODO: FIXME: delete unused function
 function _postToURL (tabId: number, url: string, issuer_url: string, schema_uid: string, proof: string): void {
   const formHtml = `
       <form id="postForm" action="${url}" method="POST" style="display: none;">

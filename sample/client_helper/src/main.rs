@@ -247,11 +247,13 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
     }
 }
 
-#[get("/show?<cred_uid>&<disc_uid>")]
-async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>) -> Result<String, String> {
-    println!("*** /show called with credential UID {} and disc_uid {}", cred_uid, disc_uid);
+#[get("/show?<cred_uid>&<disc_uid>&<challenge>")]
+async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, state: &State<SharedState>) -> Result<String, String> {
+    println!("*** /show called with credential UID {}, disc_uid {}, and challenge {}", cred_uid, disc_uid, challenge);
     let tasks = state.inner().0.lock().await;
-    
+    // Parse the challenge as a byte array
+    let pm = challenge.as_bytes();
+
     match tasks.get(&cred_uid) {
         Some(Some(show_data)) => {
 
@@ -273,10 +275,10 @@ async fn show<'a>(cred_uid: String, disc_uid: String, state: &State<SharedState>
             let show_proof =
             if &client_state.credtype == "mdl" {
                 let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())?;
-                create_show_proof_mdl(&mut client_state, &range_pk, None, &io_locations, age)
+                create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, age)
             }
             else {
-                create_show_proof(&mut client_state, &range_pk, None, &io_locations)            
+                create_show_proof(&mut client_state, &range_pk, Some(pm), &io_locations)            
             };
             
             // Return the show proof as a base64-url encoded string

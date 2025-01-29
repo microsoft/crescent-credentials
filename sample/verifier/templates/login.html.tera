@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta crescent_verify_url="{{ site1_verify_url  | safe }}">
     <meta crescent_disclosure_uid="crescent://email_domain">
+    <meta crescent_challenge="{{ session_id }}">
     <title>Login - {{ site1_verifier_name }}</title>
     <link rel="stylesheet" href="css/site1_style.css">
     <link rel="icon" href="img/site1-favicon.ico" type="image/x-icon">

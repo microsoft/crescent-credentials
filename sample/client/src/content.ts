@@ -21,11 +21,12 @@ async function scanForCredential (): Promise<void> {
   }
 }
 
-function queryDisclosureRequest (): { url: string, uid: string } | null {
+function queryDisclosureRequest (): { url: string, uid: string, challenge: string } | null {
   const verifyUrl = document.querySelector('meta[crescent_verify_url]')?.getAttribute('crescent_verify_url') ?? ''
   const disclosureUid = document.querySelector('meta[crescent_disclosure_uid]')?.getAttribute('crescent_disclosure_uid') ?? ''
-  if (verifyUrl.length > 0 && disclosureUid.length > 0) {
-    return { url: verifyUrl, uid: disclosureUid }
+  const challenge = document.querySelector('meta[crescent_challenge]')?.getAttribute('crescent_challenge') ?? ''
+  if (verifyUrl.length > 0 && disclosureUid.length > 0 && challenge.length > 0) {
+    return { url: verifyUrl, uid: disclosureUid, challenge: challenge }
   }
   return null
 }

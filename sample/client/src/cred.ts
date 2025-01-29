@@ -211,7 +211,7 @@ export class CredentialWithCard extends Credential {
     this._onStatusChangeCallback?.(status)
   }
 
-  public discloserRequest (url: string, disclosureUid: string): void {
+  public discloserRequest (url: string, disclosureUid: string, challenge: string): void {
     if (this.status !== 'PREPARED') {
       return
     }
@@ -219,12 +219,12 @@ export class CredentialWithCard extends Credential {
     if (disclosureProperty === null) {
       return
     }
-    this.element.discloseRequest(url, disclosureProperty, disclosureUid)
+    this.element.discloseRequest(url, disclosureProperty, disclosureUid, challenge)
     this.status = 'DISCLOSABLE'
   }
 
-  public disclose (url: string, disclosureUid: string): void {
-    void verifier.disclose(this, url, disclosureUid)
+  public disclose (url: string, disclosureUid: string, challenge: string): void {
+    void verifier.disclose(this, url, disclosureUid, challenge)
     this.status = 'PREPARED'
     window.close()
   }
