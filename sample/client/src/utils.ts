@@ -91,6 +91,8 @@ export function base64Decode (base64: string): Uint8Array {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/max-params
+// FIXME: This function is not used in the code. It should be removed. TODO
+/*
 function _postToURL (tabId: number, url: string, issuer_url: string, schema_uid: string, proof: string): void {
   const formHtml = `
       <form id="postForm" action="${url}" method="POST" style="display: none;">
@@ -114,7 +116,7 @@ function _postToURL (tabId: number, url: string, issuer_url: string, schema_uid:
     args: [formHtml]
   })
 }
-
+*/
 export function guid (): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (char) {
     const random = (Math.random() * 16) | 0

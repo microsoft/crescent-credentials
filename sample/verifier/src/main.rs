@@ -12,7 +12,7 @@ use rocket::response::status::Custom;
 use rocket::State;
 use rocket::fs::{FileServer, NamedFile};
 use rocket::http::Status;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use serde_json::Value;
 use jsonwebkey::JsonWebKey;
 use std::path::Path;
@@ -45,7 +45,11 @@ struct VerifierConfig {
     site2_verify_url: String,
     site2_verifier_name: String,
     site2_verifier_domain: String,
-
+    
+    // holds active session IDs (in a real system, these would be removed
+    // after a timeout period)
+    active_session_ids: Mutex<HashSet<String>>,
+    
     // holds validation state
     validation_results: Mutex<HashMap<String, ValidationResult>>,
 }
@@ -56,7 +60,8 @@ struct ProofInfo {
     proof: String,
     schema_uid: String,
     issuer_url: String,
-    disclosure_uid: String,    
+    disclosure_uid: String,
+    session_id: String,
 }
 
 // helper function to provide the base context for the login page
@@ -66,11 +71,15 @@ fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, Stri
     let site2_verifier_name_str = verifier_config.site2_verifier_name.clone();
     let site2_verify_url_str = verifier_config.site2_verify_url.clone();
 
+    let session_id = Uuid::new_v4().to_string();
+    verifier_config.active_session_ids.lock().unwrap().insert(session_id.clone());
+
     let mut context = HashMap::new();
     context.insert("site1_verifier_name".to_string(), site1_verifier_name_str);
     context.insert("site1_verify_url".to_string(), site1_verify_url_str);
     context.insert("site2_verifier_name".to_string(), site2_verifier_name_str);
     context.insert("site2_verify_url".to_string(), site2_verify_url_str);
+    context.insert("session_id".to_string(), session_id);
     
     context
 }
@@ -217,10 +226,17 @@ macro_rules! error_template {
 #[post("/verify", format = "json", data = "<proof_info>")]
 async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierConfig>) -> Result<Custom<Redirect>, Template> {
     println!("*** /verify called");
+    println!("Session ID: {}", proof_info.session_id);
     println!("Schema UID: {}", proof_info.schema_uid);
     println!("Issuer URL: {}", proof_info.issuer_url);
     println!("Disclosure UID: {}", proof_info.disclosure_uid);
     println!("Proof: {}", proof_info.proof);
+
+    // check if session_id is present in active_session_ids
+    if !verifier_config.active_session_ids.lock().unwrap().contains(&proof_info.session_id) {
+        let msg = format!("Unknown session ID ({})", proof_info.session_id);
+        error_template!(msg, verifier_config);
+    }
 
     // verify if the schema_uid is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&proof_info.schema_uid.as_str()) {
@@ -239,6 +255,9 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         Err(_) => error_template!("Credential type not found", verifier_config),
     };
     
+    // Parse the session ID as a byte array
+    let pm = proof_info.session_id.as_bytes();
+
     // Define base folder path and credential-specific folder path
     let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, proof_info.schema_uid);
     let shared_folder = format!("{}/{}", base_folder, CRESCENT_SHARED_DATA_SUFFIX);
@@ -275,30 +294,27 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     let is_valid;
     let disclosed_info;
     if cred_type == "jwt" {
-        let (valid, info) = verify_show(&vp, &show_proof, None);
+        let (valid, info) = verify_show(&vp, &show_proof, Some(pm));
         is_valid = valid;
         disclosed_info = Some(info);
     } else {
         let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap(); // disclosure UID validated, so unwrap should be safe
-        let (valid, info) = verify_show_mdl(&vp, &show_proof, None, age);
+        let (valid, info) = verify_show_mdl(&vp, &show_proof, Some(pm), age);
         is_valid = valid;
         disclosed_info = Some(info);
     }
 
     if is_valid {
-        // Generate a unique session_id
-        let session_id = Uuid::new_v4().to_string();
-
         // Store the validation result in the hashmap
         let validation_result = ValidationResult {
             disclosed_info: disclosed_info.clone(),
         };
-        verifier_config.validation_results.lock().unwrap().insert(session_id.clone(), validation_result);
+        verifier_config.validation_results.lock().unwrap().insert(proof_info.session_id.clone(), validation_result);
 
         // Redirect to the resource page or signup2 page with the session_id as a query parameter
         let redirect_url = match cred_type {
-            "jwt" => uri!(resource_page(session_id = session_id.clone())).to_string(),
-            "mdl" => uri!(signup2_page(session_id = session_id.clone())).to_string(),
+            "jwt" => uri!(resource_page(session_id = proof_info.session_id.clone())).to_string(),
+            "mdl" => uri!(signup2_page(session_id = proof_info.session_id.clone())).to_string(),
             _ => error_template!("Unsupported credential type", verifier_config),
         };
 
@@ -341,6 +357,7 @@ fn rocket() -> _ {
         site2_verifier_name,
         site2_verifier_domain,
         site2_verify_url,
+        active_session_ids: Mutex::new(HashSet::new()),
         validation_results: Mutex::new(HashMap::new()),
     };
     

@@ -143,11 +143,11 @@ async function init (): Promise<void> {
 }
 
 async function scanForDisclosureRequest (): Promise<void> {
-  const disclosureRequest = await messageToActiveTab<{ url: string, uid: string } | null>(MSG_POPUP_CONTENT_SCAN_DISCLOSURE)
+  const disclosureRequest = await messageToActiveTab<{ url: string, uid: string, challenge: string } | null>(MSG_POPUP_CONTENT_SCAN_DISCLOSURE)
   console.debug('disclosureRequest', disclosureRequest)
   if (disclosureRequest != null) {
     CredentialWithCard.creds.forEach((cred) => {
-      cred.discloserRequest(disclosureRequest.url, disclosureRequest.uid)
+      cred.discloserRequest(disclosureRequest.url, disclosureRequest.uid, disclosureRequest.challenge)
     })
   }
 }

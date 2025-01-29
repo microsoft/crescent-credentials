@@ -17,8 +17,8 @@ export interface ClientHelperShowResponse {
 
 export type ShowProof = string
 
-export async function show (cred: Credential, disclosureUid: string): Promise<RESULT<ShowProof, Error>> {
-  const response = await fetchText(`${config.clientHelperUrl}/show`, { cred_uid: cred.id, disc_uid: disclosureUid }, 'GET')
+export async function show (cred: Credential, disclosureUid: string, challenge: string): Promise<RESULT<ShowProof, Error>> {
+  const response = await fetchText(`${config.clientHelperUrl}/show`, { cred_uid: cred.id, disc_uid: disclosureUid, challenge: challenge }, 'GET')
   if (!response.ok) {
     console.error('Failed to show:', response.error)
     return response
@@ -26,11 +26,11 @@ export async function show (cred: Credential, disclosureUid: string): Promise<RE
   return response
 }
 
-async function handleDisclose (id: string, destinationUrl: string, disclosureUid: string): Promise<void> {
+async function handleDisclose (id: string, destinationUrl: string, disclosureUid: string, challenge: string): Promise<void> {
   const cred = Credential.get(id)
   assert(cred)
 
-  const showProof = await show(cred, disclosureUid)
+  const showProof = await show(cred, disclosureUid, challenge)
   if (!showProof.ok) {
     console.error('Failed to show proof:', showProof.error)
     return
@@ -41,14 +41,15 @@ async function handleDisclose (id: string, destinationUrl: string, disclosureUid
     disclosure_uid: disclosureUid,
     issuer_url: cred.data.issuer.url,
     schema_uid: cred.data.token.schema,
+    session_id: challenge,
     proof: showProof.value
   }
 
   void messageToActiveTab(MSG_BACKGROUND_CONTENT_SEND_PROOF, params)
 }
 
-export async function disclose (cred: Credential, verifierUrl: string, disclosureUid: string): Promise<void> {
-  void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, cred.id, verifierUrl, disclosureUid)
+export async function disclose (cred: Credential, verifierUrl: string, disclosureUid: string, challenge: string): Promise<void> {
+  void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, cred.id, verifierUrl, disclosureUid, challenge)
 }
 
 // if this is running the the extension background service worker, then listen for messages

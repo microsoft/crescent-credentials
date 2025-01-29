@@ -31,7 +31,7 @@ The *Setup Service* sets up the Crescent parameters. These parameters, identifie
 
 To obtain a JWT, Alice visits the Issuer welcome page using a browser with the *Browser Extension* installed and the *Client Helper* running. She logs in using her username and password, and clicks "Issue" to get issued a JWT. The browser extension reads the JWT from the HTML page and sends it to the Client Helper which 1) retrieves the corresponding Crescent parameters from the Setup Service, and 2) runs the `prove` library function preparing the JWT for later showing. The proving parameters are stored in the Client Helper and associated with the JWT. A mDL can be loaded directly into the Browser Extension, in absence of a sample issuance workflow; the same preparation steps are performed by the Client Helper.
 
-Later, Alice visits a *Verifier* page. Her browser extension detects a meta tag indicating a Crescent proof request requesting a specific disclosure UID (see below). She opens the extensions and selects the credential to use (matching the requesting type (JWT or mDL) and disclosure capabilities). The Client then generates a showing by calling the `show` library function and sends it to the Verifier endpoint specified in a meta tag. Upon reception, the Verifier downloads the validation parameters from the Setup Service (the first time it sees a presentation for the schema UID) and, for JWTs, the Issuer's public key (the first time it sees credential from this Issuer), and calls the `verify` library function. Upon successful proof validation, Alice is granted access. 
+Later, Alice visits a *Verifier* page. Her browser extension detects a meta tag indicating a Crescent proof request requesting a specific disclosure UID (see below) and specifying a random session ID value (challenge) to be signed by the client (to prevent replay attacks). She opens the extensions and selects the credential to use (matching the requesting type (JWT or mDL) and disclosure capabilities). The Client then generates a showing by calling the `show` library function and sends it to the Verifier endpoint specified in a meta tag. Upon reception, the Verifier downloads the validation parameters from the Setup Service (the first time it sees a presentation for the schema UID) and, for JWTs, the Issuer's public key (the first time it sees credential from this Issuer), and calls the `verify` library function. Upon successful proof validation, Alice is granted access. 
 
 # Sample details
 
@@ -109,10 +109,10 @@ sequenceDiagram
     participant V as Verifier
     participant I as Issuer
     B->>V: visit login page
-    V->>E: read {disclosure_UID, verify_URL} from <meta> tag
+    V->>E: read {disclosure_UID, verify_URL, challenge} from <meta> tag
     E->>E: filter JWT that support disclosure_uid
     B->>E: user selects a JWT to present
-    E->>C: fetch show proof from /show?cred_uid=<cred_UID>&disc_uid=<disclosure_uid>
+    E->>C: fetch show proof from /show?cred_uid=<cred_UID>&disc_uid=<disclosure_uid>&pm=<challenge>
     C->>C: generate Crescent proof
     C->>E: return proof
     E->>V: post {proof, schema_uid, issuer_UID, disclosure_uid} to verify_URL
