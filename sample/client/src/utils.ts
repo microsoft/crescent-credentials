@@ -90,32 +90,6 @@ export function base64Decode (base64: string): Uint8Array {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/max-params
-// TODO: FIXME: delete unused function
-function _postToURL (tabId: number, url: string, issuer_url: string, schema_uid: string, proof: string): void {
-  const formHtml = `
-      <form id="postForm" action="${url}" method="POST" style="display: none;">
-          <input type="hidden" name="issuer_url" value="${issuer_url}">
-          <input type="hidden" name="schema_uid" value="${schema_uid}">
-          <input type="hidden" name="proof" value="${proof}">
-      </form>
-      <script>
-          document.getElementById('postForm').submit();
-      </script>
-  `
-
-  void chrome.scripting.executeScript({
-    target: { tabId },
-    func: (formHtml) => {
-      console.log('Injecting form:', formHtml)
-      const formContainer = document.createElement('div')
-      formContainer.innerHTML = formHtml
-      document.body.appendChild(formContainer)
-    },
-    args: [formHtml]
-  })
-}
-
 export function guid (): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (char) {
     const random = (Math.random() * 16) | 0
