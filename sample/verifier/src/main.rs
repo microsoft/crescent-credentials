@@ -255,7 +255,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         Err(_) => error_template!("Credential type not found", verifier_config),
     };
 
-    // Parse the session ID as a byte array
+    // Parse the challenge session ID as a byte array for the presentation message
     let pm = proof_info.session_id.as_bytes();
 
     // Define base folder path and credential-specific folder path

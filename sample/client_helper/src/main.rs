@@ -251,7 +251,7 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
 async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, state: &State<SharedState>) -> Result<String, String> {
     println!("*** /show called with credential UID {}, disc_uid {}, and challenge {}", cred_uid, disc_uid, challenge);
     let tasks = state.inner().0.lock().await;
-    // Parse the challenge as a byte array
+    // Parse the challenge as a byte array for the presentation message
     let pm = challenge.as_bytes();
 
     match tasks.get(&cred_uid) {
