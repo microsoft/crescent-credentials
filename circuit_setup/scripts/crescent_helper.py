@@ -10,7 +10,7 @@ from jwcrypto.common import base64url_decode
 import json, math, string
 
 ##### Constants ######
-MAX_FIELD_BYTE_LEN = 31        # Maximum length for each field in AAD token.
+MAX_FIELD_BYTE_LEN = 31        # Maximum length of a field element
 CIRCOM_RS256_LIMB_BITS = 121
 CIRCOM_ES256K_LIMB_BITS = 64 
 CIRCOM_ES256_LIMB_BITS = 43     # Required by the ecdsa-p256 circuit we use
@@ -46,7 +46,6 @@ def camel_to_snake(str):
 
 # typ: 0 for string, 1 for number, 2 for bool, 3 for null, 4 for array, 5 for object
 def claim_type_as_int(type):
-     print_debug("claim_type_as_int got input: " + type)
      if type == "string":
          return 0
      elif type == "number":
@@ -155,6 +154,16 @@ def print_json_array(label, values, no_leading_comma=False):
 def hex_string_to_binary_array(hex_str, bits):
     return [int(b) for b in (bin(int(hex_str, 16))[2:]).zfill(bits)]
 
+def claim_reveal_unhashed(claim):
+     if claim.get("reveal") is not None and claim["reveal"] == True:
+         return True
+     return False
+
+def claim_reveal_hashed(claim):
+     if claim.get("reveal_digest") is not None and claim["reveal_digest"] == True:
+         return True
+     return False
+
 def check_config(config):
     # Check that the config file has required fields
     if 'alg' not in config:
@@ -203,17 +212,29 @@ def check_config(config):
 
 
     # For all the config entries about claims (e.g, "email", "exp", etc.) make sure that if the claim 
-    # is to be revealed, that max_claim_byte_len is set
+    # is to be revealed, that max_claim_byte_len is set.  Further, if reveal_digest is not set, the 
+    # claim must fit in a field element
     for key in config.keys():
-        if key not in CRESCENT_CONFIG_KEYS:
-            if config[key].get("reveal"):
-                if config[key].get("max_claim_byte_len") is None:
-                    print_debug("Error: claim '", key, "' has reveal flag set but is missing 'max_claim_byte_len'")
-                    return False
+        if key in CRESCENT_CONFIG_KEYS:
+            continue
+        if claim_reveal_hashed(config[key]) or claim_reveal_unhashed(config[key]):            
+            if config[key].get("max_claim_byte_len") is None:
+                print_debug("Error: claim '", key, "' is going to be revealed but is missing 'max_claim_byte_len'")
+                return False
+            if config[key].get("max_claim_byte_len") % MAX_FIELD_BYTE_LEN != 0:
+                print_debug("Error: claim '{}' must have max_claim_byte_len be a multiple of the field element size ({})".format(key, MAX_FIELD_BYTE_LEN))
+                return False        
+        if claim_reveal_unhashed(config[key]):
+            max_claim_byte_len = config[key].get("max_claim_byte_len")
+            if max_claim_byte_len > MAX_FIELD_BYTE_LEN:
+                print_debug("Error: claim '{}' has reveal flag set but max_claim_byte_len={} exceeds MAX_FIELD_BYTE_LEN={}. To reveal larger claims use reveal_digest".format(key, max_claim_byte_len))
+                return False
 
     return True
 
+
 def base64_decoded_size(encoded_len):
     return ((encoded_len + 3) // 4) * 3
+
 def base64_encoded_size(decoded_len):
     return ((decoded_len + 2) // 3) * 4

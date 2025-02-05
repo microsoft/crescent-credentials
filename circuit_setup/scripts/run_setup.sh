@@ -103,9 +103,11 @@ echo "=== circom output end ===" >> ${LOG_FILE}
 # Read the number of public inputs from $NAME.log
 # there is a line of the form "public inputs: NUM_PUBLIC_INPUTS". parse out NUM_PUBLIC_INPUTS into a variable
 NUM_PUBLIC_INPUTS=$(grep -m 1 "public inputs:" "$LOG_FILE" | awk '{print $3}')
+NUM_PUBLIC_OUTPUTS=$(grep -m 1 "public outputs:" "$LOG_FILE" | awk '{print $3}')
+NUM_PUBLIC_IOS=$(($NUM_PUBLIC_INPUTS + $NUM_PUBLIC_OUTPUTS))
 
 # clean up the main.sym file as follows. Each entry is of the form #s, #w, #c, name as described in https://docs.circom.io/circom-language/formats/sym/
-awk -v max="$NUM_PUBLIC_INPUTS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, "."); printf "%s,%s\n", parts[2], $2}' "${CIRCOM_DIR}/main.sym" > "${CIRCOM_DIR}/io_locations.sym"
+awk -v max="$NUM_PUBLIC_IOS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, "."); printf "%s,%s\n", parts[2], $2}' "${CIRCOM_DIR}/main.sym" > "${CIRCOM_DIR}/io_locations.sym"
 
 if [ ${CREDTYPE} == 'mdl' ]; then 
     # Create the prover inputs (do it here, rather than in Rust like we do for JWTs; since the CBOR/mDL parsing code is in python) TODO: in future we should re-write it in rust
@@ -126,6 +128,7 @@ SYM_FILE=${OUTPUTS_DIR}/circom/io_locations.sym
 CONFIG_FILE=${INPUTS_DIR}/config.json
 TOKEN_FILE=${INPUTS_DIR}/token.jwt
 ISSUER_KEY_FILE=${INPUTS_DIR}/issuer.pub
+PROOF_SPEC_FILE=${INPUTS_DIR}/proof_spec.json
 
 rm -rf ${COPY_DEST}
 mkdir -p ${COPY_DEST}
@@ -137,6 +140,7 @@ cp ${ISSUER_KEY_FILE} ${COPY_DEST}/
 
 if [ ${CREDTYPE} == 'jwt' ]; then
     cp ${TOKEN_FILE} ${COPY_DEST}/
+    cp ${PROOF_SPEC_FILE} ${COPY_DEST}/ || true     # Optional file
 fi
 
 if [ ${CREDTYPE} == 'mdl' ]; then 

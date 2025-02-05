@@ -108,6 +108,7 @@ pub fn show_bench(c: &mut Criterion) {
 
     let mut client_state = ClientState::<Bn254>::new(
         public_inputs.clone(),
+        None,
         proof.clone(),
         vk.clone(),
         pvk.clone(),

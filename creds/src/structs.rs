@@ -80,8 +80,18 @@ impl IOLocations {
                 indices.push(*self.public_io_locations.get(key).unwrap() - 1);
             }
         }
+        indices.sort();
         
         indices
+    }
+
+    pub fn get_all_names(&self) -> Vec<String> {
+        let mut keys = vec![];
+        for key in self.public_io_locations.keys() {
+           keys.push(key.clone());
+        }        
+
+        keys
     }
 }
 
