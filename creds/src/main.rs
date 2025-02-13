@@ -5,7 +5,7 @@ use ark_groth16::{VerifyingKey,PreparedVerifyingKey};
 use ark_serialize::CanonicalSerialize;
 use crescent::groth16rand::{ClientState, ShowGroth16};
 use crescent::rangeproof::{RangeProofPK, RangeProofVK};
-use crescent::utils::{read_from_file, write_to_file};
+use crescent::utils::{read_from_file, string_to_byte_vec, write_to_file};
 use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, run_zksetup, verify_show, verify_show_mdl, CachePaths, ShowProof, VerifierParams, ProofSpec};
 use crescent::CrescentPairing;
 use crescent::prep_inputs::{prepare_prover_inputs, parse_config};
@@ -100,7 +100,7 @@ pub fn run_prover(
 ) {
     let paths = CachePaths::new(base_path);
     let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
-    let config = parse_config(config_str).expect("Failed to parse config");
+    let config = parse_config(&config_str).expect("Failed to parse config");
 
     let client_state = 
     if config.contains_key("credtype") && config.get("credtype").unwrap() == "mdl" {
@@ -179,13 +179,14 @@ pub fn run_show(
     let io_locations = IOLocations::new(&paths.io_locations);    
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
-    let pm = presentation_message.as_deref().map(|s| s.as_bytes());
+    let pm = string_to_byte_vec(presentation_message);
 
     let show_proof = if client_state.credtype == "mdl" {
-        create_show_proof_mdl(&mut client_state, &range_pk, pm, &io_locations, MDL_AGE_GREATER_THAN)  
+        create_show_proof_mdl(&mut client_state, &range_pk, pm.as_deref(), &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
-        let proof_spec = load_proof_spec(&paths.proof_spec);
-        create_show_proof(&mut client_state, &range_pk, pm, &io_locations, &proof_spec)
+        let mut proof_spec = load_proof_spec(&paths.proof_spec);
+        proof_spec.presentation_message = pm;
+        create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec)
     };
     println!("Proving time: {:?}", proof_timer.elapsed());
 
@@ -204,13 +205,14 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     let config_str = std::fs::read_to_string(&paths.config).unwrap();
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str};
-    let pm = presentation_message.as_deref().map(|s| s.as_bytes());
+    let pm = string_to_byte_vec(presentation_message);
 
     let (verify_result, data) = if show_proof.show_range2.is_some() {
-        verify_show_mdl(&vp, &show_proof, pm, MDL_AGE_GREATER_THAN)
+        verify_show_mdl(&vp, &show_proof, pm.as_deref(), MDL_AGE_GREATER_THAN)
     } else {
-        let proof_spec = load_proof_spec(&paths.proof_spec);
-        verify_show(&vp, &show_proof, pm, &proof_spec)
+        let mut proof_spec = load_proof_spec(&paths.proof_spec);
+        proof_spec.presentation_message = pm;
+        verify_show(&vp, &show_proof, &proof_spec)
     };
 
     if verify_result {

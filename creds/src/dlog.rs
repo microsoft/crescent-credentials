@@ -35,7 +35,7 @@ impl<G: Group> DLogPoK<G> {
     /// optionally, specify a set of positions to assert equality of in the form {(i1,j1), (i2,j2), ...}
     /// TODO (perf): shrink the proof size by compressing the responses since they're the same for all the equal positions
     pub fn prove(
-        pm: Option<&[u8]>,
+        context: Option<&[u8]>,
         y: &[G],
         bases: &[Vec<G>],
         scalars: &[Vec<G::ScalarField>],
@@ -52,8 +52,8 @@ impl<G: Group> DLogPoK<G> {
         let mut r = Vec::new();
 
         let mut ts: Transcript = Transcript::new(&[0u8]);
-        let pm = pm.unwrap_or(b"");
-        add_to_transcript(&mut ts, b"presentation_message", &pm);
+        let pm = context.unwrap_or(b"");
+        add_to_transcript(&mut ts, b"context string", &pm);
 
         for i in 0..y.len() {
             let mut ri = Vec::new();
@@ -116,7 +116,7 @@ impl<G: Group> DLogPoK<G> {
 
     pub fn verify(
         &self,
-        pm: Option<&[u8]>,
+        context: Option<&[u8]>,
         bases: &[Vec<G>],
         y: &[G],
         eq_pos: Option<Vec<(usize, usize)>>,
@@ -128,8 +128,8 @@ impl<G: Group> DLogPoK<G> {
         // serialize and hash the bases, k and y
         let dl_verify_timer = start_timer!(|| format!("DlogPoK verify y.len = {}", y.len()));
         let mut ts: Transcript = Transcript::new(&[0u8]);
-        let pm = pm.unwrap_or(b"");
-        add_to_transcript(&mut ts, b"presentation_message", &pm);
+        let pm = context.unwrap_or(b"");
+        add_to_transcript(&mut ts, b"context string", &pm);
 
         let mut recomputed_k = Vec::new();
         for i in 0..y.len() {

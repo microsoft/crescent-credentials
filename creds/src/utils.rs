@@ -189,6 +189,15 @@ where
     Ok(state)
 }
 
+pub fn string_to_byte_vec(s : Option<String>) -> Option<Vec<u8>> {
+    let v : Option<Vec<u8>> = if s.is_some() {
+        Some(s.unwrap().as_bytes().iter().map(|c| *c).collect())
+    } else {
+        None
+    };
+    v
+}
+
 #[cfg(test)]
 mod tests {
     use crate::rangeproof::RangeProofPK;

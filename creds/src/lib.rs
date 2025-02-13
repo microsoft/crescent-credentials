@@ -96,10 +96,14 @@ impl<E: Pairing> VerifierParams<E> {
 #[derive(Serialize, Deserialize)]
 pub struct ProofSpec {
     pub revealed: Vec<String>,
+    pub presentation_message: Option<Vec<u8>>
 }
+#[derive(Serialize)]
 pub(crate) struct ProofSpecInternal {
     pub revealed: Vec<String>,
-    pub hashed: Vec<String>
+    pub hashed: Vec<String>, 
+    pub presentation_message : Option<Vec<u8>>,
+    pub config_str: String
 }
 
 /// Structure to hold all the parts of a show/presentation proof
@@ -274,7 +278,7 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     Ok(client_state)
 }
 
-pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, pm: Option<&[u8]>, io_locations: &IOLocations, proof_spec: &ProofSpec) -> ShowProof<ECPairing>
+pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations, proof_spec: &ProofSpec) -> ShowProof<ECPairing>
 {
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
@@ -287,7 +291,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     }
 
     let proof_spec = create_proof_spec_internal(&proof_spec, &client_state.config_str).expect("Failed to create internal proof spec");  // TODO: return error
-    println!("Proof spec internal: revealed: {:?}, hashed: {:?}", proof_spec.revealed, proof_spec.hashed);
+
     // For the attributes revealed as field elements, we set the position to Revealed and send the value
     let mut revealed_inputs = vec![];
     for attr in &proof_spec.revealed {
@@ -325,7 +329,9 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
         revealed_preimages.insert(attr.clone(), json!(aux[attr].clone().to_string()));
     }
 
-    let show_groth16 = client_state.show_groth16(pm, &io_types);
+    // Serialize the proof spec as the context
+    let context_str = serde_json::to_string(&proof_spec).unwrap();
+    let show_groth16 = client_state.show_groth16(Some(context_str.as_bytes()), &io_types);
     
     // Create fresh range proof 
     let time_sec = SystemTime::now()
@@ -398,7 +404,7 @@ fn sort_by_io_location(attrs: &[String], io_locations: &IOLocations) -> Vec<Stri
     attrs_with_locs.into_iter().map(|(_, attr)| attr).collect()
 }
 
-pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, pm: Option<&[u8]>, proof_spec: &ProofSpec) -> (bool, String)
+pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, proof_spec: &ProofSpec) -> (bool, String)
 {
     let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
@@ -487,8 +493,10 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     //     println!("input {}  =  {:?}", i, input.into_bigint().to_string());
     // }
     
+    let context_str = serde_json::to_string(&proof_spec).unwrap();
+
     let verify_timer = std::time::Instant::now();
-    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, pm, &io_types, &inputs);
+    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, Some(context_str.as_bytes()), &io_types, &inputs);
     if !ret {
         println!("show_groth16.verify failed");
         return (false, "".to_string());
@@ -652,20 +660,10 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prep_inputs::{parse_config, prepare_prover_inputs};
+    use crate::{prep_inputs::{parse_config, prepare_prover_inputs}, utils::string_to_byte_vec};
     use serial_test::serial;
 
-    const MDL_AGE_GT : usize = 18;
-    pub const DEFAULT_CONFIG : &str = r#"{
-        "alg": "RS256",
-        "email": {
-            "type" : "string",
-            "reveal": true,
-            "max_claim_byte_len": 31,
-            "reveal_domain_only": true
-        }
-    }
-    "#;    
+    const MDL_AGE_GT : usize = 18; 
 
     // We run the end-to-end tests with [serial] because they use a lot of memory, 
     // if two are run at the same time some machines do not have enough RAM
@@ -696,7 +694,7 @@ mod tests {
 
         println!("Running prove (creating client state)");
         let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
-        let config = parse_config(config_str).expect("Failed to parse config");
+        let config = parse_config(&config_str).expect("Failed to parse config");
     
         let prover_inputs = 
         if cred_type == "mdl" {
@@ -716,14 +714,15 @@ mod tests {
         let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
 
         println!("Running show");
-        let pm = "some presentation message".as_bytes();
+        let pm = "some presentation message";
         let io_locations = IOLocations::new(&paths.io_locations);    
         let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
         let show_proof = if client_state.credtype == "mdl" {
-            create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, MDL_AGE_GT)  
+            create_show_proof_mdl(&mut client_state, &range_pk, Some(pm.as_bytes()), &io_locations, MDL_AGE_GT)  
         } else {
-            let proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
-            create_show_proof(&mut client_state, &range_pk, Some(pm), &io_locations, &proof_spec)
+            let mut proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
+            proof_spec.presentation_message = string_to_byte_vec(Some(pm.to_string()));
+            create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec)
         };
 
         write_to_file(&show_proof, &paths.show_proof);
@@ -736,13 +735,14 @@ mod tests {
         let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
         let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     
-        let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str: DEFAULT_CONFIG.to_string()};
+        let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str: config_str.clone()};
     
         let (verify_result, _data) = if show_proof.show_range2.is_some() {
-            verify_show_mdl(&vp, &show_proof, Some(pm), MDL_AGE_GT)
+            verify_show_mdl(&vp, &show_proof, Some(pm.as_bytes()), MDL_AGE_GT)
         } else {
-            let proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
-            verify_show(&vp, &show_proof, Some(pm), &proof_spec)
+            let mut proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
+            proof_spec.presentation_message = string_to_byte_vec(Some(pm.to_string()));
+            verify_show(&vp, &show_proof, &proof_spec)
         };
         assert!(verify_result);
     }
