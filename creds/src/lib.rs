@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, error::Error};
 use std::time::{SystemTime, UNIX_EPOCH};
 use ark_bn254::{Bn254 as ECPairing, Fr};
 use ark_circom::{CircomBuilder, CircomConfig};
@@ -278,7 +278,7 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     Ok(client_state)
 }
 
-pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations, proof_spec: &ProofSpec) -> ShowProof<ECPairing>
+pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations, proof_spec: &ProofSpec) -> Result<ShowProof<ECPairing>, Box<dyn Error>>
 {
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
@@ -290,18 +290,18 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
         io_types[i] = PublicIOType::Revealed;
     }
 
-    let proof_spec = create_proof_spec_internal(&proof_spec, &client_state.config_str).expect("Failed to create internal proof spec");  // TODO: return error
+    let proof_spec = create_proof_spec_internal(&proof_spec, &client_state.config_str)?;
 
     // For the attributes revealed as field elements, we set the position to Revealed and send the value
     let mut revealed_inputs = vec![];
     for attr in &proof_spec.revealed {
-        let io_loc = io_locations.get_io_location(&format!("{}_value", &attr));
-        if io_loc.is_err() {
-            println!("Asked to reveal attribute {}, but did not find it in io_locations", attr);
-            println!("IO locations: {:?}", io_locations.get_all_names());
-            panic!(); // TODO: return error
-        }
-        let io_loc = io_loc.unwrap();
+        let io_loc = match io_locations.get_io_location(&format!("{}_value", &attr)) {
+            Ok(loc) => loc,
+            Err(_) => {
+                return_error!(
+                    format!("Asked to reveal hashed attribute {}, but did not find it in io_locations\nIO locations: {:?}", attr, io_locations.get_all_names()));
+            }
+        };
 
         io_types[io_loc - 1] = PublicIOType::Revealed;
         revealed_inputs.push(client_state.inputs[io_loc - 1]);
@@ -310,19 +310,18 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     // For the attributes revealed as digests, we provide the preimage, the verifier will hash it to get the field element
     let mut revealed_preimages = serde_json::Map::new();
     for attr in &proof_spec.hashed {
-        let io_loc = io_locations.get_io_location(&format!("{}_digest", &attr));
-        if io_loc.is_err() {
-            println!("Asked to reveal hashed attribute {}, but did not find it in io_locations", attr);
-            println!("IO locations: {:?}", io_locations.get_all_names());
-            panic!(); // TODO: return error
-        }
-        let io_loc = io_loc.unwrap();
+        let io_loc = match io_locations.get_io_location(&format!("{}_digest", &attr)) {
+            Ok(loc) => loc,
+            Err(_) => {
+                return_error!(
+                    format!("Asked to reveal hashed attribute {}, but did not find it in io_locations\nIO locations: {:?}", attr, io_locations.get_all_names()));
+            }
+        };        
 
         io_types[io_loc - 1] = PublicIOType::Revealed;
 
         if client_state.aux.is_none() {
-            println!("Proof spec asked to reveaal hashed attribute {}, but client state is missing aux data", attr);
-            panic!(); // TODO: return error
+            return_error!(format!("Proof spec asked to reveal hashed attribute {}, but client state is missing aux data", attr));
         }
         let aux = serde_json::from_str::<Value>(client_state.aux.as_ref().unwrap()).unwrap();
         let aux = aux.as_object().unwrap();
@@ -352,7 +351,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     } else {
         Some(serde_json::to_string(&revealed_preimages).unwrap())
     };
-    ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, revealed_preimages, inputs_len: client_state.inputs.len(), cur_time: time_sec}
+    Ok(ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, revealed_preimages, inputs_len: client_state.inputs.len(), cur_time: time_sec})
 }
 
 pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, pm: Option<&[u8]>, io_locations: &IOLocations, age: usize) -> ShowProof<ECPairing>
@@ -722,7 +721,9 @@ mod tests {
         } else {
             let mut proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
             proof_spec.presentation_message = string_to_byte_vec(Some(pm.to_string()));
-            create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec)
+            let proof = create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec);
+            assert!(proof.is_ok());
+            proof.unwrap()
         };
 
         write_to_file(&show_proof, &paths.show_proof);

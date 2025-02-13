@@ -186,7 +186,7 @@ pub fn run_show(
     } else {
         let mut proof_spec = load_proof_spec(&paths.proof_spec);
         proof_spec.presentation_message = pm;
-        create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec)
+        create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec).unwrap()
     };
     println!("Proving time: {:?}", proof_timer.elapsed());
 
