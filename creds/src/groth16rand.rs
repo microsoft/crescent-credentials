@@ -32,6 +32,7 @@ pub struct ClientState<E: Pairing> {
     input_com_randomness: Option<E::ScalarField>,
     pub committed_input_openings: Vec<PedersenOpening<E::G1>>, //TODO: make this into a hashmap
     pub credtype : String,
+    pub config_str: String
 }
 
 /// An unlinkable showing of a valid groth16 proof satisfying a particular NP relation
@@ -62,6 +63,7 @@ impl<E: Pairing> ClientState<E> {
         proof: Proof<E>,
         vk: VerifyingKey<E>,
         pvk: PreparedVerifyingKey<E>,
+        config_str: String
     ) -> Self {
         Self {
             inputs,
@@ -71,7 +73,8 @@ impl<E: Pairing> ClientState<E> {
             pvk,
             input_com_randomness: None,
             committed_input_openings: Vec::new(),
-            credtype : "jwt".to_string()
+            credtype : "jwt".to_string(), 
+            config_str
         }
     }
 

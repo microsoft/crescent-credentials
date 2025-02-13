@@ -154,16 +154,15 @@ fn show_proof_size(show_proof: &ShowProof<CrescentPairing>) -> usize {
     total
 }
 
-fn load_proof_spec(proof_spec_file : &str) -> ProofSpec {
-    let ps_str = if PathBuf::from(proof_spec_file).exists() {
-        println!("Using proof spec file {}", proof_spec_file);
-        fs::read_to_string(proof_spec_file).expect("Proof spec file exists, but failed while reading it")
+fn load_proof_spec(proof_spec_file_path : &str) -> ProofSpec {
+    let ps_raw = if PathBuf::from(proof_spec_file_path).exists() {
+        println!("Using proof spec file {}", proof_spec_file_path);
+        fs::read_to_string(proof_spec_file_path).expect("Proof spec file exists, but failed while reading it")
     } else {
-        println!("Proof spec file not found; using default (looked for file: {}) ", proof_spec_file);
+        println!("Proof spec file not found; using default (looked for file: {}) ", proof_spec_file_path);
         crescent::DEFAULT_PROOF_SPEC.to_string()
     };
-    let ps : ProofSpec = serde_json::from_str(&ps_str).unwrap();
-
+    let ps : ProofSpec = serde_json::from_str(&ps_raw).unwrap();    
     ps
 }
 
@@ -198,8 +197,9 @@ pub fn run_verifier(base_path: PathBuf) {
     let range_vk : RangeProofVK<CrescentPairing> = read_from_file(&paths.range_vk).unwrap();
     let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
     let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
+    let config_str = std::fs::read_to_string(&paths.config).unwrap();
 
-    let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
+    let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str};
 
     let (verify_result, data) = if show_proof.show_range2.is_some() {
         verify_show_mdl(&vp, &show_proof, MDL_AGE_GREATER_THAN)

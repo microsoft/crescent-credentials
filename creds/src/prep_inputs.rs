@@ -15,6 +15,8 @@ use std::fs;
 use ark_std::path::PathBuf;
 use ark_ff::BigInteger;
 use crate::return_error;
+use crate::ProofSpec;
+use crate::ProofSpecInternal;
 
 // If not set in config.json, the max_jwt_len is set to this value. 
 const DEFAULT_MAX_TOKEN_LENGTH : usize = 2048;
@@ -541,5 +543,25 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
     }
 
     Ok(config.clone())
+}
 
+
+// Create the internal version of the ProofSpec object.  This combines information from the config file and the
+// provided ProofSpec to create a mode detailed object. 
+pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &String) -> Result<ProofSpecInternal, Box<dyn Error>> {
+
+    let config = parse_config(config_str.clone())?;
+    let mut revealed = vec![];
+    let mut hashed = vec![];
+    for attr in &proof_spec.revealed {
+        let config_entry = config.get(attr.as_str()).ok_or(format!("Attribute {} not found in config", attr))?;
+        if config_entry.get("reveal_digest").is_some() && config_entry.get("reveal_digest").ok_or("Expected boolean value for 'reveal_digest'")?.as_bool().unwrap() {
+            hashed.push(attr.to_string());
+        }
+        else {
+            revealed.push(attr.to_string());
+        }
+    }
+
+    Ok(ProofSpecInternal {revealed, hashed})
 }

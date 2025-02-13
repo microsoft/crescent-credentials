@@ -12,7 +12,7 @@ use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
 use groth16rand::{ShowGroth16, ShowRange};
-use prep_inputs::{pem_to_inputs, unpack_int_to_string_unquoted};
+use prep_inputs::{create_proof_spec_internal, pem_to_inputs, unpack_int_to_string_unquoted};
 use serde::{Deserialize, Serialize};
 use serde_json::{json,Value};
 use sha2::{Digest, Sha256};
@@ -35,7 +35,7 @@ pub mod daystamp;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
-pub const DEFAULT_PROOF_SPEC : &str = r#"{"revealed" : ["email"], "hashed" : []}"#;
+pub const DEFAULT_PROOF_SPEC : &str = r#"{"revealed" : ["email"]}"#;
 
 pub type CrescentPairing = ECPairing;
 pub type CrescentFr = Fr;
@@ -75,7 +75,8 @@ pub struct VerifierParams<E: Pairing> {
     pub pvk : PreparedVerifyingKey<E>,
     pub range_vk: RangeProofVK<E>,
     pub io_locations_str: String, // Stored as String since IOLocations does not implement CanonicalSerialize
-    pub issuer_pem: String
+    pub issuer_pem: String, 
+    pub config_str: String
 }
 impl<E: Pairing> VerifierParams<E> {
     pub fn new(paths : &CachePaths) -> Result<Self, SerializationError> {
@@ -84,7 +85,8 @@ impl<E: Pairing> VerifierParams<E> {
         let range_vk : RangeProofVK<E> = read_from_file(&paths.range_vk)?;
         let io_locations_str = std::fs::read_to_string(&paths.io_locations)?;
         let issuer_pem = std::fs::read_to_string(&paths.issuer_pem)?;
-        Ok(Self{vk, pvk, range_vk, io_locations_str, issuer_pem})
+        let config_str = std::fs::read_to_string(&paths.config)?;
+        Ok(Self{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str})
     }
 }
 
@@ -93,6 +95,9 @@ impl<E: Pairing> VerifierParams<E> {
 // The range proof that "exp" is in the future is always done.
 #[derive(Serialize, Deserialize)]
 pub struct ProofSpec {
+    pub revealed: Vec<String>,
+}
+pub(crate) struct ProofSpecInternal {
     pub revealed: Vec<String>,
     pub hashed: Vec<String>
 }
@@ -207,7 +212,6 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     let serialize_timer = start_timer!(|| "Writing everything to files");
     write_to_file(&range_pk, &paths.range_pk);
     write_to_file(&range_vk, &paths.range_vk);    
-    write_to_file(&params, &paths.groth16_params);
     write_to_file(&vk, &paths.groth16_vk);
     write_to_file(&pvk, &paths.groth16_pvk);
 
@@ -231,8 +235,8 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     prover_inputs.push_inputs(&mut builder);
     end_timer!(circom_timer);
 
-    let load_params_timer = start_timer!(||"Reading Groth16 params from file");
-    let params : ProvingKey<ECPairing> = read_from_file(&paths.groth16_params)?;
+    let load_params_timer = start_timer!(||"Reading ProverParams params from file");
+    let prover_params : ProverParams<ECPairing> = read_from_file(&paths.prover_params)?;
     end_timer!(load_params_timer);
     
     let build_timer = start_timer!(|| "Witness Generation");
@@ -247,7 +251,7 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
 
     let mut rng = thread_rng();
     let prove_timer = start_timer!(|| "Groth16 prove");    
-    let proof = Groth16::<ECPairing>::prove(&params, circom, &mut rng).unwrap();    
+    let proof = Groth16::<ECPairing>::prove(&prover_params.groth16_params, circom, &mut rng).unwrap();    
     end_timer!(prove_timer);
 
     let pvk : PreparedVerifyingKey<ECPairing> = read_from_file(&paths.groth16_pvk)?;
@@ -261,8 +265,9 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
         inputs.clone(),
         prover_aux.cloned(),
         proof.clone(),
-        params.vk.clone(),
+        prover_params.groth16_params.vk.clone(),
         pvk.clone(),
+        prover_params.config_str.clone()
     );
     client_state.credtype = credtype.to_string();
 
@@ -280,7 +285,9 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     for i in io_locations.get_public_key_indices() {
         io_types[i] = PublicIOType::Revealed;
     }
-    
+
+    let proof_spec = create_proof_spec_internal(&proof_spec, &client_state.config_str).expect("Failed to create internal proof spec");  // TODO: return error
+    println!("Proof spec internal: revealed: {:?}, hashed: {:?}", proof_spec.revealed, proof_spec.hashed);
     // For the attributes revealed as field elements, we set the position to Revealed and send the value
     let mut revealed_inputs = vec![];
     for attr in &proof_spec.revealed {
@@ -400,7 +407,10 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
     for i in io_locations.get_public_key_indices() {
         io_types[i] = PublicIOType::Revealed;
-    }    
+    }
+
+    let proof_spec = create_proof_spec_internal(&proof_spec, &vp.config_str).expect("Failed to create internal proof spec");  // TODO: return error
+
     // Set attributes to Revealed
     for attr in &proof_spec.revealed {
         let io_loc = io_locations.get_io_location(&format!("{}_value", &attr));
@@ -642,6 +652,16 @@ mod tests {
     use serial_test::serial;
 
     const MDL_AGE_GT : usize = 18;
+    pub const DEFAULT_CONFIG : &str = r#"{
+        "alg": "RS256",
+        "email": {
+            "type" : "string",
+            "reveal": true,
+            "max_claim_byte_len": 31,
+            "reveal_domain_only": true
+        }
+    }
+    "#;    
 
     // We run the end-to-end tests with [serial] because they use a lot of memory, 
     // if two are run at the same time some machines do not have enough RAM
@@ -711,7 +731,7 @@ mod tests {
         let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
         let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     
-        let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
+        let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str: DEFAULT_CONFIG.to_string()};
     
         let (verify_result, _data) = if show_proof.show_range2.is_some() {
             verify_show_mdl(&vp, &show_proof, MDL_AGE_GT)
