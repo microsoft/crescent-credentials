@@ -49,10 +49,8 @@ pub struct ProverParams<E: Pairing> {
 }
 impl<E: Pairing> ProverParams<E> {
     pub fn new(paths : &CachePaths) -> Result<Self, SerializationError> {
-        let groth16_params : ProvingKey<E> = read_from_file(&paths.groth16_params)?;
-        let groth16_pvk : PreparedVerifyingKey<E> = read_from_file(&paths.groth16_pvk)?;
-        let config_str = fs::read_to_string(&paths.config)?;
-        Ok(Self{groth16_params, groth16_pvk, config_str})
+        let prover_params : ProverParams<E> = read_from_file(&paths.prover_params)?;
+        Ok(prover_params)
     }
 }
 
@@ -132,7 +130,6 @@ pub struct CachePaths {
    pub range_vk: String,
    pub groth16_vk: String,
    pub groth16_pvk: String,
-   pub groth16_params: String,
    pub prover_params: String,   
    pub client_state: String, 
    pub show_proof: String,
@@ -175,7 +172,6 @@ impl CachePaths {
             range_vk: format!("{}range_vk.bin", &cache_path),
             groth16_vk: format!("{}groth16_vk.bin", &cache_path),
             groth16_pvk: format!("{}groth16_pvk.bin", &cache_path),
-            groth16_params: format!("{}groth16_params.bin", &cache_path),
             prover_params: format!("{}prover_params.bin", &cache_path),
             client_state: format!("{}client_state.bin", &cache_path),
             show_proof: format!("{}show_proof.bin", &cache_path),

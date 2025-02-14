@@ -7,7 +7,7 @@ use crescent::groth16rand::ClientState;
 use crescent::prep_inputs::{parse_config, prepare_prover_inputs};
 use crescent::rangeproof::RangeProofPK;
 use crescent::structs::{GenericInputsJSON, IOLocations};
-use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, CachePaths, CrescentPairing};
+use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, CachePaths, CrescentPairing, ProofSpec};
 use crescent::utils::{read_from_b64url, read_from_file, write_to_b64url};
 use crescent::ProverParams;
 
@@ -21,7 +21,7 @@ use rocket::fs::FileServer;
 
 use uuid::Uuid;
 use tokio::sync::Mutex;
-use serde_json::Value;
+use serde_json::{json, Value};
 use jsonwebkey::JsonWebKey;
 
 use std::collections::HashMap;
@@ -171,7 +171,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
             println!("Loading prover params");
             let prover_params = ProverParams::<CrescentPairing>::new(&paths).map_err(|_| "Failed to create prover params")?;
             println!("Parsing config");
-            let config = parse_config(prover_params.config_str).map_err(|_| "Failed to parse config")?;
+            let config = parse_config(&prover_params.config_str).map_err(|_| "Failed to parse config")?;
 
             let range_pk: RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).map_err(|_| "Failed to read range proof pk")?;
             println!("Serializing range proof pk");
@@ -188,13 +188,14 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
                 println!("Loading issuer public key");
                 let issuer_pem = fs::read_to_string(&paths.issuer_pem).map_err(|_| "Unable to read issuer public key PEM")?;                
                 println!("Creating prover inputs");
-                let (prover_inputs_json, _prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &cred_info.cred, &issuer_pem).map_err(|_| "Failed to prepare prover inputs")?;
+                let (prover_inputs_json, prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &cred_info.cred, &issuer_pem).map_err(|_| "Failed to prepare prover inputs")?;
                 let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
+                let prover_aux_string = json!(prover_aux_json).to_string();
 
                 println!("Creating client state... this is slow...");
                 
                 
-                create_client_state(&paths, &prover_inputs, "jwt").map_err(|_| "Failed to create client state")?
+                create_client_state(&paths, &prover_inputs, Some(&prover_aux_string), "jwt").map_err(|_| "Failed to create client state")?
             };
 
             let client_state_b64 = write_to_b64url(&client_state);
@@ -278,7 +279,9 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, state: 
                 create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, age)
             }
             else {
-                create_show_proof(&mut client_state, &range_pk, Some(pm), &io_locations)            
+                let mut ps : ProofSpec = serde_json::from_str(&JWT_DEMO_PROOF_SPEC).unwrap();    
+                ps.presentation_message = crescent::utils::string_to_byte_vec(Some(challenge));
+                create_show_proof(&mut client_state, &range_pk, &io_locations, &ps).map_err(|e| format!("Failed to create show proof. {:?}", e))?
             };
             
             // Return the show proof as a base64-url encoded string

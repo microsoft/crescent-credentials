@@ -34,7 +34,7 @@ for i in "${!SOURCE_DIRS[@]}"; do
     cp "${SOURCE_DIR}/main.wasm" "${TARGET_DIR}/"
     cp "${SOURCE_DIR}/main_c.r1cs" "${TARGET_DIR}/"
     cp "${SOURCE_DIR}/io_locations.sym" "${TARGET_DIR}/"
-    cp "${SOURCE_DIR}/cache/groth16_params.bin" "${TARGET_DIR}/cache/"
+    cp "${SOURCE_DIR}/cache/prover_params.bin" "${TARGET_DIR}/cache/"
     cp "${SOURCE_DIR}/cache/groth16_pvk.bin" "${TARGET_DIR}/cache/"
     cp "${SOURCE_DIR}/cache/range_pk.bin" "${TARGET_DIR}/cache/"
     set +x

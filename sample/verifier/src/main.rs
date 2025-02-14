@@ -3,17 +3,17 @@
 
 #[macro_use] extern crate rocket;
 
-use crescent::verify_show_mdl;
+use crescent::{verify_show_mdl, ProofSpec};
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
 use rocket_dyn_templates::{context, Template};
-use rocket::response::{Redirect};
+use rocket::response::Redirect;
 use rocket::response::status::Custom;
 use rocket::State;
 use rocket::fs::{FileServer, NamedFile};
 use rocket::http::Status;
 use std::collections::{HashMap, HashSet};
-use serde_json::Value;
+use serde_json::{json, Value};
 use jsonwebkey::JsonWebKey;
 use std::path::Path;
 use std::fs;
@@ -110,6 +110,22 @@ fn login_page(verifier_config: &State<VerifierConfig>) -> Template {
     Template::render("login", context)
 }
 
+fn get_email_domain(disclsosed_info : &Option<String>) -> String {
+
+    match disclsosed_info {
+        Some(info) => {
+            match serde_json::from_str::<Value>(&info) {
+                Ok(j) =>{
+                    j.get("email_value").unwrap_or(&json!("ERROR: email key not found")).as_str().unwrap_or("ERROR: email domain is not a string").to_string()
+                }
+                Err(_) => "ERROR: domain not found".to_string()
+            }
+            
+        }
+        None => "ERROR: domain not found".to_string()
+    }
+}
+
 // route to serve the protected resource page after successful verification  (site 1 - JWT verifier)
 #[get("/resource?<session_id>")]
 fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) -> Template {
@@ -130,8 +146,8 @@ fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) ->
 
         if let Some(result) = validation_result {
             Template::render("resource", context! {
-                site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
-                email_domain: result.disclosed_info.unwrap_or_else(|| "example.com".to_string()),
+                site1_verifier_name: verifier_config.site1_verifier_name.as_str(),               
+                email_domain: get_email_domain(&result.disclosed_info),
             })
         } else {
             Template::render("error", context! { error: "Invalid session ID" })
@@ -256,7 +272,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     };
 
     // Parse the challenge session ID as a byte array for the presentation message
-    let pm = proof_info.session_id.as_bytes();
+    let challenge = proof_info.session_id.clone();
 
     // Define base folder path and credential-specific folder path
     let base_folder = format!("{}/{}", CRESCENT_DATA_BASE_PATH, proof_info.schema_uid);
@@ -294,12 +310,14 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     let is_valid;
     let disclosed_info;
     if cred_type == "jwt" {
-        let (valid, info) = verify_show(&vp, &show_proof, Some(pm));
+        let mut ps : ProofSpec = serde_json::from_str(&JWT_DEMO_PROOF_SPEC).unwrap();    
+        ps.presentation_message = crescent::utils::string_to_byte_vec(Some(challenge));        
+        let (valid, info) = verify_show(&vp, &show_proof, &ps);
         is_valid = valid;
         disclosed_info = Some(info);
     } else {
         let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap(); // disclosure UID validated, so unwrap should be safe
-        let (valid, info) = verify_show_mdl(&vp, &show_proof, Some(pm), age);
+        let (valid, info) = verify_show_mdl(&vp, &show_proof, Some(challenge.as_bytes()), age);
         is_valid = valid;
         disclosed_info = Some(info);
     }
