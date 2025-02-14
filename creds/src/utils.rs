@@ -79,12 +79,11 @@ pub fn bits_to_num(bytes : &[u8]) -> BigUint {
     let mut e = BigUint::from(1u32);
     let mut res = BigUint::from(0u32);
     for i in 0..248 {
-        res = res + &e * BigUint::from(bitvec[i] as u32);
+        res += &e * BigUint::from(bitvec[i] as u32);
         e = BigUint::from(2u32)*e;  // e = 2*e
     }
 
-    return res;
-
+    res
 }
 
 pub fn random_vec<F: PrimeField>(n: usize) -> Vec<F> {
@@ -190,12 +189,8 @@ where
 }
 
 pub fn string_to_byte_vec(s : Option<String>) -> Option<Vec<u8>> {
-    let v : Option<Vec<u8>> = if s.is_some() {
-        Some(s.unwrap().as_bytes().iter().map(|c| *c).collect())
-    } else {
-        None
-    };
-    v
+    // Retruns None if s is None
+    Some(s?.as_bytes().to_vec())
 }
 
 #[cfg(test)]

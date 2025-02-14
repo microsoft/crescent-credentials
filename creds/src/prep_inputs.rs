@@ -186,10 +186,10 @@ Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 
 // For each of the claims that are specified in the config file, the prover will need some info about each one
 // (e.g., the value, where in the payload it starts and ends)
-fn prepare_prover_claim_inputs(header_and_payload: &String, config: &serde_json::Map<String, Value>, claims: &Value, prover_inputs_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
+fn prepare_prover_claim_inputs(header_and_payload: &str, config: &serde_json::Map<String, Value>, claims: &Value, prover_inputs_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
     let msg = header_and_payload;
 
-    if !is_minified(&msg) {
+    if !is_minified(msg) {
         return_error!("JSON is not minified, Circom circuit will fail.")
     }
     let keys = config.keys();
@@ -207,7 +207,7 @@ fn prepare_prover_claim_inputs(header_and_payload: &String, config: &serde_json:
         let type_string = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", name))?;
 
         let claim_name = format!("\"{}\"", name);
-        let (claim_l, claim_r) = find_value_interval(&msg, &claim_name, type_string)?;
+        let (claim_l, claim_r) = find_value_interval(msg, &claim_name, type_string)?;
 
         let name_l = format!("{}_l", name);
         let name_r = format!("{}_r", name);
@@ -250,7 +250,7 @@ fn prepare_prover_claim_inputs(header_and_payload: &String, config: &serde_json:
 // The digests are outputs of the circuit and made available to the prover during witness generation. 
 // When showing the credential, if the prover selectively discloses a hashed attribute, they need the
 // preimage to send to the verifier.
-fn prepare_prover_aux(_header_and_payload: &String, config: &serde_json::Map<String, Value>, claims: &Value, prover_aux_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
+fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String, Value>, claims: &Value, prover_aux_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
     
     for key in config.keys() {
         if CRESCENT_CONFIG_KEYS.contains(key.as_str()) {
@@ -500,8 +500,8 @@ pub fn load_config(path: PathBuf) -> Result<serde_json::Map<String, Value>, Box<
     parse_config(&config_str)
 }
 
-pub fn parse_config(config_str: &String) -> Result<serde_json::Map<String, Value>, Box<dyn Error>> {
-    let mut config_v: Value = serde_json::from_str(&config_str)?;
+pub fn parse_config(config_str: &str) -> Result<serde_json::Map<String, Value>, Box<dyn Error>> {
+    let mut config_v: Value = serde_json::from_str(config_str)?;
     let config: &mut serde_json::Map<String, Value> = config_v.as_object_mut().ok_or("Invalid config")?;
 
     // Validate config
@@ -548,7 +548,7 @@ pub fn parse_config(config_str: &String) -> Result<serde_json::Map<String, Value
 
 // Create the internal version of the ProofSpec object.  This combines information from the config file and the
 // provided ProofSpec to create a mode detailed object. 
-pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &String) -> Result<ProofSpecInternal, Box<dyn Error>> {
+pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &str) -> Result<ProofSpecInternal, Box<dyn Error>> {
 
     let config = parse_config(config_str)?;
     let mut revealed = vec![];
@@ -563,5 +563,5 @@ pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &St
         }
     }
 
-    Ok(ProofSpecInternal {revealed, hashed, presentation_message: proof_spec.presentation_message.clone(), config_str: config_str.clone()})
+    Ok(ProofSpecInternal {revealed, hashed, presentation_message: proof_spec.presentation_message.clone(), config_str: config_str.to_owned()})
 }

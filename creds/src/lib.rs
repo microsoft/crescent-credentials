@@ -286,7 +286,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
         io_types[i] = PublicIOType::Revealed;
     }
 
-    let proof_spec = create_proof_spec_internal(&proof_spec, &client_state.config_str)?;
+    let proof_spec = create_proof_spec_internal(proof_spec, &client_state.config_str)?;
 
     // For the attributes revealed as field elements, we set the position to Revealed and send the value
     let mut revealed_inputs = vec![];
@@ -341,7 +341,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
 
     // Assemble proof
-    let revealed_preimages = if proof_spec.hashed.len() == 0 { 
+    let revealed_preimages = if proof_spec.hashed.is_empty() { 
         assert!(revealed_preimages.is_empty());
         None 
     } else {
@@ -409,7 +409,12 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         io_types[i] = PublicIOType::Revealed;
     }
 
-    let proof_spec = create_proof_spec_internal(&proof_spec, &vp.config_str).expect("Failed to create internal proof spec");  // TODO: return error
+    let proof_spec = create_proof_spec_internal(proof_spec, &vp.config_str); 
+    if proof_spec.is_err() {
+        println!("Failed to create internal proof spec");
+        return (false, "".to_string());
+    }
+    let proof_spec = proof_spec.unwrap();
 
     // Set attributes to Revealed
     for attr in &proof_spec.revealed {
@@ -426,9 +431,9 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     // For the attributes revealed as digests, we hash the provided preimage to get the field element
     let mut revealed_hashed = vec![];
     let mut preimages = json!(serde_json::Value::Null);
-    if proof_spec.hashed.len() > 0 {
+    if !proof_spec.hashed.is_empty() {
         assert!(show_proof.revealed_preimages.is_some());
-        let preimages0 = serde_json::from_str::<Value>(&show_proof.revealed_preimages.as_ref().unwrap());
+        let preimages0 = serde_json::from_str::<Value>(show_proof.revealed_preimages.as_ref().unwrap());
         if preimages0.is_err() {
             println!("Failed to deserialize revealed_preimages");
             return (false, "".to_string());
@@ -464,7 +469,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
             };
             let digest = Sha256::digest(data);
             let digest248 = &digest[0..digest.len()-1];
-            let digest_uint = utils::bits_to_num(&digest248);
+            let digest_uint = utils::bits_to_num(digest248);
             let digest_scalar = utils::biguint_to_scalar::<CrescentFr>(&digest_uint);
             revealed_hashed.push(digest_scalar);
         }
@@ -528,9 +533,8 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
     // Add the revealed attributes to the output, after converting from field elt to string
-    let mut revealed_idx = 0;
     let mut revealed = serde_json::Map::<String, Value>::new();
-    for attr_name in &proof_spec.revealed {
+    for (revealed_idx, attr_name) in proof_spec.revealed.iter().enumerate() {
         let attr_name = attr_name.clone() + "_value";
         let unpacked = unpack_int_to_string_unquoted( &show_proof.revealed_inputs[revealed_idx].into_bigint());
         if unpacked.is_err() {
@@ -539,8 +543,6 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         }
         let attr_value = &unpacked.unwrap().clone();
         revealed.insert(attr_name.clone(), json!(attr_value));
-        
-        revealed_idx += 1;
     }
 
     // Add the hashed revealed attributes to the output
