@@ -97,9 +97,12 @@
                     throw new Error("cred_uid is not available. Please start the task first.");
                 }
 
+                // the verifier's challenge
+                const challenge = document.getElementById("challengeInput").value;
+
                 // the disclosure UID associated with the credential
                 const disclosure_UID = document.getElementById("disclosureUidSelect").value;
-                const showResponse = await fetch(`${clientHelperUrl}/show?cred_uid=${cred_uid}&disc_uid=${disclosure_UID}`);
+                const showResponse = await fetch(`${clientHelperUrl}/show?cred_uid=${cred_uid}&disc_uid=${disclosure_UID}&challenge=${challenge}`);
                 if (!showResponse.ok) { 
                     throw new Error('Failed to fetch Show Proof'); 
                 }
@@ -109,7 +112,7 @@
                 
                 // Display the test command in the textarea                
                 const schema_uid = document.getElementById("schemaUidInput").value;
-                const test_command = `wget --method=POST --body-data='{"schema_uid":"${schema_uid}", "issuer_url":"http://127.0.0.1:8001", "proof":"${show_proof_b64}", "disclosure_uid":"${disclosure_UID}"}' --header='Content-Type: application/json' --server-response --max-redirect=3 -d http://127.0.0.1:8004/verify -O- --no-verbose`;
+                const test_command = `wget --method=POST --body-data='{"schema_uid":"${schema_uid}", "issuer_url":"http://127.0.0.1:8001", "proof":"${show_proof_b64}", "disclosure_uid":"${disclosure_UID}", "session_id":"${challenge}"}' --header='Content-Type: application/json' --server-response --max-redirect=3 -d http://127.0.0.1:8004/verify -O- --no-verbose`;
                 document.getElementById('testCommand').value = test_command;
                 console.log(test_command);
             } catch (error) {
@@ -162,6 +165,8 @@
     <div>
         <h2>Show Proof:</h2>
         <p>Click "Show Credential" to fetch the proof for the credential.</p>
+        <label for="challengeInput">Verifier challenge (from the meta tag "crescent_challenge" value):</label><br>
+        <input type="text" id="challengeInput" size="80" value=""><br>
         <label for="disclosureUidSelect">Disclosure UID:</label>
         <select id="disclosureUidSelect">
             <option value="crescent://email_domain">crescent://email_domain</option>
