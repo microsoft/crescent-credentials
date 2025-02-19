@@ -17,7 +17,7 @@ ark-std = { version = "=0.4.0", default-features = false, features = [
     "parallel",
 ] }
 ark-bn254 = { version = "=0.4.0" }
-ark-bls12-381 = "0.4.0"
+
 ark-poly = { version = "=0.4.1", default-features = false, features = [
     "parallel",
 ] }
@@ -58,6 +58,7 @@ ark-poly-commit = { path = "../forks/ark-poly-commit", default-features = false,
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 serial_test = "*"
+ark-bls12-381 = "0.4.0"
 
 [build-dependencies]
 cargo-patch = "0.3"
