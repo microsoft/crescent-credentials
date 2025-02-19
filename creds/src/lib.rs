@@ -94,7 +94,7 @@ impl<E: Pairing> VerifierParams<E> {
 #[derive(Serialize, Deserialize)]
 pub struct ProofSpec {
     pub revealed: Vec<String>,
-    pub presentation_message: Option<Vec<u8>>
+    pub presentation_message: Option<String>,
 }
 #[derive(Serialize)]
 pub(crate) struct ProofSpecInternal {
@@ -711,14 +711,14 @@ mod tests {
         let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
 
         println!("Running show");
-        let pm = "some presentation message";
+        let pm = "some presentation message".to_string();
         let io_locations = IOLocations::new(&paths.io_locations);    
         let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
         let show_proof = if client_state.credtype == "mdl" {
             create_show_proof_mdl(&mut client_state, &range_pk, Some(pm.as_bytes()), &io_locations, MDL_AGE_GT)  
         } else {
             let mut proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
-            proof_spec.presentation_message = string_to_byte_vec(Some(pm.to_string()));
+            proof_spec.presentation_message = Some(pm.clone());
             let proof = create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec);
             assert!(proof.is_ok());
             proof.unwrap()
@@ -740,7 +740,7 @@ mod tests {
             verify_show_mdl(&vp, &show_proof, Some(pm.as_bytes()), MDL_AGE_GT)
         } else {
             let mut proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
-            proof_spec.presentation_message = string_to_byte_vec(Some(pm.to_string()));
+            proof_spec.presentation_message = Some(pm);
             verify_show(&vp, &show_proof, &proof_spec)
         };
         assert!(verify_result);

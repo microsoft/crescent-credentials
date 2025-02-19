@@ -158,7 +158,7 @@ fn show_proof_size(show_proof: &ShowProof<CrescentPairing>) -> usize {
     total
 }
 
-fn load_proof_spec(proof_spec_file_path : &str) -> ProofSpec {
+fn load_proof_spec(proof_spec_file_path : &str, presentation_message: Option<String>) -> ProofSpec {
     let ps_raw = if PathBuf::from(proof_spec_file_path).exists() {
         println!("Using proof spec file {}", proof_spec_file_path);
         fs::read_to_string(proof_spec_file_path).expect("Proof spec file exists, but failed while reading it")
@@ -166,7 +166,16 @@ fn load_proof_spec(proof_spec_file_path : &str) -> ProofSpec {
         println!("Proof spec file not found; using default (looked for file: {}) ", proof_spec_file_path);
         crescent::DEFAULT_PROOF_SPEC.to_string()
     };
-    let ps : ProofSpec = serde_json::from_str(&ps_raw).unwrap();    
+    let mut ps : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
+
+    if ps.presentation_message.is_some() && presentation_message.is_some() {
+        println!("Error: presentation message was provided twice, once in the proof specification file ({}) and once as a command line option.", proof_spec_file_path);
+        panic!("Multiple presentation messages");
+    }
+    if presentation_message.is_some() {
+        ps.presentation_message = presentation_message;
+    }
+
     ps
 }
 
@@ -179,13 +188,13 @@ pub fn run_show(
     let io_locations = IOLocations::new(&paths.io_locations);    
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
-    let pm = string_to_byte_vec(presentation_message);
+    
 
     let show_proof = if client_state.credtype == "mdl" {
+        let pm = string_to_byte_vec(presentation_message);
         create_show_proof_mdl(&mut client_state, &range_pk, pm.as_deref(), &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
-        let mut proof_spec = load_proof_spec(&paths.proof_spec);
-        proof_spec.presentation_message = pm;
+        let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
         create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec).unwrap()
     };
     println!("Proving time: {:?}", proof_timer.elapsed());
@@ -205,13 +214,13 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     let config_str = std::fs::read_to_string(&paths.config).unwrap();
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str};
-    let pm = string_to_byte_vec(presentation_message);
+    
 
     let (verify_result, data) = if show_proof.show_range2.is_some() {
+        let pm = string_to_byte_vec(presentation_message);
         verify_show_mdl(&vp, &show_proof, pm.as_deref(), MDL_AGE_GREATER_THAN)
     } else {
-        let mut proof_spec = load_proof_spec(&paths.proof_spec);
-        proof_spec.presentation_message = pm;
+        let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
         verify_show(&vp, &show_proof, &proof_spec)
     };
 

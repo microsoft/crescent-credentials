@@ -15,6 +15,7 @@ use std::fs;
 use ark_std::path::PathBuf;
 use ark_ff::BigInteger;
 use crate::return_error;
+use crate::utils::string_to_byte_vec;
 use crate::ProofSpec;
 use crate::ProofSpecInternal;
 
@@ -562,6 +563,7 @@ pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &st
             revealed.push(attr.to_string());
         }
     }
+    let presentation_message_bytes = string_to_byte_vec(proof_spec.presentation_message.clone());
 
-    Ok(ProofSpecInternal {revealed, hashed, presentation_message: proof_spec.presentation_message.clone(), config_str: config_str.to_owned()})
+    Ok(ProofSpecInternal {revealed, hashed, presentation_message : presentation_message_bytes, config_str: config_str.to_owned()})
 }
