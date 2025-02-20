@@ -532,7 +532,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     }    
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
-    // Add the revealed attributes to the output, after converting from field elt to string
+    // Add the revealed attributes to the output, after converting from field element to string
     let mut revealed = serde_json::Map::<String, Value>::new();
     for (revealed_idx, attr_name) in proof_spec.revealed.iter().enumerate() {
         let attr_name = attr_name.clone() + "_value";
@@ -657,7 +657,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{prep_inputs::{parse_config, prepare_prover_inputs}, utils::string_to_byte_vec};
+    use crate::prep_inputs::{parse_config, prepare_prover_inputs};
     use serial_test::serial;
 
     const MDL_AGE_GT : usize = 18; 

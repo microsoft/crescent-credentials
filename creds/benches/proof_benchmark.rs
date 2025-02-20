@@ -112,7 +112,7 @@ pub fn show_bench(c: &mut Criterion) {
         proof.clone(),
         vk.clone(),
         pvk.clone(),
-        "empty config.json".to_string()
+        "empty configuration string".to_string()
     );
 
     let io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];

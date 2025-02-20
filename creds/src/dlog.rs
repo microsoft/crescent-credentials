@@ -52,8 +52,8 @@ impl<G: Group> DLogPoK<G> {
         let mut r = Vec::new();
 
         let mut ts: Transcript = Transcript::new(&[0u8]);
-        let pm = context.unwrap_or(b"");
-        add_to_transcript(&mut ts, b"context string", &pm);
+        let context = context.unwrap_or(b"");
+        add_to_transcript(&mut ts, b"context string", &context);
 
         for i in 0..y.len() {
             let mut ri = Vec::new();
@@ -128,8 +128,8 @@ impl<G: Group> DLogPoK<G> {
         // serialize and hash the bases, k and y
         let dl_verify_timer = start_timer!(|| format!("DlogPoK verify y.len = {}", y.len()));
         let mut ts: Transcript = Transcript::new(&[0u8]);
-        let pm = context.unwrap_or(b"");
-        add_to_transcript(&mut ts, b"context string", &pm);
+        let context = context.unwrap_or(b"");
+        add_to_transcript(&mut ts, b"context string", &context);
 
         let mut recomputed_k = Vec::new();
         for i in 0..y.len() {
@@ -235,10 +235,10 @@ mod tests {
             y += bases[i] * scalars[i];
         }
 
-        let pm = "some presentation message".as_bytes();
+        let context = "some context data to bind to the proof".as_bytes();
 
         let pok = DLogPoK::<G1>::prove(
-            Some(pm),
+            Some(context),
             &[y, y],
             &[bases.clone(), bases.clone()],
             &[scalars.clone(), scalars.clone()],
@@ -248,26 +248,26 @@ mod tests {
         // verify with the wrong bases
         let wrong_bases = vec![G1::zero(); num_terms];
         let wrong_bases_result = pok.verify(
-            Some(pm),
+            Some(context),
             &[wrong_bases.clone(), wrong_bases.clone()],
             &[y, y],
             Some(vec![(0, 1), (1, 1)]),
         );
         assert!(!wrong_bases_result, "Verification should fail with the wrong bases");
 
-        // verify with the wrong pm
-        let wrong_pm = "wrong presentation message".as_bytes();
-        let wrong_pm_result = pok.verify(
-            Some(wrong_pm),
+        // verify with the wrong context
+        let wrong_context = "wrong context data".as_bytes();
+        let wrong_context_result = pok.verify(
+            Some(wrong_context),
             &[bases.clone(), bases.clone()],
             &[y, y],
             Some(vec![(0, 1), (1, 1)]),
         );
-        assert!(!wrong_pm_result, "Verification should fail with the wrong presentation message");
+        assert!(!wrong_context_result, "Verification should fail with the wrong context data");
 
         // successful verification
         let result = pok.verify(
-            Some(pm),
+            Some(context),
             &[bases.clone(), bases.clone()],
             &[y, y],
             Some(vec![(0, 1), (1, 1)]),
