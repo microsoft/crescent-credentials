@@ -14,7 +14,7 @@ MAX_FIELD_BYTE_LEN = 31        # Maximum length of a field element
 CIRCOM_RS256_LIMB_BITS = 121
 CIRCOM_ES256K_LIMB_BITS = 64 
 CIRCOM_ES256_LIMB_BITS = 43     # Required by the ecdsa-p256 circuit we use
-CRESCENT_CONFIG_KEYS = ['alg', 'credtype', 'reveal_all_claims', 'defer_sig_ver', 'max_jwt_len']     # fields in config.json that are for crescent configuration and do not refer to claims in the token
+CRESCENT_CONFIG_KEYS = ['alg', 'credtype', 'reveal_all_claims', 'defer_sig_ver', 'max_cred_len']     # fields in config.json that are for crescent configuration and do not refer to claims in the token
 CRESCENT_SUPPORTED_ALGS = ['RS256', 'ES256', 'ES256K']     # Signature algorithms used to sign JWT/mDL
 
 
@@ -191,17 +191,17 @@ def check_config(config):
     if 'credtype' not in config:
         config['credtype'] = 'jwt'
         
-    if 'max_jwt_len' not in config:
-        config['max_jwt_len'] = 2048  # Maximum length of JWT, excluding the
+    if 'max_cred_len' not in config:
+        config['max_cred_len'] = 2048  # Maximum length of JWT, excluding the
                                       # signature part.  The length in bytes of the header 
                                       # and payload, base64url encoded. Must be a multiple of 64.
     else:
-        if type(config['max_jwt_len']) != int:
-            print_debug("Error: config field 'max_jwt_len' must be an integer")
+        if type(config['max_cred_len']) != int:
+            print_debug("Error: config field 'max_cred_len' must be an integer")
             return False
-        max_jwt_len = config['max_jwt_len']
-        if max_jwt_len % 64 != 0:
-            print_debug("Error: 'max_jwt_len' must be a multiple of 64. Found {}, try {}".format(max_jwt_len, (64 - (max_jwt_len % 64)) + max_jwt_len ))
+        max_cred_len = config['max_cred_len']
+        if max_cred_len % 64 != 0:
+            print_debug("Error: 'max_cred_len' must be a multiple of 64. Found {}, try {}".format(max_cred_len, (64 - (max_cred_len % 64)) + max_cred_len ))
             return False
         
     # Additional checks

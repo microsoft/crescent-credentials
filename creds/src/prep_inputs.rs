@@ -19,7 +19,7 @@ use crate::utils::string_to_byte_vec;
 use crate::ProofSpec;
 use crate::ProofSpecInternal;
 
-// If not set in config.json, the max_jwt_len is set to this value. 
+// If not set in config.json, the max_cred_len is set to this value. 
 const DEFAULT_MAX_TOKEN_LENGTH : usize = 2048;
 const CIRCOM_RS256_LIMB_BITS : usize = 121;
 const CIRCOM_ES256_LIMB_BITS : usize = 43;  // Limb size required by ecdsa-p256 circuit
@@ -36,7 +36,7 @@ lazy_static! {
         let mut set = HashSet::new();
         set.insert("alg");
         set.insert("credtype");
-        set.insert("max_jwt_len");
+        set.insert("max_cred_len");
         set
     };
 }
@@ -127,19 +127,19 @@ Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 
     let msg_len_after_sha2_padding = padded_m.len() as u64;
 
-    if msg_len_after_sha2_padding > config["max_jwt_len"].as_u64().unwrap() {
-        let errmsg = format!("Error: JWT too large.  Current token JSON header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.\nThe config file value `max_jwt_len` would have to be increased to {} bytes (currently config['max_jwt_len'] = {})", 
+    if msg_len_after_sha2_padding > config["max_cred_len"].as_u64().unwrap() {
+        let errmsg = format!("Error: JWT too large.  Current token JSON header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.\nThe config file value `max_cred_len` would have to be increased to {} bytes (currently config['max_cred_len'] = {})", 
         header_utf8.len() + payload_utf8.len(), 
         msg_len_after_sha2_padding, 
-        base64_decoded_size(config["max_jwt_len"].as_u64().unwrap()), 
-        header_utf8.len() + payload_utf8.len() + 64, config["max_jwt_len"].as_u64().unwrap()
+        base64_decoded_size(config["max_cred_len"].as_u64().unwrap()), 
+        header_utf8.len() + payload_utf8.len() + 64, config["max_cred_len"].as_u64().unwrap()
         );
 
         return_error!(errmsg);
     }
 
     // Add additional zero padding for Circom
-    while padded_m.len() < config["max_jwt_len"].as_u64().unwrap() as usize {
+    while padded_m.len() < config["max_cred_len"].as_u64().unwrap() as usize {
         padded_m.push(0);
     }
   
@@ -517,18 +517,18 @@ pub fn parse_config(config_str: &str) -> Result<serde_json::Map<String, Value>, 
     }
 
     // Set defaults
-    if !config.contains_key("max_jwt_len") {
-        config.insert("max_jwt_len".to_string(), json!(DEFAULT_MAX_TOKEN_LENGTH));
+    if !config.contains_key("max_cred_len") {
+        config.insert("max_cred_len".to_string(), json!(DEFAULT_MAX_TOKEN_LENGTH));
     }
     else {
-        if !config["max_jwt_len"].is_u64() {
-            return_error!("max_jwt_len must have integer type");
+        if !config["max_cred_len"].is_u64() {
+            return_error!("max_cred_len must have integer type");
         }
-        let max_jwt_len = config["max_jwt_len"].as_u64().ok_or("Invalid value for max_jwt_len")?;
-        if max_jwt_len % 64 != 0 {
-            let round = (64 - (max_jwt_len % 64)) + max_jwt_len;
-            config["max_jwt_len"] = json!(round);
-            println!("Warning: max_jwt_len not a multiple of 64. Rounded from {} to {}", max_jwt_len, round);
+        let max_cred_len = config["max_cred_len"].as_u64().ok_or("Invalid value for max_cred_len")?;
+        if max_cred_len % 64 != 0 {
+            let round = (64 - (max_cred_len % 64)) + max_cred_len;
+            config["max_cred_len"] = json!(round);
+            println!("Warning: max_cred_len not a multiple of 64. Rounded from {} to {}", max_cred_len, round);
         }
     }
 

@@ -216,7 +216,7 @@ def prepare_circom(config, circom_output_file):
         main_input = "{ public [" + ", ".join(public_inputs) + " ] }"
         f.write('''
 component main {main_input} = Main({max_msg_len}, {max_json_len}, {max_field_byte_len}, {limb_size}, {n_limbs});
-'''.format(main_input = main_input, max_msg_len = config['max_jwt_len'], max_json_len = base64_decoded_size(config['max_jwt_len']), max_field_byte_len = MAX_FIELD_BYTE_LEN, limb_size=limb_size, n_limbs=n_limbs))
+'''.format(main_input = main_input, max_msg_len = config['max_cred_len'], max_json_len = base64_decoded_size(config['max_cred_len']), max_field_byte_len = MAX_FIELD_BYTE_LEN, limb_size=limb_size, n_limbs=n_limbs))
 
 
     print_debug("Claims:", claims)
