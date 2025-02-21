@@ -268,7 +268,7 @@ else :
     exit(-1)
 
 if config['alg'] == 'ES256':
-    # See https://www.rfc-editor.org/rfc/rfc7515#appendix-A.3.1 for ECDSA encoding details in JWTs, the signature is R||S FIXME: why are we referencing JWT?
+    # See https://www.rfc-editor.org/rfc/rfc7515#appendix-A.3.1 for ECDSA encoding details, the signature is R||S
     # this code assumes |R|==|S|
     siglen = len(signature_bytes)
     assert(siglen % 2  == 0)
