@@ -1765,3 +1765,106 @@ SOFTWARE.
 ### Additional Attribution
 None  
 
+---
+
+### Component
+circ_fields
+https://github.com/circify/circ/tree/master/circ_fields
+Note: forked to support the T-256 curve 
+Path: forks/Spartan-t256/
+
+### Open Source License/Copyright Notice
+MIT 
+https://github.com/circify/circ/blob/master/LICENSE-MIT
+
+### Additional Attribution
+Fork created by the authors of the paper:
+Efficient Proofs of Possession for Legacy Signatures. 
+Anna Pui Yung Woo, University of Michigan  
+Alex Ozdemir, Stanford University  
+Chad Sharp, University of Michigan  
+Thomas Pornin, NCC Group  
+Paul Grubbs, University of Michigan
+Published at IEEE S&P 2025
+
+---
+
+
+### Component
+ff-derive-num
+https://github.com/kwantam/ff-derive-num/pull/1
+Note: Fork that includes PR#1 
+Path: forks/Spartan-t256/circ_fields/  
+
+### Open Source License/Copyright Notice
+MIT
+https://github.com/kwantam/ff-derive-num/blob/main/LICENSE-mit
+
+### Additional Attribution
+Riad S. Wahby
+
+---
+
+### Component
+Spartan, Spartan2
+https://github.com/microsoft/Spartan
+https://github.com/microsoft/Spartan2
+Path: forks/Spartan-t256
+Note: Forked to support curve T-256 and include support for bellpepper circuits
+
+### Open Source License/Copyright Notice
+MIT 
+https://github.com/microsoft/Spartan/blob/master/LICENSE
+https://github.com/microsoft/Spartan2/blob/master/LICENSE
+
+### Additional Attributions
+Sritnath Setty
+Github contributors
+
+---
+
+### Component
+Nova
+https://github.com/microsoft/Nova/blob/main/src/provider/poseidon.rs
+https://github.com/microsoft/Nova/blob/b7f5be7bb5d8cc4a93d1363347359743fa30d161/src/gadgets/ecc.rs#L1
+Path: creds/src/device_binding/ecdsa-pop/
+Note: Poseidon wrapper and ECC gadgets 
+
+### Open Source License/Copyright Notice
+MIT
+https://github.com/microsoft/Nova/blob/main/LICENSE
+
+### Additional Attributions
+Sritnath Setty
+Github contributors
+
+---
+
+### Component
+bellpepper-gadgets/emulated
+https://github.com/lurk-lab/bellpepper-gadgets/tree/main/crates/emulated
+Path: creds/src/device_binding/ecdsa-pop/
+Note: Non-native arithmetic gadgets
+
+### Open Source License/Copyright Notice
+MIT 
+https://github.com/lurk-lab/bellpepper-gadgets/blob/main/LICENSE-MIT
+
+### Additional Attributions
+François Garillot (huitseeker)
+
+---
+
+### Component
+Neptune
+https://github.com/lurk-lab/neptune
+Path: creds/src/device_binding/ecdsa-pop/
+Note: forked to support older version of bellpepper-core 
+
+### Open Source License/Copyright Notice
+MIT 
+https://github.com/lurk-lab/neptune/blob/main/LICENSE-MIT
+
+### Additional Attributions
+None
+
