@@ -116,7 +116,7 @@ pub fn direct_msm<G: CurveGroup>(bases: &[G::Affine], scalars: &[G::ScalarField]
 pub fn msm_select<G: CurveGroup>(bases: &[G::Affine], scalars: &[G::ScalarField]) -> G {
     assert_eq!(bases.len(), scalars.len());
 
-    // TODO: I added this layer of indirection because the arkworks MSM code has high variability
+    // TODO (perf): I added this layer of indirection because the arkworks MSM code has high variability
     // and often appears to take much longer than the equivalent number of scalar multiplications. 
     // For small number of bases (say n=2-5), we can probably do better much better with a handwritten 
     // implementation. n=2, the Pedersen case, should probably have a dedicated implementation since it's
