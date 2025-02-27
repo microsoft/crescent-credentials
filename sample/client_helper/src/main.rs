@@ -280,7 +280,7 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, state: 
             }
             else {
                 let mut ps : ProofSpec = serde_json::from_str(&JWT_DEMO_PROOF_SPEC).unwrap();    
-                ps.presentation_message = crescent::utils::string_to_byte_vec(Some(challenge));
+                ps.presentation_message = Some(challenge);
                 create_show_proof(&mut client_state, &range_pk, &io_locations, &ps).map_err(|e| format!("Failed to create show proof. {:?}", e))?
             };
             
