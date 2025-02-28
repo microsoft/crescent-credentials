@@ -1,0 +1,25 @@
+[package]
+name = "mdl-tools"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_cbor = "0.11"
+serde_json = "1.0"
+anyhow = "1.0"
+pem = "1.0"
+ecdsa = { version = "0.16.9", features = ["serde", "verifying", "pem"] }
+p256 = { version = "0.13.0", features = ["serde", "ecdh", "pem"] }
+p384 = { version = "0.13.0", features = ["serde", "ecdh", "pem"] }
+rand = { version = "0.8.5", features = ["getrandom"] }
+sha2 = { version = "0.10.8", features = ["oid"] }
+elliptic-curve = "0.13.1"
+time = { version = "0.3.20", features = ["formatting", "parsing", "macros"] }
+base64 = "0.13"
+hex = "0.4"
+coset = "0.3.8"
+clap = { version = "4", features = ["derive"] }
+
+# Pull isomdl directly from GitHub, main branch
+isomdl = { git = "https://github.com/spruceid/isomdl", branch = "main" }

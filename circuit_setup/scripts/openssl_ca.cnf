@@ -1,0 +1,16 @@
+[ req ]
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
+
+[ v3_signer ]
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature
+subjectAltName         = URI:https://test.dmv.ny.gov/
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always
+
+[ v3_ca ]
+basicConstraints = CA:TRUE
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always
