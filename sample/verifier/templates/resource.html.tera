@@ -12,7 +12,7 @@
         <h1>{{ site1_verifier_name }} Health</h1>
     </div>
 
-    <p>Your email from {{ email_domain }} was successfully validated. You can now access the resources on our site.</p>
+    <p>Your email from <b>{{ email_domain }}</b> was successfully validated. You can now access the resources on our site.</p>
 
     <div style="padding: 1em; background-color: #faf9f6; border-radius: 8px; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); margin-top: 1em; width:30%; justify-content: center">
         <ul style="list-style-type: none; padding: 0;">

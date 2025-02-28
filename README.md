@@ -85,6 +85,20 @@ The `--name` parameter, used in circuit setup and with the command-line tool, sp
 
 Note that the steps have to be run in order, but once the client state is created by `prove`, the `show` and `verify` steps can be run repeatedly.
 
+### Selective Disclosure
+The demo generates proofs of fixed statements, for the `rs256` example, the domain of the email address is revealed to the verifier, and for `mdl` the statement is that the holder's age is greater than 18.  By default Crescent also proves that the credential is not expired.
+
+The `rs256-sd` example demonstrates how to disclose a subset of the attributes in a credential.  The file `creds/test-vectors/rs256-sd/proof_spec.json` contains 
+```
+{
+    "revealed" : ["family_name", "tenant_ctry", "auth_time", "aud"]
+}
+```
+which means that the proof will disclose those attributes to the verifier.  The subset of the attributes that may be revealed in this way is limited to those in `circuit_setup/inputs/rs256-sd/config.json` that have the `reveal` or `reveal_digest` boolean set to `true`. 
+The `reveal_digest` option is used for values that may be larger than 31 bytes; they will get hashed first.  Setting this flag changes how the circuit setup phase handles those attributes, allowing them to be optionally revealed during `show`.
+
+As example ways to experiment with selective disclosure, try removing `aud` from the list of revealed attributes, or adding `given_name` to the list of revealed attributes in the proof specification file. 
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a

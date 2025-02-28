@@ -31,6 +31,7 @@ for i in "${!SOURCE_DIRS[@]}"; do
     echo "Copying files from $SOURCE_DIR to $TARGET_DIR"
     set -x
     cp "${SOURCE_DIR}/io_locations.sym" "${TARGET_DIR}/"
+    cp "${SOURCE_DIR}/config.json" "${TARGET_DIR}/"
     cp "${SOURCE_DIR}/cache/groth16_pvk.bin" "${TARGET_DIR}/cache/"
     cp "${SOURCE_DIR}/cache/groth16_vk.bin" "${TARGET_DIR}/cache/"
     cp "${SOURCE_DIR}/cache/range_vk.bin" "${TARGET_DIR}/cache/"

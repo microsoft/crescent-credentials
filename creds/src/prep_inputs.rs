@@ -15,8 +15,11 @@ use std::fs;
 use ark_std::path::PathBuf;
 use ark_ff::BigInteger;
 use crate::return_error;
+use crate::utils::string_to_byte_vec;
+use crate::ProofSpec;
+use crate::ProofSpecInternal;
 
-// If not set in config.json, the max_jwt_len is set to this value. 
+// If not set in config.json, the max_cred_len is set to this value. 
 const DEFAULT_MAX_TOKEN_LENGTH : usize = 2048;
 const CIRCOM_RS256_LIMB_BITS : usize = 121;
 const CIRCOM_ES256_LIMB_BITS : usize = 43;  // Limb size required by ecdsa-p256 circuit
@@ -33,7 +36,7 @@ lazy_static! {
         let mut set = HashSet::new();
         set.insert("alg");
         set.insert("credtype");
-        set.insert("max_jwt_len");
+        set.insert("max_cred_len");
         set
     };
 }
@@ -124,26 +127,26 @@ Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 
     let msg_len_after_sha2_padding = padded_m.len() as u64;
 
-    if msg_len_after_sha2_padding > config["max_jwt_len"].as_u64().unwrap() {
-        let errmsg = format!("Error: JWT too large.  Current token JSON header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.\nThe config file value `max_jwt_len` would have to be increased to {} bytes (currently config['max_jwt_len'] = {})", 
+    if msg_len_after_sha2_padding > config["max_cred_len"].as_u64().unwrap() {
+        let errmsg = format!("Error: JWT too large.  Current token JSON header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.\nThe config file value `max_cred_len` would have to be increased to {} bytes (currently config['max_cred_len'] = {})", 
         header_utf8.len() + payload_utf8.len(), 
         msg_len_after_sha2_padding, 
-        base64_decoded_size(config["max_jwt_len"].as_u64().unwrap()), 
-        header_utf8.len() + payload_utf8.len() + 64, config["max_jwt_len"].as_u64().unwrap()
+        base64_decoded_size(config["max_cred_len"].as_u64().unwrap()), 
+        header_utf8.len() + payload_utf8.len() + 64, config["max_cred_len"].as_u64().unwrap()
         );
 
         return_error!(errmsg);
     }
 
     // Add additional zero padding for Circom
-    while padded_m.len() < config["max_jwt_len"].as_u64().unwrap() as usize {
+    while padded_m.len() < config["max_cred_len"].as_u64().unwrap() as usize {
         padded_m.push(0);
     }
   
     // Begin creating prover's output. Everthing must have string type for Circom
     let mut prover_inputs_json = serde_json::Map::new();
     let mut public_ios_json = serde_json::Map::new();
-    let prover_aux_json = serde_json::Map::new();
+    let mut prover_aux_json = serde_json::Map::new();
     prover_inputs_json.insert("message".to_string(), json!(padded_m.into_iter().map(|c| c.to_string()).collect::<Vec<_>>()));
 
     // Signature
@@ -175,7 +178,8 @@ Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 
     let header_pad = base_64_decoded_header_padding(period_idx)?;
     let header_and_payload = format!("{}{}{}", jwt_header_decoded, header_pad, claims_decoded);
-    prepare_prover_claim_inputs(header_and_payload, config, &claims, &mut prover_inputs_json)?;
+    prepare_prover_claim_inputs(&header_and_payload, config, &claims, &mut prover_inputs_json)?;
+    prepare_prover_aux(&header_and_payload, config, &claims, &mut prover_aux_json)?;
 
     Ok((prover_inputs_json, prover_aux_json, public_ios_json))
 
@@ -183,10 +187,10 @@ Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 
 // For each of the claims that are specified in the config file, the prover will need some info about each one
 // (e.g., the value, where in the payload it starts and ends)
-fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::Map<String, Value>, claims: &Value, prover_inputs_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
+fn prepare_prover_claim_inputs(header_and_payload: &str, config: &serde_json::Map<String, Value>, claims: &Value, prover_inputs_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
     let msg = header_and_payload;
 
-    if !is_minified(&msg) {
+    if !is_minified(msg) {
         return_error!("JSON is not minified, Circom circuit will fail.")
     }
     let keys = config.keys();
@@ -204,7 +208,7 @@ fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::
         let type_string = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", name))?;
 
         let claim_name = format!("\"{}\"", name);
-        let (claim_l, claim_r) = find_value_interval(&msg, &claim_name, type_string)?;
+        let (claim_l, claim_r) = find_value_interval(msg, &claim_name, type_string)?;
 
         let name_l = format!("{}_l", name);
         let name_r = format!("{}_r", name);
@@ -213,7 +217,7 @@ fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::
         prover_inputs_json.insert(name_r, json!(claim_r.to_string()));
 
         if entry.contains_key("reveal") {
-            let reveal = entry["reveal"].as_bool().ok_or("reveal for predicate {} is not of type bool")?;
+            let reveal = entry["reveal"].as_bool().ok_or(format!("reveal for claim {} is not of type bool", name))?;
             if reveal {
                 match type_string {
                     "number" => {
@@ -231,6 +235,48 @@ fn prepare_prover_claim_inputs(header_and_payload: String, config: &serde_json::
                             pack_string_to_int(claims[name].as_str().ok_or("invalid_type")?, max_claim_byte_len.try_into()?)?
                         };
                         prover_inputs_json.insert(format!("{}_value", name), json!(packed));
+                    }
+                    _ => {
+                        return_error!("Can only reveal number types and string types as a single field element for now. See also `reveal_bytes`.")
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// For now the only auxiliary information the prover needs are the pre-images of the hashed attributes.
+// The digests are outputs of the circuit and made available to the prover during witness generation. 
+// When showing the credential, if the prover selectively discloses a hashed attribute, they need the
+// preimage to send to the verifier.
+fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String, Value>, claims: &Value, prover_aux_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
+    
+    for key in config.keys() {
+        if CRESCENT_CONFIG_KEYS.contains(key.as_str()) {
+            continue;
+        }
+
+        let name = key.clone();
+        let name = name.as_str();
+        let entry = config[name].as_object().ok_or(format!("Config file entry for claim {}, does not have object type", name))?;
+        let type_string = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", name))?;
+
+        if entry.contains_key("reveal_digest") {
+            let reveal = entry["reveal_digest"].as_bool().ok_or(format!("reveal_digest for predicate {} is not of type bool", name))?;
+            if reveal {
+                match type_string {
+                    "number" => {
+                        prover_aux_json.insert(name.to_string(), json!(claims[name].clone()));
+                    }
+                    "string" => {
+                        let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().unwrap();    // validated by load_config
+                        let claim_value = claims[name].as_str().ok_or("invalid_type")?; // TODO: make sure it's quoted
+                        if claim_value.len() > max_claim_byte_len.try_into().unwrap() {
+                            return_error!(format!("Claim too large ({} bytes), largest allowed by configuration is {} bytes", claim_value.len(), max_claim_byte_len));
+                        }
+                        prover_aux_json.insert(name.to_string(), json!(claim_value));
                     }
                     _ => {
                         return_error!("Can only reveal number types and string types as a single field element for now. See also `reveal_bytes`.")
@@ -284,11 +330,12 @@ fn pack_string_to_int_unquoted(s: &str, n_bytes: usize) -> Result<String, Box<st
 pub fn unpack_int_to_string_unquoted(s_int: &ark_ff::BigInteger256) -> Result<String, Box<std::io::Error>> {
 
     let s_bytes = s_int.to_bytes_le();
-    let string = String::from_utf8(s_bytes);
+    let s_bytes_trimmed: Vec<u8> = s_bytes.into_iter().rev().skip_while(|&x| x == 0).collect::<Vec<u8>>().into_iter().rev().collect();  // strip trailing zeros
+    let string = String::from_utf8(s_bytes_trimmed);
     if string.is_err() {
         return_error!("Failed to convert to string");
     }
-    Ok(string.unwrap())
+    Ok(crate::utils::strip_quotes(string.unwrap().as_str()).to_string())
 }
 
 fn find_value_interval(msg: &str, claim_name: &str, type_string: &str) -> Result<(usize, usize), Box<dyn Error>> {
@@ -451,11 +498,11 @@ fn to_utf8_integers(input_bytes: &str) -> Vec<u32> {
 
 pub fn load_config(path: PathBuf) -> Result<serde_json::Map<String, Value>, Box<dyn Error>> {
     let config_str = fs::read_to_string(path)?;
-    parse_config(config_str)
+    parse_config(&config_str)
 }
 
-pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>, Box<dyn Error>> {
-    let mut config_v: Value = serde_json::from_str(&config_str)?;
+pub fn parse_config(config_str: &str) -> Result<serde_json::Map<String, Value>, Box<dyn Error>> {
+    let mut config_v: Value = serde_json::from_str(config_str)?;
     let config: &mut serde_json::Map<String, Value> = config_v.as_object_mut().ok_or("Invalid config")?;
 
     // Validate config
@@ -470,18 +517,18 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
     }
 
     // Set defaults
-    if !config.contains_key("max_jwt_len") {
-        config.insert("max_jwt_len".to_string(), json!(DEFAULT_MAX_TOKEN_LENGTH));
+    if !config.contains_key("max_cred_len") {
+        config.insert("max_cred_len".to_string(), json!(DEFAULT_MAX_TOKEN_LENGTH));
     }
     else {
-        if !config["max_jwt_len"].is_u64() {
-            return_error!("max_jwt_len must have integer type");
+        if !config["max_cred_len"].is_u64() {
+            return_error!("max_cred_len must have integer type");
         }
-        let max_jwt_len = config["max_jwt_len"].as_u64().ok_or("Invalid value for max_jwt_len")?;
-        if max_jwt_len % 64 != 0 {
-            let round = (64 - (max_jwt_len % 64)) + max_jwt_len;
-            config["max_jwt_len"] = json!(round);
-            println!("Warning: max_jwt_len not a multiple of 64. Rounded from {} to {}", max_jwt_len, round);
+        let max_cred_len = config["max_cred_len"].as_u64().ok_or("Invalid value for max_cred_len")?;
+        if max_cred_len % 64 != 0 {
+            let round = (64 - (max_cred_len % 64)) + max_cred_len;
+            config["max_cred_len"] = json!(round);
+            println!("Warning: max_cred_len not a multiple of 64. Rounded from {} to {}", max_cred_len, round);
         }
     }
 
@@ -497,5 +544,26 @@ pub fn parse_config(config_str: String) -> Result<serde_json::Map<String, Value>
     }
 
     Ok(config.clone())
+}
 
+
+// Create the internal version of the ProofSpec object.  This combines information from the config file and the
+// provided ProofSpec to create a mode detailed object. 
+pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &str) -> Result<ProofSpecInternal, Box<dyn Error>> {
+
+    let config = parse_config(config_str)?;
+    let mut revealed = vec![];
+    let mut hashed = vec![];
+    for attr in &proof_spec.revealed {
+        let config_entry = config.get(attr.as_str()).ok_or(format!("Attribute {} not found in config", attr))?;
+        if config_entry.get("reveal_digest").is_some() && config_entry.get("reveal_digest").ok_or("Expected boolean value for 'reveal_digest'")?.as_bool().unwrap() {
+            hashed.push(attr.to_string());
+        }
+        else {
+            revealed.push(attr.to_string());
+        }
+    }
+    let presentation_message_bytes = string_to_byte_vec(proof_spec.presentation_message.clone());
+
+    Ok(ProofSpecInternal {revealed, hashed, presentation_message : presentation_message_bytes, config_str: config_str.to_owned()})
 }

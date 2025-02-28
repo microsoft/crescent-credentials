@@ -3,7 +3,6 @@
 
 #!/usr/bin/python3
 
-import python_jwt as jwt, jwcrypto.jwk as jwk
 from jwcrypto.common import base64url_encode
 import sys, os
 import json
@@ -162,7 +161,7 @@ def ymd_to_timestamp(ymd, is_bytes=False, has_time=False):
 
 def ymd_to_daystamp(ymd, is_bytes=False, has_time=False):
     # Compute the number of days between Jan 1, year 0000 and input "YYYY-MM-DD"
-    # The implementation of the Date class' toordinal() fucntion is here: 
+    # The implementation of the Date class' toordinal() function is here: 
     # https://github.com/python/cpython/blob/54b5e4da8a4c6ae527ab238fcd6b9ba0a3ed0fc7/Lib/datetime.py#L63
     (year, month, day) = ymd.split("-")
     year = int(year)
@@ -211,12 +210,12 @@ padded_m = sha256_padding(tbs_data_ints)
 msg_len_after_SHA2_padding = len(padded_m)
 print_debug("msg_len_after_SHA2_padding: {}".format(msg_len_after_SHA2_padding))
 
-if msg_len_after_SHA2_padding > config['max_jwt_len']:
-    print_debug("Error: JWT too large.  Current token JSON header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.".format(len(tbs_data), msg_len_after_SHA2_padding, base64_decoded_size(config['max_jwt_len'])))
-    print_debug("The config file value `max_jwt_len` would have to be increased to {} bytes (currently config['max_jwt_len'] = {})".format(len(tbs_data)+64, config['max_jwt_len']))
+if msg_len_after_SHA2_padding > config['max_cred_len']:
+    print_debug("Error: mDL too large.  Current mDL header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.".format(len(tbs_data), msg_len_after_SHA2_padding, base64_decoded_size(config['max_cred_len'])))
+    print_debug("The config file value `max_cred_len` would have to be increased to {} bytes (currently config['max_cred_len'] = {})".format(len(tbs_data)+64, config['max_cred_len']))
     sys.exit(-1)
 
-while (len(padded_m) < config['max_jwt_len']):    # Additional zero padding for Circom program
+while (len(padded_m) < config['max_cred_len']):    # Additional zero padding for Circom program
     padded_m = padded_m + [0]
 
 sha256hash = hashlib.sha256(bytes(tbs_data))
@@ -269,7 +268,7 @@ else :
     exit(-1)
 
 if config['alg'] == 'ES256':
-    # See https://www.rfc-editor.org/rfc/rfc7515#appendix-A.3.1 for ECDSA encoding details in JWTs, the signature is R||S
+    # See https://www.rfc-editor.org/rfc/rfc7515#appendix-A.3.1 for ECDSA encoding details, the signature is R||S
     # this code assumes |R|==|S|
     siglen = len(signature_bytes)
     assert(siglen % 2  == 0)

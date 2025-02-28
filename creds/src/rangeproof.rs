@@ -511,7 +511,7 @@ mod tests {
         assert!(Groth16::<CrescentPairing>::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap());
     
         let mut client_state =
-            ClientState::<CrescentPairing>::new(inputs.clone(), proof.clone(), vk.clone(), pvk.clone());
+            ClientState::<CrescentPairing>::new(inputs.clone(), None, proof.clone(), vk.clone(), pvk.clone(), "empty configuration string".to_string());
     
         let (range_pk, range_vk) = RangeProofPK::<CrescentPairing>::setup(32);    
     

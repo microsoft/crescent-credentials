@@ -61,8 +61,29 @@ where
 pub fn biguint_to_scalar<F: PrimeField>(a: &BigUint) -> F {
     let a_bigint = F::BigInt::try_from(a.clone()).unwrap();
     
-
     F::from_bigint(a_bigint).unwrap()
+}
+
+// Interpret the input as a bit string, convert to an integer where the
+// leftmost bit in the string is interpreted as the LSB of the integer
+// Behavior matches circomlib's Bits2Num function.
+pub fn bits_to_num(bytes : &[u8]) -> BigUint {
+    // Convert bytes to bit array
+    let mut bitvec = vec![];
+    for b in bytes {
+        for i in (0..8).rev() {
+            bitvec.push((b >> i) & 1);
+        }
+    }
+    // Convert to integer
+    let mut e = BigUint::from(1u32);
+    let mut res = BigUint::from(0u32);
+    for i in 0..248 {
+        res += &e * BigUint::from(bitvec[i] as u32);
+        e = BigUint::from(2u32)*e;  // e = 2*e
+    }
+
+    res
 }
 
 pub fn random_vec<F: PrimeField>(n: usize) -> Vec<F> {
@@ -73,6 +94,11 @@ pub fn random_vec<F: PrimeField>(n: usize) -> Vec<F> {
     }
 
     v
+}
+
+pub fn strip_quotes(s: &str) -> &str {
+    let s = s.strip_prefix('"').unwrap_or(s);
+    s.strip_suffix('"').unwrap_or(s)
 }
 
 #[inline]
@@ -160,6 +186,11 @@ where
     let buf_reader = BufReader::new(buf.as_slice());
     let state = T::deserialize_uncompressed_unchecked(buf_reader)?;
     Ok(state)
+}
+
+pub fn string_to_byte_vec(s : Option<String>) -> Option<Vec<u8>> {
+    // Retruns None if s is None
+    Some(s?.as_bytes().to_vec())
 }
 
 #[cfg(test)]

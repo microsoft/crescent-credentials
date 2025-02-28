@@ -5,17 +5,20 @@ use ark_groth16::{VerifyingKey,PreparedVerifyingKey};
 use ark_serialize::CanonicalSerialize;
 use crescent::groth16rand::{ClientState, ShowGroth16};
 use crescent::rangeproof::{RangeProofPK, RangeProofVK};
-use crescent::utils::{read_from_file, write_to_file};
-use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, run_zksetup, verify_show, verify_show_mdl, CachePaths, ShowProof, VerifierParams};
+use crescent::utils::{read_from_file, string_to_byte_vec, write_to_file};
+use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, run_zksetup, verify_show, verify_show_mdl, CachePaths, ShowProof, VerifierParams, ProofSpec};
 use crescent::CrescentPairing;
 use crescent::prep_inputs::{prepare_prover_inputs, parse_config};
 use crescent::structs::{GenericInputsJSON, IOLocations, ProverInput};
+use serde_json::json;
 use std::env::current_dir;
 use std::{fs, path::PathBuf};
 
 use structopt::StructOpt;
 
 const MDL_AGE_GREATER_THAN : usize = 18;         // mDL show proofs will prove that the holder is older than this value (in years)
+
+
 
 fn main() {
     let root = current_dir().unwrap();
@@ -30,7 +33,7 @@ fn main() {
                 
             }
         }
-        Command::Prove { name } => {
+        Command::Prove { name } | Command::Prepare { name } => {
             let name_path = format!("test-vectors/{}", name);
             let base_path = root.join(name_path);
             run_prover(base_path);
@@ -63,11 +66,16 @@ pub enum Command {
         name: String,
     },
 
-    #[structopt(about = "Run prover.")]
+    #[structopt(about = "Run prover. (deprecated, use `prepare` instead)")]
     Prove {
         #[structopt(long)]
         name: String,
     },
+    #[structopt(about = "Prepare credential before show.")]
+    Prepare {
+        #[structopt(long)]
+        name: String,
+    },    
 
     #[structopt(about = "Generate a presentation proof to Show a credential.")]
     Show {
@@ -92,27 +100,22 @@ pub fn run_prover(
 ) {
     let paths = CachePaths::new(base_path);
     let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
-    let config = parse_config(config_str).expect("Failed to parse config");
+    let config = parse_config(&config_str).expect("Failed to parse config");
 
-    let prover_inputs = 
+    let client_state = 
     if config.contains_key("credtype") && config.get("credtype").unwrap() == "mdl" {
-        GenericInputsJSON::new(&paths.mdl_prover_inputs)
+        let prover_inputs = GenericInputsJSON::new(&paths.mdl_prover_inputs);
+        create_client_state(&paths, &prover_inputs, None, "mdl").unwrap()
     }
     else {
         let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
         let issuer_pem = fs::read_to_string(&paths.issuer_pem).unwrap_or_else(|_| panic!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
-        let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
+        let (prover_inputs_json, prover_aux_json, _public_ios_json) = 
             prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
-        GenericInputsJSON{prover_inputs: prover_inputs_json}
+        let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
+        let prover_aux_string = json!(prover_aux_json).to_string();
+        create_client_state(&paths, &prover_inputs, Some(&prover_aux_string), "jwt").unwrap()
     };
-        
-    let credtype = 
-    if config.contains_key("credtype") && config.get("credtype").unwrap() == "mdl" {
-        "mdl".to_string()
-    }
-    else {"jwt".to_string()};
-
-    let client_state = create_client_state(&paths, &prover_inputs, &credtype).unwrap();
 
     write_to_file(&client_state, &paths.client_state);
 }
@@ -155,6 +158,27 @@ fn show_proof_size(show_proof: &ShowProof<CrescentPairing>) -> usize {
     total
 }
 
+fn load_proof_spec(proof_spec_file_path : &str, presentation_message: Option<String>) -> ProofSpec {
+    let ps_raw = if PathBuf::from(proof_spec_file_path).exists() {
+        println!("Using proof spec file {}", proof_spec_file_path);
+        fs::read_to_string(proof_spec_file_path).expect("Proof spec file exists, but failed while reading it")
+    } else {
+        println!("Proof spec file not found; using default (looked for file: {}) ", proof_spec_file_path);
+        crescent::DEFAULT_PROOF_SPEC.to_string()
+    };
+    let mut ps : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
+
+    if ps.presentation_message.is_some() && presentation_message.is_some() {
+        println!("Error: presentation message was provided twice, once in the proof specification file ({}) and once as a command line option.", proof_spec_file_path);
+        panic!("Multiple presentation messages");
+    }
+    if presentation_message.is_some() {
+        ps.presentation_message = presentation_message;
+    }
+
+    ps
+}
+
 pub fn run_show(
     base_path: PathBuf,
     presentation_message: Option<String>
@@ -164,12 +188,14 @@ pub fn run_show(
     let io_locations = IOLocations::new(&paths.io_locations);    
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
-    let pm = presentation_message.as_deref().map(|s| s.as_bytes());
+    
 
     let show_proof = if client_state.credtype == "mdl" {
-        create_show_proof_mdl(&mut client_state, &range_pk, pm, &io_locations, MDL_AGE_GREATER_THAN)  
+        let pm = string_to_byte_vec(presentation_message);
+        create_show_proof_mdl(&mut client_state, &range_pk, pm.as_deref(), &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
-        create_show_proof(&mut client_state, &range_pk, pm, &io_locations)
+        let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
+        create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec).unwrap()
     };
     println!("Proving time: {:?}", proof_timer.elapsed());
 
@@ -186,14 +212,16 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     let range_vk : RangeProofVK<CrescentPairing> = read_from_file(&paths.range_vk).unwrap();
     let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
     let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
-
-    let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem};
-    let pm = presentation_message.as_deref().map(|s| s.as_bytes());
+    let config_str = std::fs::read_to_string(&paths.config).unwrap();
+    let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str};
+    
 
     let (verify_result, data) = if show_proof.show_range2.is_some() {
-        verify_show_mdl(&vp, &show_proof, pm, MDL_AGE_GREATER_THAN)
+        let pm = string_to_byte_vec(presentation_message);
+        verify_show_mdl(&vp, &show_proof, pm.as_deref(), MDL_AGE_GREATER_THAN)
     } else {
-        verify_show(&vp, &show_proof, pm)
+        let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
+        verify_show(&vp, &show_proof, &proof_spec)
     };
 
     if verify_result {

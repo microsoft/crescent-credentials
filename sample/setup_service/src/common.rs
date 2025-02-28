@@ -19,6 +19,8 @@ use junction;
 // define the supported cred schema UIDs. These are an opaque strings that identifies the setup parameters
 pub const SCHEMA_UIDS: [&str; 2] = ["jwt_corporate_1", "mdl_1"];
 
+pub const JWT_DEMO_PROOF_SPEC : &str = r#"{"revealed" : ["email"]}"#;
+
 // TODO: this is not quite right; we need to also use the Schema ID. It assumes that all JWTs support the email_domain predicate
 // This is needed during show, in the client_helper, to check if we can actually create the proof with the cred we have.
 pub fn is_disc_uid_supported(disc_uid : &str, cred_type: &str) -> bool {

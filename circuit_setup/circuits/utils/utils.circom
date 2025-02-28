@@ -78,7 +78,6 @@ template CalculateTotal(n) {
     sum <== sums[n - 1];
 }
 
-// Written by us
 // n bytes per signal, n = 31 usually
 template Packed2Bytes(n){
     signal input in; // < 2 ^ (8 * 31)
