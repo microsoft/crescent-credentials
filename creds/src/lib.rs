@@ -32,6 +32,7 @@ pub mod structs;
 pub mod utils;
 pub mod prep_inputs;
 pub mod daystamp;
+pub mod device_binding;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this

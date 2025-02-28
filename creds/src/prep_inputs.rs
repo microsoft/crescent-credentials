@@ -273,7 +273,7 @@ fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String
                     "string" => {
                         let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().unwrap();    // validated by load_config
                         let claim_value = claims[name].as_str().ok_or("invalid_type")?;
-                        if claim_value.len() > max_claim_byte_len.try_into().unwrap() {
+                        if claim_value.len() > max_claim_byte_len as usize {
                             return_error!(format!("Claim too large ({} bytes), largest allowed by configuration is {} bytes", claim_value.len(), max_claim_byte_len));
                         }
                         prover_aux_json.insert(name.to_string(), json!(claim_value));

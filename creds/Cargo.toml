@@ -6,25 +6,26 @@ default-run = "crescent"
 
 [dependencies]
 ark-crypto-primitives = { version = "=0.4.0" }
-ark-ec = { version = "=0.4.1", default-features = false, features = [
+ark-ec = { version = "0.4.2", default-features = false, features = [
     "parallel",
 ] }
-ark-ff = { version = "=0.4.1", default-features = false, features = [
+ark-ff = { version = "0.4.1", default-features = false, features = [
     "parallel",
     "asm",
 ] }
-ark-std = { version = "=0.4.0", default-features = false, features = [
+ark-std = { version = "0.4.0", default-features = false, features = [
     "parallel",
 ] }
-ark-bn254 = { version = "=0.4.0" }
+ark-bn254 = { version = "0.4.0" }
 
-ark-poly = { version = "=0.4.1", default-features = false, features = [
+ark-poly = { version = "0.4.1", default-features = false, features = [
     "parallel",
 ] }
-ark-relations = { version = "=0.4.0", default-features = false }
-ark-serialize = { version = "=0.4.1", default-features = false }
+ark-relations = { version = "0.4.0", default-features = false }
+ark-serialize = { version = "0.4.1", default-features = false }
 
 merlin = { version = "3.0", default-features = false }
+hex = "0.4.3"
 
 # json parsing
 serde_json = {version = "1.0", features = ["preserve_order"]}
@@ -54,11 +55,16 @@ ark-poly-commit = { path = "../forks/ark-poly-commit", default-features = false,
     "parallel",
 ] }
 
+# Device binding
+ecdsa-pop = {path="src/device_binding/ecdsa-pop"}
+
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 serial_test = "*"
 ark-bls12-381 = "0.4.0"
+p256 = { version = "0.13.2", features = ["ecdsa"]}
+
 
 [build-dependencies]
 cargo-patch = "0.3"

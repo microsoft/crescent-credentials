@@ -2,7 +2,7 @@
 // Licensed under the MIT license.
 
 use ark_ec::{AffineRepr, CurveGroup};
-use ark_ff::PrimeField;
+use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::rand::thread_rng;
 use merlin::Transcript;
@@ -63,6 +63,11 @@ pub fn biguint_to_scalar<F: PrimeField>(a: &BigUint) -> F {
     
     F::from_bigint(a_bigint).unwrap()
 }
+
+pub fn scalar_to_biguint<FF: ark_ff::PrimeField>(u : &FF) -> BigUint {
+    let u_big = u.into_bigint();
+    BigUint::from_bytes_le(&u_big.to_bytes_le())
+  }
 
 // Interpret the input as a bit string, convert to an integer where the
 // leftmost bit in the string is interpreted as the LSB of the integer
