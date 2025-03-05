@@ -8,7 +8,7 @@ use {
     crate::structs::ProverInput,
 };
 use std::{fs, path::PathBuf, error::Error};
-use std::time::{SystemTime, UNIX_EPOCH};>>>>>>> origin/fix_rand-core_build_errors
+use std::time::{SystemTime, UNIX_EPOCH};
 use ark_bn254::{Bn254 as ECPairing, Fr};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
@@ -32,7 +32,8 @@ use crate::{
 use {
     wasm_bindgen::prelude::wasm_bindgen,
     utils::write_to_b64url,
-}
+    base64_url::decode,
+};
 
 pub mod daystamp;
 pub mod dlog;
@@ -313,16 +314,17 @@ pub fn disc_uid_to_age(disc_uid : &str) -> Result<usize, &'static str> {
 #[cfg(feature = "wasm")]
 #[wasm_bindgen]
 pub fn create_show_proof_wasm(
-    client_state_bytes: Vec<u8>,
-    range_pk_bytes: Vec<u8>,
+    client_state_b64url: String,
+    range_pk_b64url: String,
     io_locations_str: String,
     disc_uid: String,
+    challenge: String
 ) -> String {
-    if client_state_bytes.is_empty() {
-        return "Error: Received empty client_state_bytes".to_string();
+    if client_state_b64url.is_empty() {
+        return "Error: Received empty client_state_b64url".to_string();
     }
-    if range_pk_bytes.is_empty() {
-        return "Error: Received empty range_pk_bytes".to_string();
+    if range_pk_b64url.is_empty() {
+        return "Error: Received empty range_pk_b64url".to_string();
     }
     if disc_uid.is_empty() {
         return "Error: Received empty disc_uid".to_string();
@@ -331,13 +333,23 @@ pub fn create_show_proof_wasm(
         return "Error: Received empty io_locations_str".to_string();
     }
 
+    let client_state_bytes = match decode(&client_state_b64url) {
+        Ok(bytes) => bytes,
+        Err(_) => return "Error: Failed to decode base64url client_state".to_string(),
+    };
+    let range_pk_bytes = match decode(&range_pk_b64url) {
+        Ok(bytes) => bytes,
+        Err(_) => return "Error: Failed to decode base64url range_pk".to_string(),
+    };
+
     let client_state_result = ClientState::<ECPairing>::deserialize_uncompressed(&client_state_bytes[..]);
     let range_pk_result = RangeProofPK::<ECPairing>::deserialize_uncompressed(&range_pk_bytes[..]);
     let io_locations = IOLocations::new_from_str(&io_locations_str);
+    let proof_spec_result: Result<ProofSpec, serde_json::Error> = serde_json::from_str(DEFAULT_PROOF_SPEC);
 
-    match (client_state_result, range_pk_result) {
-        (Ok(mut client_state), Ok(range_pk)) => {
-            let msg = "Successfully deserialized client state and range pk".to_string();            
+    match (client_state_result, range_pk_result, proof_spec_result) {
+        (Ok(mut client_state), Ok(range_pk), Ok(mut proof_spec)) => {
+            let msg = "Successfully deserialized client-state, range-pk, and proof-spec".to_string();            
 
             let show_proof = 
             if &client_state.credtype == "mdl" {
@@ -345,19 +357,24 @@ pub fn create_show_proof_wasm(
                 create_show_proof_mdl(&mut client_state, &range_pk, None, &io_locations, age.expect("Age not valid."))
             }
             else {
-                create_show_proof(&mut client_state, &range_pk, None, &io_locations)     
+                proof_spec.presentation_message = Some(challenge);
+                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec).unwrap()
             };
 
             let show_proof_b64 = write_to_b64url(&show_proof);
             let msg = format!("show_proof_b64: {:?}", show_proof_b64);
             msg
         }
-        (Err(e), _) => {
+        (Err(e), _, _) => {
             let msg = format!("Error: Failed to deserialize client state: {:?}", e);
             msg
         }
-        (_, Err(e)) => {
+        (_, Err(e), _) => {
             let msg = format!("Error: Failed to deserialize range pk: {:?}", e);
+            msg
+        }
+        (_, _, Err(e)) => {
+            let msg = format!("Error: Failed to deserialize proof-spec: {:?}", e);
             msg
         }
     }
