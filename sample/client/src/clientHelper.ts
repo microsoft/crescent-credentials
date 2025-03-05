@@ -15,6 +15,12 @@ import { type clientUid, Credential } from './cred'
 import { sendMessage, setListener } from './listen'
 import { removeData } from './indexeddb'
 
+export interface ShowData {
+  client_state_b64: string
+  io_locations_str: string
+  range_pk_b64: string
+}
+
 async function _prepare (issuerUrl: string, jwt: string, schemaUid: string): Promise<RESULT<string, Error>> {
   const options = {
     method: 'POST',
@@ -67,6 +73,26 @@ export async function fetchPrepareStatus (credUid: string, progress: () => void)
   })
 }
 
+export async function fetchShowData (credUid: string): Promise<RESULT<ShowData, Error>> {
+  // eslint-disable-next-line no-async-promise-executor
+  return await new Promise((resolve) => {
+    void (async () => {
+      const response = await fetch(`${config.clientHelperUrl}/getshowdata?cred_uid=${credUid}`).catch((error) => {
+        return { text: () => `Error: ${error.message}` }
+      })
+
+      const status = await response.text()
+
+      if (status === 'unknown' || status.startsWith('Error:')) {
+        resolve({ ok: false, error: new Error(status) })
+        return
+      }
+
+      resolve({ ok: true, value: JSON.parse(status) as ShowData })
+    })()
+  })
+}
+
 async function _deleteCred (credUid: string): Promise<boolean> {
   const response = await fetch(`${config.clientHelperUrl}/delete?cred_uid=${credUid}`).catch((_error) => {
     console.error('Failed to delete cred:', credUid)
@@ -89,7 +115,7 @@ async function pollStatus (cred: Credential): Promise<void> {
 
   const result = await fetchPrepareStatus (credUid,
     () => {
-      progress = Math.ceil((100 - progress) * 0.05) + progress
+      progress = Math.ceil((100 - progress) * config.pollStatusRate) + progress
       cred.progress = progress
       void cred.save().then(() => {
         void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARE_STATUS, credUid, progress)
@@ -97,19 +123,34 @@ async function pollStatus (cred: Credential): Promise<void> {
     }
   )
 
-  if (result.ok) {
-    cred.progress = 100
-    cred.status = 'PREPARED'
-    await cred.save()
-    await Credential.load()
-    void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARED, credUid)
-  }
-  else {
+  if (!result.ok) {
     console.error('Failed to prepare:', result.error)
     cred.status = 'ERROR'
     await cred.save()
     void sendMessage('popup', MSG_BACKGROUND_POPUP_ERROR, credUid)
+    return
   }
+
+  cred.progress = 100
+  cred.status = 'PREPARED'
+  await cred.save()
+  await Credential.load()
+
+  // Request client state from client helper
+  const result1 = await fetchShowData(credUid)
+
+  if (!result1.ok) {
+    console.error('Failed to fetch show data:', result1.error)
+    cred.status = 'ERROR'
+    await cred.save()
+    void sendMessage('popup', MSG_BACKGROUND_POPUP_ERROR, credUid)
+    return
+  }
+
+  cred.data.showData = result1.value
+  await cred.save()
+  await Credential.load()
+  void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARED, credUid)
 }
 
 export async function prepare (cred: Credential): Promise<clientUid> {

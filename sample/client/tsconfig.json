@@ -19,7 +19,8 @@
   "exclude": [],
   "include": [
     "src/**/*.ts",
-    "*.config.js"
+    "*.config.js",
+    "wasm/**/*.d.ts"
   ],
   "typescript.tsdk": "./node_modules/typescript/lib"
 }
