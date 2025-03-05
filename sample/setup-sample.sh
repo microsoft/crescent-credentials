@@ -19,3 +19,9 @@ cd verifier
 ./setup_verifier.sh
 cargo build --release
 cd ..
+
+# setup client project
+cd client
+./setup_client.sh
+npm run build:debug
+cd ..

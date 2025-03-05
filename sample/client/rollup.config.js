@@ -13,8 +13,6 @@ function getDirname (url) {
   return dirname(fileURLToPath(url))
 }
 
-// Usage
-
 const __dirname = getDirname(import.meta.url)
 
 /*
@@ -39,6 +37,8 @@ const __dirname = getDirname(import.meta.url)
 const isDebug = process.env.NODE_ENV !== 'production'
 
 const COPYRIGHT = `/*!\n*  Copyright (c) Microsoft Corporation.\n*  Licensed under the MIT license.\n*/`
+
+let crescentDir = (path.dirname(fileURLToPath(import.meta.url)) + '/node_modules/crescent').replace(/\\/g, '/')
 
 /*
   Common output options for all bundles
@@ -175,6 +175,7 @@ const popup = {
 const duplicateFirefox = copy({
   targets: [
     { src: 'public/icons', dest: 'dist/chrome' },
+    { src: `${crescentDir}/*.wasm`, dest: 'dist/chrome' },
     { src: 'dist/chrome', dest: 'dist', rename: 'firefox' },
     {
       src: `manifests/manifest.chrome.json`,

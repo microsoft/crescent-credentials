@@ -1,10 +1,15 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+use crate::daystamp::days_to_be_age;
+#[cfg(not(feature = "wasm"))]
+use {
+    ark_circom::{CircomBuilder, CircomConfig},
+    crate::structs::ProverInput,
+};
 use std::{fs, path::PathBuf, error::Error};
 use std::time::{SystemTime, UNIX_EPOCH};
 use ark_bn254::{Bn254 as ECPairing, Fr};
-use ark_circom::{CircomBuilder, CircomConfig};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_ff::PrimeField;
@@ -21,17 +26,22 @@ use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations};
 use crate::{
     groth16rand::ClientState,
-    structs::{GenericInputsJSON, ProverInput},
+    structs::{GenericInputsJSON},
 };
-use crate::daystamp::days_to_be_age;
+#[cfg(feature = "wasm")]
+use {
+    wasm_bindgen::prelude::wasm_bindgen,
+    utils::write_to_b64url,
+    base64_url::decode,
+};
 
+pub mod daystamp;
 pub mod dlog;
 pub mod groth16rand;
+pub mod prep_inputs;
 pub mod rangeproof;
 pub mod structs;
 pub mod utils;
-pub mod prep_inputs;
-pub mod daystamp;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
@@ -181,6 +191,7 @@ impl CachePaths {
     }
 }
 
+#[cfg(not(feature = "wasm"))]
 pub fn run_zksetup(base_path: PathBuf) -> i32 {
 
     let paths = CachePaths::new(base_path);
@@ -223,6 +234,8 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     0
 }
 
+
+#[cfg(not(feature = "wasm"))]
 pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON, prover_aux: Option<&String>, credtype : &str) -> Result<ClientState<ECPairing>, SerializationError>
 {
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
@@ -272,6 +285,100 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
     client_state.credtype = credtype.to_string();
 
     Ok(client_state)
+}
+
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+extern "C" {
+    fn js_timestamp() -> u64;
+}
+
+#[cfg(feature = "wasm")]
+pub fn disc_uid_to_age(disc_uid : &str) -> Result<usize, &'static str> {
+    match disc_uid {
+        "crescent://over_18" => Ok(18),
+        "crescent://over_21" => Ok(21),
+        "crescent://over_65" => Ok(65),
+        _ => Err("disc_uid_to_age: invalid disclosure uid"),
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+pub fn create_show_proof_wasm(
+    client_state_b64url: String,
+    range_pk_b64url: String,
+    io_locations_str: String,
+    disc_uid: String,
+    challenge: String
+) -> String {
+    if client_state_b64url.is_empty() {
+        return "Error: Received empty client_state_b64url".to_string();
+    }
+    if range_pk_b64url.is_empty() {
+        return "Error: Received empty range_pk_b64url".to_string();
+    }
+    if disc_uid.is_empty() {
+        return "Error: Received empty disc_uid".to_string();
+    }
+    if io_locations_str.is_empty() {
+        return "Error: Received empty io_locations_str".to_string();
+    }
+
+    let client_state_bytes = match decode(&client_state_b64url) {
+        Ok(bytes) => bytes,
+        Err(_) => return "Error: Failed to decode base64url client_state".to_string(),
+    };
+    let range_pk_bytes = match decode(&range_pk_b64url) {
+        Ok(bytes) => bytes,
+        Err(_) => return "Error: Failed to decode base64url range_pk".to_string(),
+    };
+
+    let client_state_result = ClientState::<ECPairing>::deserialize_uncompressed(&client_state_bytes[..]);
+    let range_pk_result = RangeProofPK::<ECPairing>::deserialize_uncompressed(&range_pk_bytes[..]);
+    let io_locations = IOLocations::new_from_str(&io_locations_str);
+    let proof_spec_result: Result<ProofSpec, serde_json::Error> = serde_json::from_str(DEFAULT_PROOF_SPEC);
+
+    match (client_state_result, range_pk_result, proof_spec_result) {
+        (Ok(mut client_state), Ok(range_pk), Ok(mut proof_spec)) => {
+            let msg = "Successfully deserialized client-state, range-pk, and proof-spec".to_string();            
+
+            let show_proof = 
+            if &client_state.credtype == "mdl" {
+                let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string());
+                create_show_proof_mdl(&mut client_state, &range_pk, None, &io_locations, age.expect("Age not valid."))
+            }
+            else {
+                proof_spec.presentation_message = Some(challenge);
+                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec).unwrap()
+            };
+
+            let show_proof_b64 = write_to_b64url(&show_proof);
+            let msg = format!("show_proof_b64: {:?}", show_proof_b64);
+            msg
+        }
+        (Err(e), _, _) => {
+            let msg = format!("Error: Failed to deserialize client state: {:?}", e);
+            msg
+        }
+        (_, Err(e), _) => {
+            let msg = format!("Error: Failed to deserialize range pk: {:?}", e);
+            msg
+        }
+        (_, _, Err(e)) => {
+            let msg = format!("Error: Failed to deserialize proof-spec: {:?}", e);
+            msg
+        }
+    }
+
 }
 
 pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, io_locations: &IOLocations, proof_spec: &ProofSpec) -> Result<ShowProof<ECPairing>, Box<dyn Error>>
@@ -329,10 +436,19 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     let show_groth16 = client_state.show_groth16(Some(context_str.as_bytes()), &io_types);
     
     // Create fresh range proof 
-    let time_sec = SystemTime::now()
+    let time_sec; 
+
+    #[cfg(feature = "wasm")]
+    {
+        time_sec = js_timestamp();
+    }
+    #[cfg(not(feature = "wasm"))]
+    {
+        time_sec = SystemTime::now()
     .duration_since(UNIX_EPOCH)
     .unwrap()
     .as_secs();
+    }
     let cur_time = Fr::from( time_sec );
 
     let mut com_exp_value = client_state.committed_input_openings[0].clone();
@@ -365,11 +481,19 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let show_groth16 = client_state.show_groth16(pm, &io_types);    
     
     // Create fresh range proof for validUntil
-    let time_sec = SystemTime::now()
+    let time_sec; 
+    #[cfg(feature = "wasm")]
+    {
+        time_sec = js_timestamp();
+    }
+    #[cfg(not(feature = "wasm"))]
+    {
+        time_sec = SystemTime::now()
     .duration_since(UNIX_EPOCH)
     .unwrap()
     .as_secs();
-    let cur_time = Fr::from( time_sec );
+    }
+    let cur_time = Fr::from(time_sec);
 
     let mut com_valid_until_value = client_state.committed_input_openings[0].clone();
     com_valid_until_value.m -= cur_time;
