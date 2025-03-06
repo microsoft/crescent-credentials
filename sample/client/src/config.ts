@@ -11,6 +11,7 @@ const config = {
   clientHelperUrl: process.env.CLIENT_HELPER_URL ?? 'http://127.0.0.1:8003',
   schemas: schemaList.replace(/\s/g, '').split(','),
   pollInterval: parseInt(process.env.PREPARE_POLL_INTERVAL ?? '5000'),
+  pollStatusRate: parseFloat(process.env.PREPARE_STATUS_RATE ?? '0.07'),
   cardColor: process.env.CARD_COLOR ?? '#4E95D9',
   autoOpen: (process.env.AUTO_OPEN ?? '').trim().toLowerCase() === 'true'
 }

@@ -36,6 +36,9 @@ num-bigint = { version = "=0.4.3", default-features = false, features = [
 ] }
 num-traits = "0.2.14"
 
+# wasm
+wasm-bindgen = { version = "0.2", optional = true }
+
 rand = "~0.8.5"
 sha2 = "0.10.8"
 rayon = "1.7"
@@ -46,14 +49,13 @@ jwt-simple = "0.12.10"
 chrono = "0.4"
 
 # Local dependencies
-ark-circom = { path = "../forks/circom-compat" }
+ark-circom = { path = "../forks/circom-compat", optional = true }
 ark-groth16 = { path = "../forks/groth16", default-features = false, features = [
     "parallel",
 ] }
 ark-poly-commit = { path = "../forks/ark-poly-commit", default-features = false, features = [
     "parallel",
 ] }
-
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -65,6 +67,8 @@ cargo-patch = "0.3"
 
 [features]
 print-trace = ["ark-std/print-trace"]
+default = ["ark-circom"]  # Native builds are the default
+wasm = ["wasm-bindgen"]  # Wasm feature explicitly excludes ark-circom
 
 [[bench]]
 name = "proof_benchmark"
@@ -78,8 +82,9 @@ harness = false
 name = "ecc_bench"
 harness = false
 
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [profile.dev.package."*"]
 opt-level = 3               # optimize dependencies, even in dev builds
 debug-assertions = false    # We need this to work around a bug in Wasmer
-

@@ -13,6 +13,7 @@ import { addData, getData, removeData } from './indexeddb.js'
 import * as clientHelper from './clientHelper'
 import * as verifier from './verifier'
 import { MSG_POPUP_BACKGROUND_UPDATE } from './constants'
+import type { ShowData } from './clientHelper'
 
 export interface CredentialRecord {
   token: {
@@ -26,6 +27,7 @@ export interface CredentialRecord {
     url: string
     name: string
   }
+  showData: ShowData | null
   status: Card_status
   credUid: string
   progress: number
@@ -98,7 +100,8 @@ export class Credential {
       status: 'PENDING',
       credUid: guid(),
       // eslint-disable-next-line @typescript-eslint/no-magic-numbers
-      progress: 0
+      progress: 0,
+      showData: null
     }
   }
 
