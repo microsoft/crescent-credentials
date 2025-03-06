@@ -354,7 +354,7 @@ pub fn create_show_proof_wasm(
             let show_proof = 
             if &client_state.credtype == "mdl" {
                 let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string());
-                create_show_proof_mdl(&mut client_state, &range_pk, None, &io_locations, age.expect("Age not valid."))
+                create_show_proof_mdl(&mut client_state, &range_pk, Some(challenge.as_bytes()), &io_locations, age.expect("Age not valid."))
             }
             else {
                 proof_spec.presentation_message = Some(challenge);
