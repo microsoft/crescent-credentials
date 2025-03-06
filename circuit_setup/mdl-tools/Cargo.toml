@@ -16,10 +16,13 @@ rand = { version = "0.8.5", features = ["getrandom"] }
 sha2 = { version = "0.10.8", features = ["oid"] }
 elliptic-curve = "0.13.1"
 time = { version = "0.3.20", features = ["formatting", "parsing", "macros"] }
-base64 = "0.13"
+base64 = "0.21"
 hex = "0.4"
 coset = "0.3.8"
 clap = { version = "4", features = ["derive"] }
+num-bigint = "0.4"
+num-traits = "0.2"
+chrono = "0.4"
 
 # Pull isomdl directly from GitHub, main branch
 isomdl = { git = "https://github.com/spruceid/isomdl", branch = "main" }

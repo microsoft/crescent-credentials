@@ -126,8 +126,8 @@ def find_value_digest_info(mdoc, name):
         print("Digest: {}".format(binascii.hexlify(recomputed_value_digest).decode('utf-8')))
 
     # Now we need an encoded version of the digest, that we can match against the CBOR-encoded cred
-    # The format, for birth_date (number 19), is:
-    # 13     unsigned(19)
+    # The format is:
+    # unsigned(digestID)
     # 58 20  bytes(32)
     # (32-byte SHA-256 digest)
     cbored_digest = "{:02x}{}{}".format(element_digest_ids[name], "5820", binascii.hexlify(recomputed_value_digest).decode('utf-8'))
