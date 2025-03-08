@@ -35,6 +35,7 @@ use p256::ecdsa::{Signature, VerifyingKey};
 use p256::pkcs8::EncodePublicKey;
 use p256::NistP256;
 use serde_json::Map;
+use sha2::digest::typenum::Double;
 use sha2::{Digest, Sha256};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use num_bigint::BigUint;
@@ -406,23 +407,35 @@ fn main() {
     println!("Digest Base64: {}", digest_b64);
     println!("Digest Limbs: {:?}", digest_limbs);
     
-    if let Some(valid_until_unix_timestamp) = extract_valid_until(&tbs_data) {
-        // FIXME: this doesn't work (TIMEZONE is wrong)
-        println!("valid_until_unix_timestamp: {}", valid_until_unix_timestamp);
-    } else {
-        println!("valid_until_unix_timestamp not found");
-    }
+    let valid_until_prefix = "6a76616c6964556e74696cc074"; // 6a: text(10), 7661...696c: "validUntil", c0: date, 74: text(20)
+    let tbs_data_hex = hex::encode(&tbs_data);
+    let valid_until_pos = tbs_data_hex.find(valid_until_prefix).unwrap();
+    let valid_until_pos = valid_until_pos + valid_until_prefix.len();
+    let valid_until_data = &tbs_data_hex[valid_until_pos..valid_until_pos + 40];
+    let valid_until_unix_timestamp = ymd_to_timestamp(valid_until_data, true, true).unwrap();
+    // let valid_until_unix_timestamp = extract_valid_until(&tbs_data).expect("valid_until_unix_timestamp not found"); (OLD = FIXME)
 
-    let dob_info = find_value_digest_info(&namespaces, &mso, &tbs_data, "birth_date")/* .unwrap() FIXME*/;
+    let dob_info = find_value_digest_info(&namespaces, &mso, &tbs_data, "birth_date").unwrap();
     println!("dob_info: {:?}", dob_info);
 
     // begin output of prover's inputs
     let mut prover_inputs = Map::new();
     println!("prover_inputs: {:?}", padded_m);
     prover_inputs.insert("message".to_string(), serde_json::json!(padded_m));
-    // TODO: add more prover inputs
-    
-    // TODO: continue re-impl python script from here
+    prover_inputs.insert("valid_until_value".to_string(), serde_json::json!(valid_until_unix_timestamp));
+    let valid_until_prefix_l = tbs_data_hex.find(valid_until_prefix).unwrap() / 2 - 1;
+    prover_inputs.insert("valid_until_prefix_l".to_string(), valid_until_prefix_l.into());
+    let valid_until_prefix_r = valid_until_prefix_l + valid_until_prefix.len() / 2;
+    prover_inputs.insert("valid_until_prefix_r".to_string(), valid_until_prefix_r.into());
+    let dob_value = ymd_to_daystamp(dob_info.value.into_tag().unwrap().1.into_text().unwrap().as_str()).unwrap();
+    prover_inputs.insert("dob_value".to_string(), serde_json::json!(dob_value));
+    prover_inputs.insert("dob_id".to_string(), serde_json::json!(dob_info.id));
+    let dob_preimage = sha256_padding(&dob_info.preimage.as_ref());
+    prover_inputs.insert("dob_preimage".to_string(), serde_json::json!(dob_preimage));
+    prover_inputs.insert("dob_encoded_l".to_string(), serde_json::json!(dob_info.encoded_l));
+    prover_inputs.insert("dob_encoded_r".to_string(), serde_json::json!(dob_info.encoded_r));
+
+    // TODO: continue re-impl python script from here *****
 
     let signature_bytes = issuer_auth.signature.clone();
     let signature_len = signature_bytes.len();
