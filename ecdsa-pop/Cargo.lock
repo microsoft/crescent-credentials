@@ -195,21 +195,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
 
 [[package]]
-name = "base64"
-version = "0.21.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
-
-[[package]]
-name = "base64-url"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb9fb9fb058cc3063b5fc88d9a21eefa2735871498a04e1650da76ed511c8569"
-dependencies = [
- "base64",
-]
-
-[[package]]
 name = "bellpepper"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -569,11 +554,9 @@ dependencies = [
  "ark-ff",
  "ark-secp256r1 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ark-std",
- "base64-url",
  "bellpepper",
  "bellpepper-core",
  "bincode",
- "byteorder",
  "ff",
  "flate2",
  "generic-array 1.2.0",
@@ -1309,7 +1292,7 @@ checksum = "7fcf8323ef1faaee30a44a340193b1ac6814fd9b7b4e88e9d4519a3e4abe1cfd"
 
 [[package]]
 name = "spartan-t256"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "ark-ec",
  "ark-ff",

@@ -7,7 +7,7 @@ description = "Proof of knowledge of ECDSA-P256 sigantures suitable in the conte
 
 
 [dependencies]
-spartan-t256 = { path="../../../../forks/Spartan-t256", features=["multicore"]}
+spartan-t256 = { path="../forks/Spartan-t256", features=["multicore"]}
 bellpepper-core = { version="0.2.0", default-features = false }
 bellpepper = { version="0.2.0", default-features = false }
 ff = { version = "0.13.0", features = ["derive"] }

@@ -3,7 +3,7 @@
 
 use ark_groth16::{VerifyingKey,PreparedVerifyingKey};
 use ark_serialize::CanonicalSerialize;
-use crescent::device_binding::device::TestDevice;
+use crescent::device::TestDevice;
 use crescent::groth16rand::{ClientState, ShowGroth16};
 use crescent::rangeproof::{RangeProofPK, RangeProofVK};
 use crescent::utils::{read_from_file, string_to_byte_vec, write_to_file};

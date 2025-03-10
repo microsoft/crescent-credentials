@@ -11,7 +11,7 @@ use ark_ff::PrimeField;
 use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::{end_timer, rand::thread_rng, start_timer};
-use device_binding::device::ECDSASig;
+
 use groth16rand::{ShowGroth16, ShowRange};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -25,7 +25,7 @@ use crate::structs::{PublicIOType, IOLocations};
 use crate::{
     groth16rand::ClientState,
     structs::{GenericInputsJSON, ProverInput},
-    device_binding::device::DeviceProof
+    device::{DeviceProof, ECDSASig}
 };
 use crate::daystamp::days_to_be_age;
 
@@ -36,7 +36,7 @@ pub mod structs;
 pub mod utils;
 pub mod prep_inputs;
 pub mod daystamp;
-pub mod device_binding;
+pub mod device;
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this

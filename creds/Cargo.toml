@@ -56,7 +56,7 @@ ark-poly-commit = { path = "../forks/ark-poly-commit", default-features = false,
 ] }
 
 # Device binding
-ecdsa-pop = {path="src/device_binding/ecdsa-pop"}
+ecdsa-pop = {path="../ecdsa-pop"}
 p256 = { version = "0.13.2", features = ["ecdsa", "pem"]}
 
 
