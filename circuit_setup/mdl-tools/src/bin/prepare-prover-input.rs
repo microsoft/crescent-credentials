@@ -1,11 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-// *******************************************************************************************
-// NOTE: work in progress rust re-implementation of the prepare-prover-input.py script
-//       Many things are not yet working and don't produce the same output  (FIXME)
-// *******************************************************************************************
-
 // This program parses a CBOR-encoded mDL and tests extracting the required information
 // to generate the ZK circuit inputs.
 //
@@ -29,30 +24,28 @@ use isomdl::definitions::helpers::{ByteStr, NonEmptyVec};
 use isomdl::definitions::issuer_signed::IssuerSignedItemBytes;
 use isomdl::definitions::x509::x5chain::X5CHAIN_COSE_HEADER_LABEL;
 use isomdl::definitions::x509::X5Chain;
-use isomdl::definitions::{DigestId, IssuerSignedItem, Mso};
+use isomdl::definitions::{DigestAlgorithm, DigestId, Mso};
 use isomdl::issuance::mdoc::Mdoc;
 use p256::ecdsa::{Signature, VerifyingKey};
 use p256::pkcs8::EncodePublicKey;
 use p256::NistP256;
 use serde_json::Map;
-use sha2::digest::typenum::Double;
 use sha2::{Digest, Sha256};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use num_bigint::BigUint;
-use num_traits::{Num, Signed};
+use num_traits::{Num, Zero, One, ToPrimitive};
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use hex;
 use std::str;
-use serde::Serialize;
 use std::collections::BTreeMap;
 
 static MDL_DOCTYPE: &str = "org.iso.18013.5.1.mDL";
 static ISO_MDL_NAMESPACE: &str = "org.iso.18013.5.1";
 static AAMVA_MDL_NAMESPACE: &str = "org.iso.18013.5.1.aamva";
 static SUPPORTED_NAMESPACES: [&str; 2] = [ISO_MDL_NAMESPACE, AAMVA_MDL_NAMESPACE];
+const CIRCOM_ES256_LIMB_BITS: usize = 43;
 
-
-// Define the issuer's timezone as PST (UTC-8). Change this if needed (TODO: move to config?)
+// Define the issuer's timezone as PST (UTC-8). Change this if needed (TODO: move to config)
 const ISSUER_TIMEZONE_OFFSET_HOURS: i32 = -8; // US West Coast / PST (UTC-8)
 
 #[derive(Parser, Debug)]
@@ -90,7 +83,6 @@ fn sha256_padding(prepad_m: &[u8]) -> Vec<u8> {
 }
 
 fn hex_string_to_binary_array(hex_str: &str, bits: usize) -> Vec<u8> {
-    //let binary_string = format!("{:0>bits$b}", u128::from_str_radix(hex_str, 16).unwrap(), bits = bits); FIXME
     let num = BigUint::from_str_radix(hex_str, 16)
     .expect("Invalid hex string");
     let binary_string = format!("{:0>bits$b}", num, bits = bits);    
@@ -112,51 +104,46 @@ fn base64_decoded_size(encoded_len: usize) -> usize {
 }
 
 fn ymd_to_timestamp(ymd: &str, is_bytes: bool, has_time: bool) -> Option<u64> {
+    // Decode hex if necessary.
     let ymd_str = if is_bytes {
-        match hex::decode(ymd) {
-            Ok(decoded) => match String::from_utf8(decoded) {
-                Ok(s) => s,
-                Err(_) => return None,
-            },
-            Err(_) => return None,
-        }
+        hex::decode(ymd)
+            .ok()
+            .and_then(|decoded| String::from_utf8(decoded).ok())?
     } else {
         ymd.to_string()
     };
 
-    let format_string = if has_time { "%Y-%m-%dT%H:%M:%SZ" } else { "%Y-%m-%d" };
-    match NaiveDateTime::parse_from_str(&ymd_str, format_string) {
-        Ok(dt) => {
-            // Set the correct timezone based on ISSUER_TIMEZONE_OFFSET_HOURS
-            // FIXME: not working; I don't get the same value as the python script
-            let fixed_offset = FixedOffset::west_opt(ISSUER_TIMEZONE_OFFSET_HOURS * 3600)?;
-            let dt_fixed = fixed_offset.from_local_datetime(&dt).single()?;
+    // Determine the format string.
+    let format_string = if has_time {
+        "%Y-%m-%dT%H:%M:%SZ"
+    } else {
+        "%Y-%m-%d"
+    };
 
-            // Convert to UTC before getting the timestamp
-            let dt_utc: DateTime<Utc> = dt_fixed.with_timezone(&Utc);
-            Some(dt_utc.timestamp() as u64)
-        }
-        Err(_) => None,
-    }
+    // Parse the date/time from the string.
+    let naive_dt = NaiveDateTime::parse_from_str(&ymd_str, format_string).ok()?;
+
+    // Reset time-of-day to midnight.
+    let midnight = naive_dt.date().and_hms(0, 0, 0);
+
+    // Build the correct FixedOffset.
+    let offset_secs = ISSUER_TIMEZONE_OFFSET_HOURS * 3600;
+    let fixed_offset = if offset_secs < 0 {
+        FixedOffset::west_opt(-offset_secs)?
+    } else {
+        FixedOffset::east_opt(offset_secs)?
+    };
+
+    // Convert the naive datetime to a timezone-aware datetime.
+    let dt_fixed = fixed_offset.from_local_datetime(&midnight).single()?;
+    // Convert to UTC and return the timestamp.
+    let dt_utc: DateTime<Utc> = dt_fixed.with_timezone(&Utc);
+    Some(dt_utc.timestamp() as u64)
 }
 
 fn ymd_to_daystamp(ymd: &str) -> Option<i32> {
     let parsed_date = NaiveDate::parse_from_str(ymd, "%Y-%m-%d").ok()?;
     Some(parsed_date.num_days_from_ce())
-}
-
-fn extract_valid_until(tbs_data: &[u8]) -> Option<u64> {
-    let valid_until_prefix = "6a76616c6964556e74696cc074"; // 6a: text(10), 7661...696c: "validUntil", c0: date, 74: text(20)
-    let tbs_data_hex = hex::encode(tbs_data);
-
-    if let Some(valid_until_pos) = tbs_data_hex.find(valid_until_prefix) {
-        let valid_until_pos = valid_until_pos + valid_until_prefix.len();
-        let valid_until_data = &tbs_data_hex[valid_until_pos..valid_until_pos + 40];
-
-        return ymd_to_timestamp(valid_until_data, true, true);
-    }
-
-    None
 }
 
 #[derive(Debug)]
@@ -179,16 +166,19 @@ struct  ValueDigestInfo {
 /// Then we find the position of this string in the hex-encoded tbs_data. Each byte is 2 hex digits,
 /// so we convert the found index to a byte index (by dividing by 2) and subtract 1 (to adjust for a header).
 /// Finally, encoded_r is computed as encoded_l + (length of cbored_digest in bytes).
-/*
 pub fn compute_encoded_positions(
     tbs_data: &[u8],
-    id: DigestId,
+    digest_id: DigestId,
     digest: &[u8],
-) -> Result<(usize, usize), Box<dyn Error>> {
+) -> Result<(usize, usize), String> {
     // Build the "cbored_digest" string.
     // - Format: "{:02x}5820{}", where {:02x} is the digest id in 2-digit hex,
     //   "5820" is a literal string, and the digest is hex-encoded.
-    let cbored_digest = format!("{:02x}5820{}", id.0, hex::encode(digest));
+    // FIXME: bending over backward to convert the digest_id into a value accepted by format()
+    //         Digest is defined as "pub struct DigestId(i32)" and provide no public accessor
+    //         to the i32.
+    let id_i32: i32 = serde_json::from_str(&serde_json::to_string(&digest_id).unwrap()).unwrap();
+    let cbored_digest = format!("{:02x}5820{}", id_i32, hex::encode(digest));
     
     // Convert the entire tbs_data into a hex string.
     let tbs_data_hex = hex::encode(tbs_data);
@@ -200,19 +190,17 @@ pub fn compute_encoded_positions(
     
     // Each byte is represented by 2 hex characters.
     // So, convert the position from hex characters to byte index and subtract 1.
-    let encoded_l = (pos / 2).checked_sub(1)
-        .ok_or("Invalid encoded_l calculation")?;
-    
+    let encoded_l = pos / 2;
+
     // The length of cbored_digest in bytes is its length (in hex characters) divided by 2.
     let encoded_r = encoded_l + (cbored_digest.len() / 2);
     
     Ok((encoded_l, encoded_r))
 }
- */
 
 /// Given an mdoc and a target element name, recompute the value digest,
 /// compare it with the signed digest in the mso, and return detailed info.
-pub fn find_value_digest_info(
+pub(crate) fn find_value_digest_info(
     namespaces: &BTreeMap<String, NonEmptyVec<IssuerSignedItemBytes>>,
     mso: &Mso,
     tbs_data: &[u8],
@@ -229,7 +217,6 @@ pub fn find_value_digest_info(
     };
 
     // Iterate over each supported namespace.
-    let mut found = false;
     for &ns in SUPPORTED_NAMESPACES.iter() {
         if let Some(items) = namespaces.get(ns) {
             // items is a NonEmptyVec<IssuerSignedItemBytes>; iterate over its items.
@@ -238,16 +225,17 @@ pub fn find_value_digest_info(
                     continue;
                 }
                 println!("found claim: {}", claim);
-                found = true;
                 println!("item: {:?}", item);
 
                 info.value = item.as_ref().element_value.clone();
+                println!("value: {:?}", info.value);
                 info.id = item.as_ref().digest_id;
                 info.preimage = ByteStr::from(serde_cbor::to_vec(item).expect("unable to encode IssuerSigned as cbor bytes"));
-                // cbor::to_vec(&item).expect("unable to encode IssuerSigned as cbor bytes");
                 let mut hasher = Sha256::new();
                 hasher.update(&info.preimage);
                 let recomputed_value_digest = hasher.finalize().to_vec();
+                // print recomputed digest as hex
+                println!("Recomputed digest: {}", hex::encode(&recomputed_value_digest));
                 let ns_digests = mso.value_digests.get(ns)
                     .ok_or(format!("Namespace {} not found", ns)).unwrap();
                 let signed_value_digest = ns_digests.get(&info.id)
@@ -257,33 +245,14 @@ pub fn find_value_digest_info(
                     println!("Digest mismatch");
                     println!("Recomputed: {}", hex::encode(&recomputed_value_digest));
                     println!("Signed    : {}", hex::encode(&signed_value_digest));
+                    // TODO: return an error
                 } else {
                     println!("Digest: {}", hex::encode(&recomputed_value_digest));
                 }
-                
-                /*
-                    let encoded_pos = compute_encoded_positions(tbs_data, info.id, &info.digest).unwrap();
-                    info.encoded_l = encoded_pos.0;
-                    info.encoded_r = encoded_pos.1;
-                 */
-                // or should I just ?
-                /*
-                    // Build the "encoded" digest string.
-                    // Format: [digestID (1-byte hex)] + "5820" + [32-byte SHA-256 digest in hex]
-                    let cbored_digest = format!("{:02x}5820{}", digest_id, hex::encode(&recomputed_value_digest));
-
-                    // Load the tbs_data from the mdoc.
-                    let tbs_data = load_tbs_data(mdoc)?;
-                    let tbs_data_hex = hex::encode(&tbs_data);
-                    let pos = tbs_data_hex.find(&cbored_digest)
-                        .ok_or("cbored_digest not found in tbs_data")?;
-                    // Each byte is 2 hex digits; subtract 1 per the original algorithm.
-                    let encoded_l = pos / 2;
-                    let encoded_l = encoded_l.checked_sub(1)
-                        .ok_or("Invalid encoded_l calculation")?;
-                    let encoded_r = encoded_l + cbored_digest.len() / 2;
-                */
-
+                info.digest = recomputed_value_digest;
+                let encoded_pos = compute_encoded_positions(tbs_data, info.id, &info.digest).unwrap();
+                info.encoded_l = encoded_pos.0;
+                info.encoded_r = encoded_pos.1;
                 return Some(info)
             }
         }
@@ -293,6 +262,43 @@ pub fn find_value_digest_info(
     None
 }
 
+// TODO: see the check_config() function in the python script; more stuff to implement
+fn check_config(config: &serde_json::Value) -> () {
+    // check the credtype
+    let credtype = config["credtype"].as_str().unwrap();
+    if credtype != "mdl" {
+        panic!("Invalid credtype: {}", credtype);
+    }
+
+    // check the signature alg
+    let alg = config["alg"].as_str().unwrap();
+    if alg != "ES256" {
+        panic!("Unsupported alg: {}", alg);
+    }
+
+    // make sure max_cred_len exists
+    let max_cred_len = config["max_cred_len"].as_u64().unwrap();
+    if max_cred_len <= 0 {
+        panic!("Invalid max_cred_len: {}", max_cred_len);
+    }
+}
+
+fn bytes_to_circom_limbs(bytes: &[u8], limb_size: usize) -> Vec<u128> {
+    let n = BigUint::from_bytes_be(bytes);
+    let mut limbs = Vec::new();
+    // Create a BigUint mask: (1 << limb_size) - 1
+    let msk = (BigUint::one() << limb_size) - BigUint::one();
+    let mut n_copy = n.clone();
+    
+    while n_copy > BigUint::zero() {
+        // Use the BigUint mask in the bitwise AND operation
+        let limb = (n_copy.clone() & msk.clone()).to_u128().unwrap();
+        limbs.push(limb);
+        n_copy >>= limb_size;
+    }
+    
+    limbs
+}
 
 fn main() {
     //let args = Args::parse(); // FIXME
@@ -305,12 +311,14 @@ fn main() {
     // read and parse the config file
     let config_file = std::fs::read_to_string(&args.config).unwrap();
     let config: serde_json::Value = serde_json::from_str(&config_file).unwrap();
+    check_config(&config);
 
     let mdl_cbor = std::fs::read(&args.mdl).unwrap();
     let mdoc = cbor::from_slice::<Mdoc>(
         &mdl_cbor)
         .map_err(|_| "Failed to parse mDL")
         .unwrap();
+    println!("Parsed mDL: {:?}", mdoc);
 
     let doc_type = mdoc.doc_type;
     println!("doc_type: {}\n", doc_type);
@@ -320,16 +328,17 @@ fn main() {
     
     // TODO: anything to do with the MSO?
     let mso = mdoc.mso;
-    let digest_algorithm = mso.digest_algorithm;
-    // TODO: make sure it's SHA-256. Note, the test mdoc.cbor uses "SHA256", and the spec uses "SHA-256".
-    //       Are our generation code wrong? Should we be lenient here and ignore case and blanks?
-    let value_digests = &mso.value_digests;
+    // make sure the digest alg is SHA256. No compare or public accessor on the DigestAlgorithm enum, so
+    // I need to serialize it to compare its value.
+    if !matches!(mso.digest_algorithm, DigestAlgorithm::SHA256) {
+        panic!("Unsupported MSO digest algorithm: {:?}, expected SHA-256", mso.digest_algorithm)
+    }
+    // TODO: we might need these digests in the future, for selective disclosure
+    let _value_digests = &mso.value_digests;
 
     let namespaces = mdoc.namespaces;
-    // print all namespaces
     for (key, value) in namespaces.iter() {
-        println!("Namespace: {}", key);
-        if key != ISO_MDL_NAMESPACE && key != AAMVA_MDL_NAMESPACE { // TODO: replace with SUPPORTED_NAMESPACES
+        if !SUPPORTED_NAMESPACES.contains(&key.as_str()) {
             panic!("Invalid mDL namespace: {}", key);
         }
         println!("Claim count: {}\n", value.len());
@@ -355,13 +364,9 @@ fn main() {
         .unwrap();
     println!("PEM formatted public key:\n{}\n", pem);
 
-    /* FIXME: uncomment when not using test data from the old cred.txt
     // per mDL spec, aad is empty
     let empty_aad = Vec::<u8>::new();
     let tbs_data = issuer_auth.inner.tbs_data(&empty_aad);
-    */
-    // read temp tbs_data from file FIXME: delete this
-    let tbs_data = std::fs::read("/home/cpaquin/dev/identity/crescent-credentials/circuit_setup/inputs/mdl1/tbs_data.bin").unwrap();
 
     // convert tbs_data to a vector of integers
     let tbs_data_ints = tbs_data.to_vec();
@@ -398,9 +403,9 @@ fn main() {
     let sha256_hash = hasher.finalize();
 
     let digest_hex_str = hex::encode(&sha256_hash);
-    let digest_bits = hex_string_to_binary_array(&digest_hex_str, 256);
-    let digest_b64 = URL_SAFE_NO_PAD.encode(&sha256_hash);
-    let digest_limbs = digest_to_limbs(&digest_hex_str);
+    let digest_bits = hex_string_to_binary_array(&digest_hex_str, 256); // FIXME: from python script, but unused
+    let digest_b64 = URL_SAFE_NO_PAD.encode(&sha256_hash); // FIXME: from python script, but unused
+    let digest_limbs = digest_to_limbs(&digest_hex_str); // FIXME: from python script, but unused
 
     println!("Digest Hex: {}", digest_hex_str);
     println!("Digest Bits: {:?}", digest_bits);
@@ -409,11 +414,11 @@ fn main() {
     
     let valid_until_prefix = "6a76616c6964556e74696cc074"; // 6a: text(10), 7661...696c: "validUntil", c0: date, 74: text(20)
     let tbs_data_hex = hex::encode(&tbs_data);
-    let valid_until_pos = tbs_data_hex.find(valid_until_prefix).unwrap();
-    let valid_until_pos = valid_until_pos + valid_until_prefix.len();
+    let valid_until_prefix_pos = tbs_data_hex.find(valid_until_prefix).unwrap();
+    let valid_until_pos = valid_until_prefix_pos + valid_until_prefix.len();
     let valid_until_data = &tbs_data_hex[valid_until_pos..valid_until_pos + 40];
     let valid_until_unix_timestamp = ymd_to_timestamp(valid_until_data, true, true).unwrap();
-    // let valid_until_unix_timestamp = extract_valid_until(&tbs_data).expect("valid_until_unix_timestamp not found"); (OLD = FIXME)
+    println!("valid_until_unix_timestamp: {}", valid_until_unix_timestamp);
 
     let dob_info = find_value_digest_info(&namespaces, &mso, &tbs_data, "birth_date").unwrap();
     println!("dob_info: {:?}", dob_info);
@@ -423,7 +428,7 @@ fn main() {
     println!("prover_inputs: {:?}", padded_m);
     prover_inputs.insert("message".to_string(), serde_json::json!(padded_m));
     prover_inputs.insert("valid_until_value".to_string(), serde_json::json!(valid_until_unix_timestamp));
-    let valid_until_prefix_l = tbs_data_hex.find(valid_until_prefix).unwrap() / 2 - 1;
+    let valid_until_prefix_l = valid_until_prefix_pos / 2;
     prover_inputs.insert("valid_until_prefix_l".to_string(), valid_until_prefix_l.into());
     let valid_until_prefix_r = valid_until_prefix_l + valid_until_prefix.len() / 2;
     prover_inputs.insert("valid_until_prefix_r".to_string(), valid_until_prefix_r.into());
@@ -431,30 +436,60 @@ fn main() {
     prover_inputs.insert("dob_value".to_string(), serde_json::json!(dob_value));
     prover_inputs.insert("dob_id".to_string(), serde_json::json!(dob_info.id));
     let dob_preimage = sha256_padding(&dob_info.preimage.as_ref());
+    if dob_preimage.len() != 128 {
+        panic!("Invalid dob_preimage length: {}; expected 128 (hardcoded in circom circuit)", dob_preimage.len());
+    }
     prover_inputs.insert("dob_preimage".to_string(), serde_json::json!(dob_preimage));
     prover_inputs.insert("dob_encoded_l".to_string(), serde_json::json!(dob_info.encoded_l));
     prover_inputs.insert("dob_encoded_r".to_string(), serde_json::json!(dob_info.encoded_r));
 
-    // TODO: continue re-impl python script from here *****
-
+    // extract the signature from the issuer_auth
     let signature_bytes = issuer_auth.signature.clone();
-    let signature_len = signature_bytes.len();
-    println!(
-        "signature ({} bytes):\n{:?}\n",
-        signature_len, signature_bytes
-    );
 
+    // sanity check: verify the signature
     let verification_result =
             issuer_auth
             .verify::<VerifyingKey, Signature>(&issuer_pub_key, None, None);
-    println!(
-        "mDL signature verification result: {:?}\n",
-        verification_result
-    );
+    if !verification_result.is_success() {
+        panic!("Error: issuer signature verification failed");
+    }
+
+    // process the signature
+    // See https://www.rfc-editor.org/rfc/rfc7515#appendix-A.3.1 for ECDSA encoding details, the signature is R||S
+    // this code assumes |R|==|S|
+    let sig_len = signature_bytes.len();
+    if sig_len % 2 != 0 {
+        panic!("Invalid signature length: {}", sig_len);
+    }
+    let r_bytes = &signature_bytes[0..sig_len / 2];
+    let s_bytes = &signature_bytes[sig_len / 2..sig_len];
+    let r_limbs = bytes_to_circom_limbs(r_bytes, CIRCOM_ES256_LIMB_BITS);
+    let s_limbs = bytes_to_circom_limbs(s_bytes, CIRCOM_ES256_LIMB_BITS);
+    prover_inputs.insert("signature_r".to_string(), serde_json::json!(r_limbs));
+    prover_inputs.insert("signature_s".to_string(), serde_json::json!(s_limbs));
+
+    // process the issuer public key
+    let issuer_key_bytes = issuer_pub_key.to_sec1_bytes();
+    if issuer_key_bytes[0] != 0x04 {
+        panic!("Invalid serialized issuer public key format: {}, expected uncompressed marker 0x04", issuer_key_bytes[0]);
+    }
+    if issuer_key_bytes.len() != 65 {
+        panic!("Invalid serialized issuer public key length: {}", issuer_key_bytes.len());
+    }
+    // skipping the first byte (0x04) which indicates the key is uncompressed
+    let issuer_key_x = &issuer_key_bytes[1..33];
+    let issuer_key_y = &issuer_key_bytes[33..65];
+    let x_limb = bytes_to_circom_limbs(issuer_key_x, CIRCOM_ES256_LIMB_BITS);
+    let y_limb = bytes_to_circom_limbs(issuer_key_y, CIRCOM_ES256_LIMB_BITS);
+    prover_inputs.insert("pubkey_x".to_string(), serde_json::json!(x_limb));
+    prover_inputs.insert("pubkey_y".to_string(), serde_json::json!(y_limb));
+    prover_inputs.insert("message_padded_bytes".to_string(),msg_len_after_sha2_padding.into());
+    println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
+
+    // the python script defines a public_IOs and prover_aux_data dictionaries, but never write them out (FIXME) 
 
     // save prover_inputs to a file
     let prover_inputs_json = serde_json::to_string_pretty(&prover_inputs).unwrap();
     std::fs::write(&args.prover_inputs, prover_inputs_json).unwrap();
     println!("Prover inputs saved to: {}\n", args.prover_inputs);
 }
-
