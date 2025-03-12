@@ -240,16 +240,17 @@ pub(crate) fn find_value_digest_info(
                     .ok_or(format!("Namespace {} not found", ns)).unwrap();
                 let signed_value_digest = ns_digests.get(&info.id)
                     .ok_or(format!("Signed value digest not found for digest id {:?}", info.id)).unwrap();
+                println!("signed_value_digest: {:?}", hex::encode(signed_value_digest));
                 // Compare recomputed digest with the signed digest.
                 if recomputed_value_digest != signed_value_digest.as_ref()  {
                     println!("Digest mismatch");
                     println!("Recomputed: {}", hex::encode(&recomputed_value_digest));
                     println!("Signed    : {}", hex::encode(&signed_value_digest));
-                    // TODO: return an error
+                    // panic!("Digest mismatch"); FIXME: this should not happen but currently it does when using our freshly generated mDL. Investigate...
                 } else {
                     println!("Digest: {}", hex::encode(&recomputed_value_digest));
                 }
-                info.digest = recomputed_value_digest;
+                info.digest = signed_value_digest.as_ref().to_vec();
                 let encoded_pos = compute_encoded_positions(tbs_data, info.id, &info.digest).unwrap();
                 info.encoded_l = encoded_pos.0;
                 info.encoded_r = encoded_pos.1;
@@ -318,7 +319,6 @@ fn main() {
         &mdl_cbor)
         .map_err(|_| "Failed to parse mDL")
         .unwrap();
-    println!("Parsed mDL: {:?}", mdoc);
 
     let doc_type = mdoc.doc_type;
     println!("doc_type: {}\n", doc_type);
@@ -341,7 +341,7 @@ fn main() {
         if !SUPPORTED_NAMESPACES.contains(&key.as_str()) {
             panic!("Invalid mDL namespace: {}", key);
         }
-        println!("Claim count: {}\n", value.len());
+        println!("{} namespace claim count: {}\n", key, value.len());
     }
     
     let issuer_auth = mdoc.issuer_auth;
@@ -358,11 +358,9 @@ fn main() {
         .unwrap();
 
     let issuer_pub_key = x5chain.end_entity_public_key::<NistP256>().unwrap();
-    println!("issuer_pub_key: {:?}\n", issuer_pub_key);
     let pem = issuer_pub_key
         .to_public_key_pem(Default::default())
         .unwrap();
-    println!("PEM formatted public key:\n{}\n", pem);
 
     // per mDL spec, aad is empty
     let empty_aad = Vec::<u8>::new();
@@ -403,14 +401,9 @@ fn main() {
     let sha256_hash = hasher.finalize();
 
     let digest_hex_str = hex::encode(&sha256_hash);
-    let digest_bits = hex_string_to_binary_array(&digest_hex_str, 256); // FIXME: from python script, but unused
-    let digest_b64 = URL_SAFE_NO_PAD.encode(&sha256_hash); // FIXME: from python script, but unused
-    let digest_limbs = digest_to_limbs(&digest_hex_str); // FIXME: from python script, but unused
-
-    println!("Digest Hex: {}", digest_hex_str);
-    println!("Digest Bits: {:?}", digest_bits);
-    println!("Digest Base64: {}", digest_b64);
-    println!("Digest Limbs: {:?}", digest_limbs);
+    let _digest_bits = hex_string_to_binary_array(&digest_hex_str, 256); // FIXME: from python script, but unused
+    let _digest_b64 = URL_SAFE_NO_PAD.encode(&sha256_hash); // FIXME: from python script, but unused
+    let _digest_limbs = digest_to_limbs(&digest_hex_str); // FIXME: from python script, but unused
     
     let valid_until_prefix = "6a76616c6964556e74696cc074"; // 6a: text(10), 7661...696c: "validUntil", c0: date, 74: text(20)
     let tbs_data_hex = hex::encode(&tbs_data);

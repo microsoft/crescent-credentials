@@ -19,7 +19,9 @@
 //    - The issuer key and cert chain can be generated using the ../scripts/gen_x509_cert_chain.sh script
 //    - To test: cargo run --bin mdl-gen -- -c ../inputs/mdl1/claims.json -d ../inputs/mdl1/device_private_key.pem
 //                                          -k ../inputs/mdl1/issuer_key.pem -x ../inputs/mdl1/issuer_certs.pem
-//                                          -o ../inputs/mdl1/mdl.cbor
+//                                          -o ../generated_files/mdl1/mdl.cbor
+
+use std::collections::BTreeMap;
 
 use clap::Parser;
 use elliptic_curve::sec1::ToEncodedPoint;
@@ -67,31 +69,31 @@ fn mdoc_builder(claims: String, device_priv_key: String) -> Builder {
     // Parse the claims.json content into a serde_json::Value
     let parsed: serde_json::Value = serde_json::from_str(&claims).unwrap();
 
-    // Extract the JSON objects for each namespace
+    // Handle the ISO MDL namespace
     let isomdl_claims = parsed.get(ISO_MDL_NAMESPACE)
         .ok_or_else(|| format!("Missing key: {}", ISO_MDL_NAMESPACE))
         .unwrap();
-    let aamva_claims = parsed.get(AAMVA_MDL_NAMESPACE)
-        .ok_or_else(|| format!("Missing key: {}", AAMVA_MDL_NAMESPACE))
-        .unwrap();
-
-    // Convert the JSON sub-objects back into strings to pass to from_json
     let isomdl_data = OrgIso1801351::from_json(&isomdl_claims)
         .unwrap()
         .to_ns_map();
-    let aamva_data = OrgIso1801351Aamva::from_json(&aamva_claims)
-        .unwrap()
-        .to_ns_map();
+    
+    // Handle the optional AAMVA namespace
+    let aamva_data_opt = parsed.get(AAMVA_MDL_NAMESPACE).map(|claims| {
+        OrgIso1801351Aamva::from_json(claims)
+            .unwrap()
+            .to_ns_map()
+    });
 
     // Build the namespaces mapping
-    let namespaces = [
-        (ISO_MDL_NAMESPACE.to_string(), isomdl_data),
-        (AAMVA_MDL_NAMESPACE.to_string(), aamva_data),
-    ]
-    .into_iter()
-    .collect();
+    
+    let mut namespaces = BTreeMap::new();
+    namespaces.insert(ISO_MDL_NAMESPACE.to_string(), isomdl_data);
+    if let Some(aamva_data) = aamva_data_opt {
+        namespaces.insert(AAMVA_MDL_NAMESPACE.to_string(), aamva_data);
+    }
 
     // TODO: should read these values from a config file
+    // FIXME: how do these compare to the ones in the claims.json file?
     let now = OffsetDateTime::now_utc();
     let validity_info = ValidityInfo {
         signed: now,
@@ -154,8 +156,14 @@ fn generate_mdl(claims: String, device_pub_key: String, private_key_pem: String,
 
 fn main() {
     // Parse command-line arguments
-    let args = Args::parse();
-
+    //let args = Args::parse(); FIXME
+    let args = Args {
+        claims: String::from("../inputs/mdl1/claims.json"),
+        device_priv_key: String::from("../inputs/mdl1/device_private_key.pem"),
+        issuer_private_key: String::from("../inputs/mdl1/issuer_key.pem"),
+        issuer_x5chain: String::from("../inputs/mdl1/issuer_certs.pem"),
+        mdl: String::from("../generated_files/mdl1/mdl.cbor"),
+    };
     // Read the claims JSON file
     let claims_data = std::fs::read_to_string(&args.claims)
         .expect("Failed to read claims file");
