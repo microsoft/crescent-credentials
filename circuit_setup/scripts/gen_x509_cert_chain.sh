@@ -29,6 +29,8 @@ openssl x509 -req -in "$tmpdir/issuer.csr" -out "$tmpdir/issuer.crt" -CA "$tmpdi
 
 # create a X509 chain file in the output directory
 cat "$tmpdir/issuer.crt" "$tmpdir/CA.crt" "$tmpdir/root_CA.crt" > "$outdir/issuer_certs.pem"
+echo "Generated issuer cert chain: $outdir/issuer_certs.pem"
 
 # copy the issuer key to the output directory
 cp "$tmpdir/issuer.key" "$outdir/issuer_key.pem"
+echo "Generated issuer key: $outdir/issuer_key.pem"

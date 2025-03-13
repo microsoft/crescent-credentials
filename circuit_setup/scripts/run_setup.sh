@@ -75,8 +75,10 @@ elif [ ${CREDTYPE} == 'mdl' ] && ([ ! -f ${INPUTS_DIR}/device_private_key.pem ] 
         ALG="${BASH_REMATCH[1]}"
         echo "Creating sample device/issuer keys and mdl for algorithm $ALG"
     fi # TODO: what if alg is not found?
-    ./scripts/gen_mdl_device_key.sh
-    ./scripts/gen_x509_cert_chain.sh
+    cd ${ROOT_DIR}/scripts
+    ./gen_mdl_device_key.sh
+    ./gen_x509_cert_chain.sh
+    cd ${ROOT_DIR}
 fi
 
 # Check that circomlib is present
