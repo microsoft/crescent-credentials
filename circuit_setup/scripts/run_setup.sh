@@ -49,6 +49,11 @@ else
     CIRCOM_SRC_DIR="${ROOT_DIR}/circuits"
 fi
 
+# Replace symlink with junction if on Windows
+if [ -f "${CIRCOM_SRC_DIR}/circomlib" ]; then
+    rm -f "${CIRCOM_SRC_DIR}/circomlib"
+    cmd //c "mklink /J ${CIRCOM_SRC_DIR##*/}\circomlib circuits\circomlib"
+fi
 
 # Create the output directory if not there.
 mkdir $OUTPUTS_DIR 2>/dev/null || true
