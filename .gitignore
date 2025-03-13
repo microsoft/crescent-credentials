@@ -21,3 +21,4 @@ circuit_setup/inputs/*/issuer.pub
 circuit_setup/inputs/*/token.jwt
 
 setup/generated_files/
+circuit_setup/circuits-mdl/circomlib
