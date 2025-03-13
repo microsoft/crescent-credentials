@@ -304,6 +304,7 @@ print_debug("number of SHA blocks to hash: " + str(msg_len_after_SHA2_padding //
 
 # Write out prover inputs, public IOs, prover aux data. Always create a file, even if they're empty
 
+# FIXME: public_IOs and prover_aux_data are not written to file
 if len(public_IOs.keys()) == 0:
     public_IOs["_placeholder"] = "empty file"
 if len(prover_aux_data.keys()) == 0:
