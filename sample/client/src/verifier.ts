@@ -21,9 +21,9 @@ export type ShowProof = string
 // required for wasm now()
 declare global {
   // eslint-disable-next-line @typescript-eslint/naming-convention, no-unused-vars
-  function js_timestamp (): bigint
+  function js_now_seconds (): bigint
 }
-globalThis.js_timestamp = (): bigint => BigInt(Math.floor(Date.now() / 1000))
+globalThis.js_now_seconds = (): bigint => BigInt(Math.floor(Date.now() / 1000))
 
 export async function show (cred: Credential, disclosureUid: string, challenge: string): Promise<RESULT<ShowProof, Error>> {
   const response = await fetchText(`${config.clientHelperUrl}/show`, { cred_uid: cred.id, disc_uid: disclosureUid, challenge }, 'GET')

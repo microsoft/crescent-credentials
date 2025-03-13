@@ -194,17 +194,16 @@ pub fn string_to_byte_vec(s : Option<String>) -> Option<Vec<u8>> {
 }
 
 pub fn utc_now_seconds() -> u64 {
-    let time_sec;
-
     #[cfg(feature = "wasm")]
-    {
-        time_sec = crate::wasm_lib::js_timestamp();
-    }
+    { crate::wasm_lib::js_now_seconds() }
+
     #[cfg(not(feature = "wasm"))]
-    {
-        time_sec = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    { 
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() 
     }
-    time_sec
 }
 
 #[cfg(test)]

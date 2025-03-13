@@ -22,10 +22,10 @@ extern "C" {
 
 #[wasm_bindgen]
 extern "C" {
-    pub fn js_timestamp() -> u64;
+    pub fn js_now_seconds() -> u64;
 }
 
-pub fn disc_uid_to_age(disc_uid: &str) -> Result<usize, &'static str> {
+fn disc_uid_to_age(disc_uid: &str) -> Result<usize, &'static str> {
     match disc_uid {
         "crescent://over_18" => Ok(18),
         "crescent://over_21" => Ok(21),

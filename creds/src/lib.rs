@@ -2,11 +2,6 @@
 // Licensed under the MIT license.
 
 use crate::daystamp::days_to_be_age;
-#[cfg(not(feature = "wasm"))]
-use {
-    ark_circom::{CircomBuilder, CircomConfig},
-    crate::structs::ProverInput,
-};
 use std::{fs, path::PathBuf, error::Error};
 use ark_bn254::{Bn254 as ECPairing, Fr};
 use ark_crypto_primitives::snark::SNARK;
@@ -22,12 +17,15 @@ use serde_json::{json,Value};
 use sha2::{Digest, Sha256};
 use utils::{read_from_file, strip_quotes, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
-use crate::structs::{PublicIOType, IOLocations};
-use crate::{
-    groth16rand::ClientState,
-    structs::GenericInputsJSON,
-};
+use crate::structs::{PublicIOType, IOLocations, GenericInputsJSON};
+use crate::groth16rand::ClientState;
 use crate::utils::utc_now_seconds;
+
+#[cfg(not(feature = "wasm"))]
+use {
+    ark_circom::{CircomBuilder, CircomConfig},
+    crate::structs::ProverInput,
+};
 
 #[cfg(feature = "wasm")]
 pub use wasm_lib::create_show_proof_wasm;
@@ -234,7 +232,6 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
 
     0
 }
-
 
 #[cfg(not(feature = "wasm"))]
 pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON, prover_aux: Option<&String>, credtype : &str) -> Result<ClientState<ECPairing>, SerializationError>
