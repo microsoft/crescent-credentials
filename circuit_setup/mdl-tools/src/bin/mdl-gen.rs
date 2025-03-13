@@ -156,14 +156,8 @@ fn generate_mdl(claims: String, device_pub_key: String, private_key_pem: String,
 
 fn main() {
     // Parse command-line arguments
-    //let args = Args::parse(); FIXME
-    let args = Args {
-        claims: String::from("../inputs/mdl1/claims.json"),
-        device_priv_key: String::from("../inputs/mdl1/device_private_key.pem"),
-        issuer_private_key: String::from("../inputs/mdl1/issuer_key.pem"),
-        issuer_x5chain: String::from("../inputs/mdl1/issuer_certs.pem"),
-        mdl: String::from("../generated_files/mdl1/mdl.cbor"),
-    };
+    let args = Args::parse();
+
     // Read the claims JSON file
     let claims_data = std::fs::read_to_string(&args.claims)
         .expect("Failed to read claims file");

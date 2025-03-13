@@ -27,5 +27,8 @@ openssl req -new -newkey ec:<(openssl ecparam -name prime256v1) -keyout "$tmpdir
 # intermediate CA signs the issuer cert request
 openssl x509 -req -in "$tmpdir/issuer.csr" -out "$tmpdir/issuer.crt" -CA "$tmpdir/CA.crt" -CAkey "$tmpdir/CA.key" -CAcreateserial -days 365 -extfile openssl_ca.cnf -extensions v3_signer -sha384
 
-# create a X509 chain file
-cat "$tmpdir/issuer.crt" "$tmpdir/CA.crt" "$tmpdir/root_CA.crt" > "$tmpdir/chain.pem"
+# create a X509 chain file in the output directory
+cat "$tmpdir/issuer.crt" "$tmpdir/CA.crt" "$tmpdir/root_CA.crt" > "$outdir/issuer_certs.pem"
+
+# copy the issuer key to the output directory
+cp "$tmpdir/issuer.key" "$outdir/issuer_key.pem"

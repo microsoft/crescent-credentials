@@ -302,12 +302,7 @@ fn bytes_to_circom_limbs(bytes: &[u8], limb_size: usize) -> Vec<u128> {
 }
 
 fn main() {
-    //let args = Args::parse(); // FIXME
-    let args = Args {
-        config: String::from("../inputs/mdl1/config.json"),
-        mdl: String::from("../inputs/mdl1/mdl.cbor"),
-        prover_inputs: String::from("../generated_files/mdl1/prover_inputs.json"),
-    };
+    let args = Args::parse();
 
     // read and parse the config file
     let config_file = std::fs::read_to_string(&args.config).unwrap();

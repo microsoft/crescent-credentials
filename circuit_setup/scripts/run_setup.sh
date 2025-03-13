@@ -64,9 +64,19 @@ if [ ${CREDTYPE} == 'jwt' ] && ([ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${IN
     if [[ `cat ${INPUTS_DIR}/config.json` =~ $ALG_REGEX ]]; then
         ALG="${BASH_REMATCH[1]}"
         echo "Creating sample keys and token for algorithm $ALG"
-    fi
+    fi # TODO: what if alg is not found?
     python3 scripts/jwk_gen.py ${ALG} ${INPUTS_DIR}/issuer.prv ${INPUTS_DIR}/issuer.pub
     python3 scripts/jwt_sign.py ${INPUTS_DIR}/claims.json ${INPUTS_DIR}/issuer.prv  ${INPUTS_DIR}/token.jwt
+elif [ ${CREDTYPE} == 'mdl' ] && ([ ! -f ${INPUTS_DIR}/device_private_key.pem ] || [ ! -f ${INPUTS_DIR}/issuer_key.pem ] || [ ! -f ${INPUTS_DIR}/issuer_certs.pem ] || [ ! -f ${INPUTS_DIR}/mdl.cbor ] || [ ! -f ${OUTPUTS_DIR}/issuer.pub ]); then
+    echo "Creating sample issuer keys and mDL" # delete me
+    rm ${INPUTS_DIR}/device_private_key.pem ${INPUTS_DIR}/issuer_key.pem ${INPUTS_DIR}/issuer_certs.pem ${INPUTS_DIR}/mdl.org ${OUTPUTS_DIR}/issuer.pub 2>/dev/null && true         
+
+    if [[ `cat ${INPUTS_DIR}/config.json` =~ $ALG_REGEX ]]; then
+        ALG="${BASH_REMATCH[1]}"
+        echo "Creating sample device/issuer keys and mdl for algorithm $ALG"
+    fi # TODO: what if alg is not found?
+    ./scripts/gen_mdl_device_key.sh
+    ./scripts/gen_x509_cert_chain.sh
 fi
 
 # Check that circomlib is present
@@ -110,13 +120,30 @@ NUM_PUBLIC_IOS=$(($NUM_PUBLIC_INPUTS + $NUM_PUBLIC_OUTPUTS))
 awk -v max="$NUM_PUBLIC_IOS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, "."); printf "%s,%s\n", parts[2], $2}' "${CIRCOM_DIR}/main.sym" > "${CIRCOM_DIR}/io_locations.sym"
 
 if [ ${CREDTYPE} == 'mdl' ]; then 
+    echo "=== Generating mDL ===" # delete me
     # Create the prover inputs (do it here, rather than in Rust like we do for JWTs; since the CBOR/mDL parsing code is in python) TODO: in future we should re-write it in rust
     PROVER_INPUTS_FILE=${OUTPUTS_DIR}/prover_inputs.json
-    CRED_FILE=${INPUTS_DIR}/cred.txt
+    MDL_FILE=${INPUTS_DIR}/mdl.cbor
     CONFIG_FILE=${INPUTS_DIR}/config.json
+    CLAIMS_FILE=${INPUTS_DIR}/claims.json
+    DEVICE_PRIV_KEY_FILE=${INPUTS_DIR}/device_private_key.pem
+    ISSUER_PRIV_KEY_FILE=${INPUTS_DIR}/issuer_key.pem
+    ISSUER_CERTS_FILE=${INPUTS_DIR}/issuer_certs.pem
     ISSUER_KEY_FILE=${OUTPUTS_DIR}/issuer.pub
-    cd scripts/
-    python3 prepare_mdl_prover.py ${CONFIG_FILE} ${CRED_FILE}  ${PROVER_INPUTS_FILE} ${ISSUER_KEY_FILE}
+    
+    cd ${ROOT_DIR}/mdl-tools
+    echo "Current dir: `pwd`"
+
+    # generate the mDL
+    cargo run --release --bin mdl-gen -- --claims ${CLAIMS_FILE} --device_priv_key ${DEVICE_PRIV_KEY_FILE} --issuer_private_key ${ISSUER_PRIV_KEY_FILE} --issuer_x5chain ${ISSUER_CERTS_FILE} --output ${MDL_FILE} ${CONFIG_FILE} 2>> ${LOG_FILE}
+    if [ $? -ne 0 ]; then
+        echo "Error running prepare_mdl_prover"
+        exit 1
+    fi
+    
+    # generate the prover inputs
+    cargo run --release --bin prepare-prover-input --config ${CONFIG_FILE} --mdl ${MDL_FILE} --prover_inputs ${PROVER_INPUTS_FILE}
+    
     cd ${ROOT_DIR}
 fi
 
