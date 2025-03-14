@@ -1,5 +1,5 @@
 {
     "credtype": "mdl",
     "alg": "ES256",
-    "max_cred_len": 1152
+    "max_cred_len": 1792
 }
