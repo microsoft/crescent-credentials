@@ -244,12 +244,12 @@ def check_config(config):
                 return False        
         if claim_reveal_unhashed(config[key]):
             max_claim_byte_len = config[key].get("max_claim_byte_len")
-            if max_claim_byte_len > MAX_FIELD_BYTE_LEN and config[key].get("type") is not "number":
+            if max_claim_byte_len > MAX_FIELD_BYTE_LEN and config[key].get("type") != "number":
                 print_debug("Error: claim '{}' has reveal flag set but max_claim_byte_len={} exceeds MAX_FIELD_BYTE_LEN={}. To reveal larger claims use reveal_digest".format(key, max_claim_byte_len, MAX_FIELD_BYTE_LEN))
                 return False
             # For number types, the number of bytes is the number of base-10 digits, which can
             #  exceed the number bytes to represent the field (base-256 digits)            
-            if max_claim_byte_len > MAX_FIELD_BASE10_LEN and config[key].get("type") is "number":
+            if max_claim_byte_len > MAX_FIELD_BASE10_LEN and config[key].get("type") == "number":
                 print_debug("Error: claim '{}' has reveal flag set but max_claim_byte_len={} exceeds MAX_FIELD_BASE10_LEN={}. To reveal larger claims use reveal_digest".format(key, max_claim_byte_len, MAX_FIELD_BASE10_LEN))
                 return False            
 
