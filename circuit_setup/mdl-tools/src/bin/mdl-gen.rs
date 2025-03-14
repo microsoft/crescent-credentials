@@ -18,7 +18,7 @@
 //    - The device key can be generated using the ../scripts/gen_mdl_device_key.sh script
 //    - The issuer key and cert chain can be generated using the ../scripts/gen_x509_cert_chain.sh script
 //    - To test: cargo run --bin mdl-gen -- -c ../inputs/mdl1/claims.json -d ../inputs/mdl1/device_private_key.pem
-//                                          -k ../inputs/mdl1/issuer_key.pem -x ../inputs/mdl1/issuer_certs.pem
+//                                          -k ../inputs/mdl1/issuer.priv -x ../inputs/mdl1/issuer_certs.pem
 //                                          -o ../generated_files/mdl1/mdl.cbor
 
 use std::collections::BTreeMap;
