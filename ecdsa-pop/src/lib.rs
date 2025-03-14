@@ -35,9 +35,6 @@ use crate::emulated::field_element::{EmulatedFieldElement, EmulatedFieldParams, 
 
 type Scalar = P256Fp;
 
-
-// TODO: Improve this description 
-// TODO: When computing hQ = Poseidon(q0, q1, z), let hQ be a full field element rather than truncated to 248 bits. 
 // ECDSA proof when only the verification key must be secret
 // Notation
 //    Q: verification key
@@ -49,20 +46,20 @@ type Scalar = P256Fp;
 //    U = (-h/r) * G
 // Verification equation:
 //    T^s * U  = Q
-// Gadget
+// Circuit IO:
 //   public inputs: T, U, hQ, m, (e1, e2) // (public inputs are computed by both prover and verifier from R, h, G)    
 //   private inputs: q0, q1, z
-// Circuit
+// Circuit:
 //   1. Check hQ = Poseidon(q0, q1, z)
 //   2. Check m = q0 + q1*e1 + z*e2 (mod q)
 //   3. Compute public key Q.x = q0 + 2^128 * q1
 //
 // This modified signing equation was also used here: https://github.com/personaelabs/spartan-ecdsa
 
-    // We must use halo2curves's implementation of P256 because the one produced by ff_derive
-    // in circ_fields has five 64-bit limbs to represent P256, and Poseidon only works with
-    // 32-byte fields
-    // This is a known issue in ff_derive https://github.com/zkcrypto/ff/issues/71
+// We must use halo2curves's implementation of P256 because the one produced by ff_derive
+// in circ_fields has five 64-bit limbs to represent P256, and Poseidon only works with
+// 32-byte fields
+// This is a known issue in ff_derive https://github.com/zkcrypto/ff/issues/71
 
 
 ///////////////////////////////////////////////
@@ -310,13 +307,12 @@ impl ECDSAProofCircuit {
   /// Compute the hash commitment H_Q = Poseidon(q0, q1, z)
   pub fn compute_hQ(params: &ECDSAParams, q0: &BigUint, q1: &BigUint, z: &BigUint) -> Vec<u8> {
     let NUM_ABSORBS = 3;
-    let hash_len = 248;
     let mut poseidon: Poseidon<P256Fp> = Poseidon::new(params.constants.clone(), NUM_ABSORBS);
     poseidon.absorb(big_to_ff(&q0));
     poseidon.absorb(big_to_ff(&q1));
     poseidon.absorb(big_to_ff(&z));
 
-    let hQ = poseidon.squeeze(hash_len);    // H(q0, q1, z)
+    let hQ = poseidon.squeeze_field_element();    // H(q0, q1, z)
 
     let mut hQ = hQ.to_bytes();
     hQ.reverse();
@@ -404,7 +400,7 @@ impl Circuit<Scalar> for ECDSAProofCircuit {
     poseidon.absorb(&q0);
     poseidon.absorb(&q1);
     poseidon.absorb(&z);
-    let hQ_prime = poseidon.squeeze(&mut cs.namespace(||"squeeze"), 248)?;
+    let hQ_prime = poseidon.squeeze_field_element(&mut cs.namespace(||"squeeze"))?;
 
     enforce_equal(cs.namespace(||"ensure hQ == hQ_prime "), &hQ, &hQ_prime);
 

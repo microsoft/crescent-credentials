@@ -66,6 +66,7 @@ where
     self.state.push(e);
   }
 
+  #[allow(dead_code)]
   /// Compute a digest by hashing the current state
   pub fn squeeze(&mut self, num_bits: usize) -> Scalar {
     // check if we have squeezed already
@@ -97,6 +98,29 @@ where
     }
     res
   }
+
+  /// Compute a digest that is one field element long
+  pub fn squeeze_field_element(&mut self) -> Scalar {
+    // check if we have squeezed already
+    assert!(!self.squeezed, "Cannot squeeze again after squeezing");
+    self.squeezed = true;
+
+    let mut sponge = Sponge::new_with_constants(&self.constants.0, Simplex);
+    let acc = &mut ();
+    let parameter = IOPattern(vec![
+      SpongeOp::Absorb(self.num_absorbs as u32),
+      SpongeOp::Squeeze(1u32),
+    ]);
+
+    sponge.start(parameter, None, acc);
+    assert_eq!(self.num_absorbs, self.state.len());
+    SpongeAPI::absorb(&mut sponge, self.num_absorbs as u32, &self.state, acc);
+    let hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+    sponge.finish(acc).unwrap();
+
+    hash[0]
+  }
+
 }
 
 /// A Poseidon-based sponge gadget to use inside the verifier circuit.
@@ -130,42 +154,14 @@ where
   }
 
   /// Compute a digest by hashing the current state
+  #[allow(dead_code)]
   pub fn squeeze_to_bits<CS: ConstraintSystem<Scalar>>(
     &mut self,
     mut cs: CS,
     num_bits: usize,
   ) -> Result<Vec<AllocatedBit>, SynthesisError> {
-    // check if we have squeezed already
-    assert!(!self.squeezed, "Cannot squeeze again after squeezing");
-    self.squeezed = true;
-    let parameter = IOPattern(vec![
-      SpongeOp::Absorb(self.num_absorbs as u32),
-      SpongeOp::Squeeze(1u32),
-    ]);
     let mut ns = cs.namespace(|| "ns");
-
-    let hash = {
-      let mut sponge = SpongeCircuit::new_with_constants(&self.constants.0, Simplex);
-      let acc = &mut ns;
-      assert_eq!(self.num_absorbs, self.state.len());
-
-      sponge.start(parameter, None, acc);
-      neptune::sponge::api::SpongeAPI::absorb(
-        &mut sponge,
-        self.num_absorbs as u32,
-        &(0..self.state.len())
-          .map(|i| Elt::Allocated(self.state[i].clone()))
-          .collect::<Vec<Elt<Scalar>>>(),
-        acc,
-      );
-
-      let output = neptune::sponge::api::SpongeAPI::squeeze(&mut sponge, 1, acc);
-      sponge.finish(acc).unwrap();
-      output
-    };
-
-    let hash = Elt::ensure_allocated(&hash[0], &mut ns.namespace(|| "ensure allocated"), true)?;
-
+    let hash = self.squeeze_field_element(ns.namespace(||"Squeeze a field element"))?;
     // return the hash as a vector of bits, truncated
     Ok(
       hash
@@ -180,6 +176,7 @@ where
     )
   }
     /// Compute a digest by hashing the current state
+    #[allow(dead_code)]
     pub fn squeeze<CS: ConstraintSystem<Scalar>>(
       &mut self,
       mut cs: CS, 
@@ -190,8 +187,47 @@ where
       
       // convert hash bits to allocated scalar and return
       le_bits_to_num(&mut cs.namespace(||"Convert hash bits to num"), &hash_bits)
-
     }
+
+    /// Compute a digest by hashing the current state
+    pub fn squeeze_field_element<CS: ConstraintSystem<Scalar>>(
+      &mut self,
+      mut cs: CS,   
+    ) -> Result<AllocatedNum<Scalar>, SynthesisError> {
+
+      // check if we have squeezed already
+      assert!(!self.squeezed, "Cannot squeeze again after squeezing");
+      self.squeezed = true;
+      let parameter = IOPattern(vec![
+        SpongeOp::Absorb(self.num_absorbs as u32),
+        SpongeOp::Squeeze(1u32),
+      ]);
+      let mut ns = cs.namespace(|| "ns");
+
+      let hash = {
+        let mut sponge = SpongeCircuit::new_with_constants(&self.constants.0, Simplex);
+        let acc = &mut ns;
+        assert_eq!(self.num_absorbs, self.state.len());
+
+        sponge.start(parameter, None, acc);
+        neptune::sponge::api::SpongeAPI::absorb(
+          &mut sponge,
+          self.num_absorbs as u32,
+          &(0..self.state.len())
+            .map(|i| Elt::Allocated(self.state[i].clone()))
+            .collect::<Vec<Elt<Scalar>>>(),
+          acc,
+        );
+
+        let output = neptune::sponge::api::SpongeAPI::squeeze(&mut sponge, 1, acc);
+        sponge.finish(acc).unwrap();
+        output
+      };
+
+      let hash = Elt::ensure_allocated(&hash[0], &mut ns.namespace(|| "ensure allocated"), true)?;
+
+      Ok(hash)
+    }    
 
 }
 
