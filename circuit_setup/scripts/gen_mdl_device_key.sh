@@ -9,7 +9,7 @@ PUBLIC_KEY=../inputs/mdl1/device_public_key.pem
 echo "Generating mDL device key pair"
 
 # Generate the private key (PEM format)
-openssl ecparam -name prime256v1 -genkey -noout -out ${PRIVATE_KEY}
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -pkeyopt ec_param_enc:named_curve -out ${PRIVATE_KEY}
 echo "Generated private key: ${PRIVATE_KEY}"
 
 # Extract the public key (PEM format)
