@@ -19,6 +19,8 @@ sample/verifier/data
 circuit_setup/inputs/*/issuer.prv
 circuit_setup/inputs/*/issuer.pub
 circuit_setup/inputs/*/token.jwt
+circuit_setup/inputs/*/device.prv
+circuit_setup/inputs/*/device.pub
 
 setup/generated_files/
 circuit_setup/circuits-mdl/circomlib

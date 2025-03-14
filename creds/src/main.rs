@@ -3,6 +3,7 @@
 
 use ark_groth16::{VerifyingKey,PreparedVerifyingKey};
 use ark_serialize::CanonicalSerialize;
+use crescent::device::TestDevice;
 use crescent::groth16rand::{ClientState, ShowGroth16};
 use crescent::rangeproof::{RangeProofPK, RangeProofVK};
 use crescent::utils::{read_from_file, string_to_byte_vec, write_to_file};
@@ -11,6 +12,7 @@ use crescent::CrescentPairing;
 use crescent::prep_inputs::{prepare_prover_inputs, parse_config};
 use crescent::structs::{GenericInputsJSON, IOLocations, ProverInput};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::env::current_dir;
 use std::{fs, path::PathBuf};
 
@@ -110,8 +112,9 @@ pub fn run_prover(
     else {
         let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
         let issuer_pem = fs::read_to_string(&paths.issuer_pem).unwrap_or_else(|_| panic!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
+        let device_pub_pem = fs::read_to_string(&paths.device_pub_pem).ok();
         let (prover_inputs_json, prover_aux_json, _public_ios_json) = 
-            prepare_prover_inputs(&config, &jwt, &issuer_pem).expect("Failed to prepare prover inputs");    
+            prepare_prover_inputs(&config, &jwt, &issuer_pem, device_pub_pem.as_deref()).expect("Failed to prepare prover inputs");    
         let prover_inputs = GenericInputsJSON{prover_inputs: prover_inputs_json};
         let prover_aux_string = json!(prover_aux_json).to_string();
         create_client_state(&paths, &prover_inputs, Some(&prover_aux_string), "jwt").unwrap()
@@ -152,7 +155,15 @@ fn show_proof_size(show_proof: &ShowProof<CrescentPairing>) -> usize {
         0
     };
 
-    let total = groth16_size + show_range_size + show_range2_size;
+    let device_proof_size = if show_proof.device_proof.is_some() {
+        let tmp = show_proof.device_proof.compressed_size();
+        print!("{} + (device signature proof)", tmp);
+        tmp
+    } else {
+        0
+    };
+
+    let total = groth16_size + show_range_size + show_range2_size + device_proof_size;
     println!(" = {} bytes total", total);
 
     total
@@ -173,8 +184,17 @@ fn load_proof_spec(proof_spec_file_path : &str, presentation_message: Option<Str
         panic!("Multiple presentation messages");
     }
     if presentation_message.is_some() {
-        ps.presentation_message = presentation_message;
+        ps.presentation_message = string_to_byte_vec(presentation_message);
     }
+
+    if ps.device_bound.is_some() && ps.device_bound.unwrap() {
+        let pm_bytes = ps.presentation_message.expect("Presentation message is required for device-bound credentials");
+        // We hash here in the CLI tool, but applications calling the
+        // API can hash themselves, setting the message to be signed as 
+        // whatever the application needs.         
+        let digest = Sha256::digest(pm_bytes);  
+        ps.presentation_message = Some(digest.to_vec());
+    }          
 
     ps
 }
@@ -189,13 +209,21 @@ pub fn run_show(
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
     
-
     let show_proof = if client_state.credtype == "mdl" {
         let pm = string_to_byte_vec(presentation_message);
         create_show_proof_mdl(&mut client_state, &range_pk, pm.as_deref(), &io_locations, MDL_AGE_GREATER_THAN)  
     } else {
         let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
-        create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec).unwrap()
+
+        let device_signature = 
+        if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
+            let device = TestDevice::new_from_file(&paths.device_prv_pem);
+            Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
+        } else {
+            None
+        };
+
+        create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature).unwrap()
     };
     println!("Proving time: {:?}", proof_timer.elapsed());
 
@@ -215,12 +243,11 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     let config_str = std::fs::read_to_string(&paths.config).unwrap();
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str};
     
-
     let (verify_result, data) = if show_proof.show_range2.is_some() {
         let pm = string_to_byte_vec(presentation_message);
         verify_show_mdl(&vp, &show_proof, pm.as_deref(), MDL_AGE_GREATER_THAN)
     } else {
-        let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
+        let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);  
         verify_show(&vp, &show_proof, &proof_spec)
     };
 

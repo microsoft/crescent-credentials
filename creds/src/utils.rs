@@ -2,7 +2,7 @@
 // Licensed under the MIT license.
 
 use ark_ec::{AffineRepr, CurveGroup};
-use ark_ff::PrimeField;
+use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::rand::thread_rng;
 use merlin::Transcript;
@@ -15,7 +15,10 @@ use ark_serialize::Write;
 #[macro_export]
 macro_rules! return_error {
     ($msg:expr) => {
-        return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, $msg)))
+        {
+            println!("{}", $msg);
+            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, $msg)));
+        }
     };
 }
 
@@ -63,6 +66,11 @@ pub fn biguint_to_scalar<F: PrimeField>(a: &BigUint) -> F {
     
     F::from_bigint(a_bigint).unwrap()
 }
+
+pub fn scalar_to_biguint<FF: ark_ff::PrimeField>(u : &FF) -> BigUint {
+    let u_big = u.into_bigint();
+    BigUint::from_bytes_le(&u_big.to_bytes_le())
+  }
 
 // Interpret the input as a bit string, convert to an integer where the
 // leftmost bit in the string is interpreted as the LSB of the integer
@@ -116,7 +124,7 @@ pub fn direct_msm<G: CurveGroup>(bases: &[G::Affine], scalars: &[G::ScalarField]
 pub fn msm_select<G: CurveGroup>(bases: &[G::Affine], scalars: &[G::ScalarField]) -> G {
     assert_eq!(bases.len(), scalars.len());
 
-    // TODO: I added this layer of indirection because the arkworks MSM code has high variability
+    // TODO (perf): I added this layer of indirection because the arkworks MSM code has high variability
     // and often appears to take much longer than the equivalent number of scalar multiplications. 
     // For small number of bases (say n=2-5), we can probably do better much better with a handwritten 
     // implementation. n=2, the Pedersen case, should probably have a dedicated implementation since it's

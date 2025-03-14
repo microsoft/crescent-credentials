@@ -58,6 +58,10 @@ jobs:
           cd circuit_setup/scripts
           ./run_setup.sh rs256-sd
 
+      - name: Run circuit setup for rs256-db
+        run: |
+          cd circuit_setup/scripts
+          ./run_setup.sh rs256-db
 
       - name: Run circuit setup for mDL
         run: |
@@ -115,6 +119,27 @@ jobs:
         run: |
           cd creds
           cargo run --bin crescent --release --features print-trace verify --name rs256-sd
+
+# RS256-db Commands
+      - name: Run ZKSetup for rs256-db
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace zksetup --name rs256-db
+
+      - name: Run Prove for rs256-db
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace prove --name rs256-db
+
+      - name: Run Show for rs256-db
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace show --name rs256-db
+
+      - name: Run Verify for rs256-db
+        run: |
+          cd creds
+          cargo run --bin crescent --release --features print-trace verify --name rs256-db
 
 # mDL Commands
       - name: Run ZKSetup for mDL

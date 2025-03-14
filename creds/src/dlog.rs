@@ -29,10 +29,12 @@ pub struct PedersenOpening<G: CurveGroup> {
 }
 
 impl<G: Group> DLogPoK<G> {
-    /// proves knowledge of the representations of y1, y2, ... y_n
+    /// Proves knowledge of the representations of y1, y2, ... y_n
     /// in their respective bases -- bases[1], bases[2], ... bases[n]
-    /// binding the proof to a presentation message pm
-    /// optionally, specify a set of positions to assert equality of in the form {(i1,j1), (i2,j2), ...}
+    ///     y[i] = \prod_{i=0}^n bases[i]^scalars[i]
+    /// Optionally, the context is bound to the proof.
+    /// Optionally, when n=2, specify a set of positions to prove equality of scalars across the different statements.
+    /// For each pair (i,j) in eq_pos, the proof ensures that scalars[0][i] == scalars[1][j]. 
     /// TODO (perf): shrink the proof size by compressing the responses since they're the same for all the equal positions
     pub fn prove(
         context: Option<&[u8]>,
@@ -64,14 +66,12 @@ impl<G: Group> DLogPoK<G> {
             r.push(ri);
         }
 
-        // if eq_pos is some change the randomness of those positions to be the same
         if eq_pos.is_some() {
-            let eq_pos = eq_pos.unwrap();
-            let common_r = r[eq_pos[0].0][eq_pos[0].1];
+            assert!(y.len() == 2);
 
-            eq_pos.iter().for_each(|(i, j)| {
-                r[*i][*j] = common_r;
-            });
+            for (i,j) in eq_pos.unwrap().iter() {
+                r[1][*j] = r[0][*i];
+            }
         }
 
         for i in 0..y.len() {
@@ -153,17 +153,15 @@ impl<G: Group> DLogPoK<G> {
         }
 
         if eq_pos.is_some() {
-            let eq_pos = eq_pos.unwrap();
-            let mut mismatch = false;
-            eq_pos.iter().for_each(|(i, j)| {
-                if self.s[*i][*j] != self.s[eq_pos[0].0][eq_pos[0].1] {
-                    mismatch = true;
+            assert!(y.len() == 2);
+
+            for (i,j) in eq_pos.unwrap().iter() {
+                if self.s[0][*i] != self.s[1][*j] {
+                    println!("DLogPoK verification failed: eq_pos mismatch");
+                    return false;
                 }
-            });
-            if mismatch {
-                return false;
             }
-        }
+        }        
 
         // get the challenge
         let mut c_bytes = [0u8; 31];
@@ -220,6 +218,7 @@ mod tests {
     use ark_std::{test_rng, Zero};
 
     type G1 = <Bn254 as Pairing>::G1;
+    type G1A = <Bn254 as Pairing>::G1Affine;
     type F = <Bn254 as Pairing>::ScalarField;
 
     #[test]
@@ -242,7 +241,7 @@ mod tests {
             &[y, y],
             &[bases.clone(), bases.clone()],
             &[scalars.clone(), scalars.clone()],
-            Some(vec![(0, 1), (1, 1)]),
+            None
         );
 
         // verify with the wrong bases
@@ -251,7 +250,7 @@ mod tests {
             Some(context),
             &[wrong_bases.clone(), wrong_bases.clone()],
             &[y, y],
-            Some(vec![(0, 1), (1, 1)]),
+            None
         );
         assert!(!wrong_bases_result, "Verification should fail with the wrong bases");
 
@@ -261,7 +260,7 @@ mod tests {
             Some(wrong_context),
             &[bases.clone(), bases.clone()],
             &[y, y],
-            Some(vec![(0, 1), (1, 1)]),
+            None
         );
         assert!(!wrong_context_result, "Verification should fail with the wrong context data");
 
@@ -270,9 +269,71 @@ mod tests {
             Some(context),
             &[bases.clone(), bases.clone()],
             &[y, y],
-            Some(vec![(0, 1), (1, 1)]),
+            None
         );
 
         assert!(result);
+    }
+
+    #[test]
+    fn test_dleq() {
+        let num_terms = 10;
+        let rng = &mut test_rng();
+        let mut bases : Vec<G1A> = vec![];
+        let mut scalars1 = vec![F::zero(); num_terms];
+        let mut scalars2 = vec![F::zero(); num_terms];
+        for i in 0..num_terms {
+            bases.push(G1::rand(rng).into());
+            scalars1[i] = F::rand(rng);
+            scalars2[i] = F::rand(rng);
+        }
+
+        // Equal scalars vectors, expect success
+        let eq_pos = vec![(0,0)];
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos));
+        let eq_pos = vec![(0,0), (1,1)];
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos));        
+        let eq_pos = vec![(2,2), (1,1), (num_terms-1, num_terms-1)];
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos)); 
+        
+        // Equal scalars in different positions, expect success
+        let mut scalars_rev = scalars1.clone();
+        scalars_rev.reverse();
+        let eq_pos = vec![(0,num_terms-1)];
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars_rev, &eq_pos));
+        let eq_pos = vec![(3,num_terms-4), (0,num_terms-1)];
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars_rev, &eq_pos));
+
+        // Mix of matching and mismatching, expect failure
+        let eq_pos = vec![(2,2), (1,3), (num_terms-1, num_terms-1)];
+        assert!(!run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos)); 
+
+        // All different scalars, no equal positions, expect failure
+        let eq_pos = vec![(0,0)];
+        assert!(!run_dleq_test(&bases, &bases, &scalars1, &scalars2, &eq_pos));
+        
+    }    
+
+    fn run_dleq_test(bases1 : &Vec<G1A>, bases2 : &Vec<G1A>, scalars1: &Vec<F>, scalars2:  &Vec<F>, eq_pos: &[(usize, usize)]) -> bool
+    {
+        let y1 = msm_select(bases1, scalars1);
+        let y2 = msm_select(bases2, scalars2);
+        let bases1_proj : Vec<G1> = bases1.iter().map(|x| (*x).into()).collect();
+        let bases2_proj : Vec<G1> = bases2.iter().map(|x| (*x).into()).collect();
+        
+        let pok = DLogPoK::<G1>::prove(
+            None,
+            &[y1, y2],
+            &[bases1_proj.clone(), bases2_proj.clone()],
+            &[scalars1.clone(), scalars2.clone()],
+            Some(eq_pos.to_vec())
+        );
+
+        pok.verify(
+            None,
+            &[bases1_proj, bases2_proj],
+            &[y1, y2],
+            Some(eq_pos.to_vec())
+        )
     }
 }

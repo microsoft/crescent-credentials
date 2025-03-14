@@ -34,6 +34,7 @@ if [ ! -f ${INPUTS_DIR}/config.json ]; then
     exit -1 
 fi
 
+# Determine the credential type, JWT or mDL
 CREDTYPE_REGEX="\"credtype\": \"([a-z]+)\""
 if [[ `cat ${INPUTS_DIR}/config.json` =~ $CREDTYPE_REGEX ]]; then
     CREDTYPE="${BASH_REMATCH[1]}"
@@ -55,6 +56,19 @@ if [ -f "${CIRCOM_SRC_DIR}/circomlib" ]; then
     cmd //c "mklink /J ${CIRCOM_SRC_DIR##*/}\circomlib circuits\circomlib"
 fi
 
+# Determine if the credential should be device bound
+DEVICE_BOUND_REGEX="\"device_bound\": ([a-z]+)"
+if [[ `cat ${INPUTS_DIR}/config.json` =~ $DEVICE_BOUND_REGEX ]]; then
+    if [ "${BASH_REMATCH[1]}" = "true" ]; then  
+        DEVICE_BOUND=1 
+    else
+        DEVICE_BOUND=0
+    fi
+else
+    DEVICE_BOUND=0
+fi
+echo "Credential is device bound: $DEVICE_BOUND"
+
 # Create the output directory if not there.
 mkdir $OUTPUTS_DIR 2>/dev/null || true
 mkdir $CIRCOM_DIR 2>/dev/null  || true
@@ -71,7 +85,15 @@ if [ ${CREDTYPE} == 'jwt' ] && ([ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${IN
         echo "Creating sample keys and token for algorithm $ALG"
     fi
     python3 scripts/jwk_gen.py ${ALG} ${INPUTS_DIR}/issuer.prv ${INPUTS_DIR}/issuer.pub
-    python3 scripts/jwt_sign.py ${INPUTS_DIR}/claims.json ${INPUTS_DIR}/issuer.prv  ${INPUTS_DIR}/token.jwt
+
+    if [ $DEVICE_BOUND ]; then
+        echo "Creating device public key"
+        python3 scripts/jwk_gen.py ES256 ${INPUTS_DIR}/device.prv ${INPUTS_DIR}/device.pub
+        python3 scripts/jwt_sign.py ${INPUTS_DIR}/claims.json ${INPUTS_DIR}/issuer.prv  ${INPUTS_DIR}/token.jwt ${INPUTS_DIR}/device.pub
+    else
+        python3 scripts/jwt_sign.py ${INPUTS_DIR}/claims.json ${INPUTS_DIR}/issuer.prv  ${INPUTS_DIR}/token.jwt
+    fi
+
 fi
 
 # Check that circomlib is present
@@ -134,6 +156,8 @@ CONFIG_FILE=${INPUTS_DIR}/config.json
 TOKEN_FILE=${INPUTS_DIR}/token.jwt
 ISSUER_KEY_FILE=${INPUTS_DIR}/issuer.pub
 PROOF_SPEC_FILE=${INPUTS_DIR}/proof_spec.json
+DEVICE_PUB_FILE=${INPUTS_DIR}/device.pub
+DEVICE_PRV_FILE=${INPUTS_DIR}/device.prv
 
 rm -rf ${COPY_DEST}
 mkdir -p ${COPY_DEST}
@@ -146,6 +170,8 @@ cp ${ISSUER_KEY_FILE} ${COPY_DEST}/
 if [ ${CREDTYPE} == 'jwt' ]; then
     cp ${TOKEN_FILE} ${COPY_DEST}/
     cp ${PROOF_SPEC_FILE} ${COPY_DEST}/ || true     # Optional file
+    cp ${DEVICE_PUB_FILE} ${COPY_DEST}/ || true     # Optional file
+    cp ${DEVICE_PRV_FILE} ${COPY_DEST}/ || true     # Optional file
 fi
 
 if [ ${CREDTYPE} == 'mdl' ]; then 

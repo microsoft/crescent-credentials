@@ -22,14 +22,15 @@ import sys, os, json, datetime
 def usage():
     print("Python3 script to create a JWT")
     print("Usage:")
-    print("\t./" + os.path.basename(sys.argv[0]) + " <claims.file.json> <issuer private key> <output JWT>")
+    print("\t./" + os.path.basename(sys.argv[0]) + " <claims.file.json> <issuer private key> <output JWT> <optional device public key>")
     print("Example:")
     print("\tpython3 " + os.path.basename(sys.argv[0]) + "claims.json issuer.prv token.jwt")
     print("will sign the json in claims.json with the issuer private key in issuer.prv and output the JWT in token.jwt")
+    print("If a device public key is provided, it will be added to the claims.")
 
 ### Main ###
 
-if len(sys.argv) != 4 : 
+if len(sys.argv) != 4 and len(sys.argv) != 5 : 
     usage()
     sys.exit(-1)
 
@@ -61,6 +62,29 @@ print("Using signature algorithm {} for new token\n".format(new_alg))
 # load the claims from a file
 with open(sys.argv[1], 'r') as file:
     claims = json.load(file)
+
+# If a device public key was provided, add it to the claims, in the format expected by 
+# Crescent.  This is currently a custom format, but ideally would be a 'cnf' claim
+# https://datatracker.ietf.org/doc/html/rfc7800#section-3.2
+if sys.argv[4] is not None: 
+    print("Adding device public key to claims")
+    with open(sys.argv[4], "rb") as f:
+        device_key_bytes = f.read()
+
+    device_key = jwk.JWK.from_pem(device_key_bytes, password=None)    
+    if device_key.get('kty') != "EC" or device_key.get('crv') != "P-256":
+        print("device_key kty: {}".format(device_key.get('kty')))
+        print("device_key crv: {}".format(device_key.get('crv')))
+        print("Error: device key must be of type EC on curve P-256")
+        sys.exit(-1)
+
+    pk_x = device_key.get('x')
+    pk_x_int = int.from_bytes(base64url_decode(pk_x), byteorder='big')
+    device_key_0 = pk_x_int & ((1 << 128) - 1)
+    device_key_1 = pk_x_int >> 128
+    assert( device_key_0 + (1 << 128) * device_key_1 == pk_x_int)
+    claims['device_key_0'] = device_key_0
+    claims['device_key_1'] = device_key_1
 
 # Create the new token with the claims, and one year lifetime
 short_kid = issuer_key.get('kid')
