@@ -33,23 +33,6 @@ cd creds
 cargo test --release
 ```
 
-### Enabling symlinks with git on Windows
-
-This project uses symlinks to share directories within the project. On Windows, symlinks require administrator privileges. Git can be configured to create project symlinks when cloning the repository.
-To enable symlinks with git, run the following command:
-
-```bash
-git config --global core.symlinks true
-```
-
-If you have already cloned the repository, you can delete and re-clone the repository for the symlinks to be created or manually create the link by running the following CMD command in the project root directory:
-
-```cmd
-mklink /J circuit_setup\circuits-mdl\circomlib circuit_setup\circuits\circomlib
-```
-
-Verify `circuit_setup\circuits-mdl\circomlib` is now a directory.
-
 ## Running the demo steps from the command line
 
 There is a command line tool that can be used to run the individual parts of the demo separately.  This clearly separates the roles of prover and verifier, and shows what parameters are required by each.  The filesystem is used to store data between steps, and also to "communicate" show proofs from prover to verifier.
