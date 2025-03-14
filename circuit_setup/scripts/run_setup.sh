@@ -67,9 +67,9 @@ if [ ${CREDTYPE} == 'jwt' ] && ([ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${IN
     fi # TODO: what if alg is not found?
     python3 scripts/jwk_gen.py ${ALG} ${INPUTS_DIR}/issuer.prv ${INPUTS_DIR}/issuer.pub
     python3 scripts/jwt_sign.py ${INPUTS_DIR}/claims.json ${INPUTS_DIR}/issuer.prv  ${INPUTS_DIR}/token.jwt
-elif [ ${CREDTYPE} == 'mdl' ] && ([ ! -f ${INPUTS_DIR}/device_private_key.pem ] || [ ! -f ${INPUTS_DIR}/issuer_key.pem ] || [ ! -f ${INPUTS_DIR}/issuer_certs.pem ] || [ ! -f ${INPUTS_DIR}/mdl.cbor ] || [ ! -f ${OUTPUTS_DIR}/issuer.pub ]); then
+elif [ ${CREDTYPE} == 'mdl' ] && ([ ! -f ${INPUTS_DIR}/device_private_key.pem ] || [ ! -f ${INPUTS_DIR}/issuer.priv ] || [ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${INPUTS_DIR}/issuer_certs.pem ] || [ ! -f ${INPUTS_DIR}/mdl.cbor ]); then
     echo "Creating sample issuer keys and mDL" # delete me
-    rm ${INPUTS_DIR}/device_private_key.pem ${INPUTS_DIR}/issuer_key.pem ${INPUTS_DIR}/issuer_certs.pem ${INPUTS_DIR}/mdl.org ${OUTPUTS_DIR}/issuer.pub 2>/dev/null && true         
+    rm ${INPUTS_DIR}/device_private_key.pem ${INPUTS_DIR}/issuer.priv ${INPUTS_DIR}/issuer.pub ${INPUTS_DIR}/issuer_certs.pem ${INPUTS_DIR}/mdl.org ${OUTPUTS_DIR}/issuer.pub 2>/dev/null && true         
 
     if [[ `cat ${INPUTS_DIR}/config.json` =~ $ALG_REGEX ]]; then
         ALG="${BASH_REMATCH[1]}"
@@ -129,7 +129,7 @@ if [ ${CREDTYPE} == 'mdl' ]; then
     CONFIG_FILE=${INPUTS_DIR}/config.json
     CLAIMS_FILE=${INPUTS_DIR}/claims.json
     DEVICE_PRIV_KEY_FILE=${INPUTS_DIR}/device_private_key.pem
-    ISSUER_PRIV_KEY_FILE=${INPUTS_DIR}/issuer_key.pem
+    ISSUER_PRIV_KEY_FILE=${INPUTS_DIR}/issuer.priv
     ISSUER_CERTS_FILE=${INPUTS_DIR}/issuer_certs.pem
     ISSUER_KEY_FILE=${OUTPUTS_DIR}/issuer.pub
     
@@ -137,18 +137,23 @@ if [ ${CREDTYPE} == 'mdl' ]; then
     echo "Current dir: `pwd`"
 
     # generate the mDL
-    cargo run --release --bin mdl-gen -- --claims ${CLAIMS_FILE} --device_priv_key ${DEVICE_PRIV_KEY_FILE} --issuer_private_key ${ISSUER_PRIV_KEY_FILE} --issuer_x5chain ${ISSUER_CERTS_FILE} --output ${MDL_FILE} ${CONFIG_FILE} 2>> ${LOG_FILE}
+    cargo run --release --bin mdl-gen -- --claims ${CLAIMS_FILE} --device_priv_key ${DEVICE_PRIV_KEY_FILE} --issuer_private_key ${ISSUER_PRIV_KEY_FILE} --issuer_x5chain ${ISSUER_CERTS_FILE} --output ${MDL_FILE} 2>> ${LOG_FILE}
     if [ $? -ne 0 ]; then
         echo "Error running prepare_mdl_prover"
         exit 1
     fi
     
     # generate the prover inputs
-    cargo run --release --bin prepare-prover-input --config ${CONFIG_FILE} --mdl ${MDL_FILE} --prover_inputs ${PROVER_INPUTS_FILE}
-    
+    cargo run --release --bin prepare-prover-input -- --config ${CONFIG_FILE} --mdl ${MDL_FILE} --prover_inputs ${PROVER_INPUTS_FILE} 2>> ${LOG_FILE}
+    if [ $? -ne 0 ]; then
+        echo "Error running prepare_prover_input"
+        exit 1
+    fi
+
     cd ${ROOT_DIR}
 fi
 
+echo "Copying files to ${COPY_DEST}..."
 
 # Copy files needed for zksetup, prove, etc..
 R1CS_FILE=${OUTPUTS_DIR}/main_c.r1cs
