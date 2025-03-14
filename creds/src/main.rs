@@ -218,7 +218,7 @@ pub fn run_show(
         let device_signature = 
         if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
             let device = TestDevice::new_from_file(&paths.device_prv_pem);
-            Some(device.sign(&proof_spec.presentation_message.as_ref().unwrap()))
+            Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
         } else {
             None
         };

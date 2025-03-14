@@ -43,14 +43,14 @@ impl TestDevice {
     pub fn new_with_keygen() -> Self {
         let mut rng = thread_rng();
         let keypair = SigningKey::random(&mut rng);
-        let public_key = keypair.verifying_key().clone();
+        let public_key = *keypair.verifying_key();
         Self {keypair, public_key}
     }
     pub fn new_from_file(secret_key_file : &str) -> Self {
         let secret_key_pem  = std::fs::read_to_string(secret_key_file).unwrap();
         let secret_key = secret_key_pem.parse::<p256::SecretKey>().unwrap();
         let keypair = SigningKey::from_bytes(&secret_key.to_bytes()).unwrap();
-        let public_key = keypair.verifying_key().clone();
+        let public_key = *keypair.verifying_key();
         
         Self{keypair, public_key}
     }
@@ -171,7 +171,7 @@ impl<G: Group> DeviceProof<G> {
         //  {(m, r0, r1) : com1_orig = G1^m H1^r1  AND  com1 = G0^m H0^r0}
         let bases1 = vec![bases_com1[0].into(), bases_com1[1].into()];
         let bases2 = vec![bases[0].into(), bases[1].into()];
-        let pi0_valid = DLogPoK::verify(&proof.pi0, Some(CONTEXT_PI0), &[bases1, bases2], &[com1.clone().into(), proof.com1], Some(vec![(0,0)]));
+        let pi0_valid = DLogPoK::verify(&proof.pi0, Some(CONTEXT_PI0), &[bases1, bases2], &[(*com1).into(), proof.com1], Some(vec![(0,0)]));
         if !pi0_valid {
             println!("Failed to verify device proof, proof.pi0 did not verify");
             return false;
@@ -246,7 +246,7 @@ mod tests {
     fn create_mock_commitments(q_x : &BigUint) -> (PedersenOpening<G1>, PedersenOpening<G1>) 
     {
         // Mock up the commitment inputs to the device proof
-        let (q0, q1) = ECDSAProof::split_public_key_x(&q_x);
+        let (q0, q1) = ECDSAProof::split_public_key_x(q_x);
         let q0 = biguint_to_scalar::<F>(&q0);
         let q1 = biguint_to_scalar::<F>(&q1);
 
@@ -273,7 +273,7 @@ mod tests {
         let (com0, com1) = create_mock_commitments(&q_x);
         let proof = DeviceProof::prove(&com0, &com1, &sig, &q_x, &q_y);
         let valid = DeviceProof::verify(&proof, &com0.c.into(), &com1.c.into(), &com0.bases, &com1.bases);
-        assert_eq!(valid, true); 
+        assert!(valid); 
 
         println!("\nTest with bad signature, expect proof generation to fail");
         let sig = ECDSASig{ r: r.clone()-BigUint::from(1u32), s: s.clone(), digest: digest.clone() };
@@ -287,17 +287,17 @@ mod tests {
         let sig = ECDSASig{ r: r.clone(), s : s.clone(), digest : digest.clone() };
         let (com0, com1) = create_mock_commitments(&q_x);
         let mut proof = DeviceProof::prove(&com0, &com1, &sig, &q_x, &q_y);
-        proof.digest[0] = proof.digest[0] ^ 0x01;
+        proof.digest[0] ^= 0x01;
         let valid = DeviceProof::verify(&proof, &com0.c.into(), &com1.c.into(), &com0.bases, &com1.bases);
-        assert_eq!(valid, false);        
+        assert!(!valid);        
 
         println!("\nTest with bad ECDSA proof, expect proof verification to fail");
         let sig = ECDSASig{ r: r.clone(), s : s.clone(), digest : digest.clone() };
         let (com0, com1) = create_mock_commitments(&q_x);
         let mut proof = DeviceProof::prove(&com0, &com1, &sig, &q_x, &q_y);
-        proof.pi2[100] = proof.pi2[100] ^ 0x01;
+        proof.pi2[100] ^= 0x01;
         let valid = DeviceProof::verify(&proof, &com0.c.into(), &com1.c.into(), &com0.bases, &com1.bases);
-        assert_eq!(valid, false);          
+        assert!(!valid);          
     }
 
     #[test]
@@ -315,7 +315,7 @@ mod tests {
         let t = start_timer!(||"DeviceProof::verify");
         let valid = DeviceProof::verify(&proof, &com0.c.into(), &com1.c.into(), &com0.bases, &com1.bases);
         end_timer!(t);
-        assert_eq!(valid, true); 
+        assert!(valid); 
     }
 
 }

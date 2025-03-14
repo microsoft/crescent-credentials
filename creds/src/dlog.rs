@@ -290,53 +290,50 @@ mod tests {
 
         // Equal scalars vectors, expect success
         let eq_pos = vec![(0,0)];
-        assert_eq!(true, run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos));
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos));
         let eq_pos = vec![(0,0), (1,1)];
-        assert_eq!(true, run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos));        
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos));        
         let eq_pos = vec![(2,2), (1,1), (num_terms-1, num_terms-1)];
-        assert_eq!(true, run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos)); 
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos)); 
         
         // Equal scalars in different positions, expect success
         let mut scalars_rev = scalars1.clone();
         scalars_rev.reverse();
         let eq_pos = vec![(0,num_terms-1)];
-        assert_eq!(true, run_dleq_test(&bases, &bases, &scalars1, &scalars_rev, &eq_pos));
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars_rev, &eq_pos));
         let eq_pos = vec![(3,num_terms-4), (0,num_terms-1)];
-        assert_eq!(true, run_dleq_test(&bases, &bases, &scalars1, &scalars_rev, &eq_pos));
+        assert!(run_dleq_test(&bases, &bases, &scalars1, &scalars_rev, &eq_pos));
 
         // Mix of matching and mismatching, expect failure
         let eq_pos = vec![(2,2), (1,3), (num_terms-1, num_terms-1)];
-        assert_eq!(false, run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos)); 
+        assert!(!run_dleq_test(&bases, &bases, &scalars1, &scalars1, &eq_pos)); 
 
         // All different scalars, no equal positions, expect failure
         let eq_pos = vec![(0,0)];
-        assert_eq!(false, run_dleq_test(&bases, &bases, &scalars1, &scalars2, &eq_pos));
+        assert!(!run_dleq_test(&bases, &bases, &scalars1, &scalars2, &eq_pos));
         
     }    
 
-    fn run_dleq_test(bases1 : &Vec<G1A>, bases2 : &Vec<G1A>, scalars1: &Vec<F>, scalars2:  &Vec<F>, eq_pos: &Vec<(usize, usize)>) -> bool
+    fn run_dleq_test(bases1 : &Vec<G1A>, bases2 : &Vec<G1A>, scalars1: &Vec<F>, scalars2:  &Vec<F>, eq_pos: &[(usize, usize)]) -> bool
     {
         let y1 = msm_select(bases1, scalars1);
         let y2 = msm_select(bases2, scalars2);
-        let bases1_proj : Vec<G1> = bases1.iter().map(|x| x.clone().into()).collect();
-        let bases2_proj : Vec<G1> = bases2.iter().map(|x| x.clone().into()).collect();
+        let bases1_proj : Vec<G1> = bases1.iter().map(|x| (*x).into()).collect();
+        let bases2_proj : Vec<G1> = bases2.iter().map(|x| (*x).into()).collect();
         
         let pok = DLogPoK::<G1>::prove(
             None,
             &[y1, y2],
             &[bases1_proj.clone(), bases2_proj.clone()],
             &[scalars1.clone(), scalars2.clone()],
-            Some(eq_pos.clone())
+            Some(eq_pos.to_vec())
         );
 
-        // successful verification
-        let result = pok.verify(
+        pok.verify(
             None,
             &[bases1_proj, bases2_proj],
             &[y1, y2],
-            Some(eq_pos.clone())
-        );
-
-        result
+            Some(eq_pos.to_vec())
+        )
     }
 }

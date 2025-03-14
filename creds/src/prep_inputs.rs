@@ -596,11 +596,7 @@ pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &st
         }
     }
     let presentation_message_bytes = proof_spec.presentation_message.clone();
-
-    let device_bound = match proof_spec.device_bound {
-        Some(b) => b,
-        None => false
-    };
+    let device_bound = proof_spec.device_bound.unwrap_or(false);
 
     if device_bound && proof_spec.presentation_message.is_none() {
         return_error!("Proof spec indicates the credential is device bound, but is missing the presentation message");

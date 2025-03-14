@@ -583,11 +583,11 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     if proof_spec.device_bound {
         let device_key_0_pos = io_locations.get_io_location("device_key_0_value").unwrap();
         let device_key_1_pos = io_locations.get_io_location("device_key_1_value").unwrap();        
-        let com0 = show_proof.show_groth16.commited_inputs[1].clone();
-        let com1 = show_proof.show_groth16.commited_inputs[2].clone();
+        let com0 = show_proof.show_groth16.commited_inputs[1];
+        let com1 = show_proof.show_groth16.commited_inputs[2];
         let bases0 = vec![vp.pvk.vk.gamma_abc_g1[device_key_0_pos], vp.pvk.vk.delta_g1];
         let bases1 = vec![vp.pvk.vk.gamma_abc_g1[device_key_1_pos], vp.pvk.vk.delta_g1];
-        let ret = DeviceProof::verify(&show_proof.device_proof.as_ref().unwrap(), &com0.into(), &com1.into(), &bases0, &bases1);
+        let ret = DeviceProof::verify(show_proof.device_proof.as_ref().unwrap(), &com0.into(), &com1.into(), &bases0, &bases1);
         if !ret {
             println!("DeviceProof.verify failed");
             return (false, "".to_string());            
@@ -795,7 +795,7 @@ mod tests {
             let device_signature = 
             if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
                 let device = TestDevice::new_from_file(&paths.device_prv_pem);
-                Some(device.sign(&proof_spec.presentation_message.as_ref().unwrap()))
+                Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
             } else {
                 None
             };
