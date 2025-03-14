@@ -82,6 +82,20 @@ The `reveal_digest` option is used for values that may be larger than 31 bytes; 
 
 As example ways to experiment with selective disclosure, try removing `aud` from the list of revealed attributes, or adding `given_name` to the list of revealed attributes in the proof specification file. 
 
+### Device-Bound Credentials
+The example `rs256-db` demonstrates a JWT credential that is *device bound*.  This means that the JWT encodes the public key of an ECDSA signing key, where the private key is stored by a device (such as a hardware security module), and the device exposes only a signing API. 
+When the credential is used, the verifier expects the holder to demonstrate possession of the device key, by signing a challenge.  During circuit setup, the file `circuit_setup/inputs/rs256-db/config.json` has the line `"device_bound": true`, which indicates the sample credential should be generated with a device key.  In the demo, a fresh ECDSA key pair is generated in software, no special hardware is required.
+
+For show proofs, The file `creds/test-vectors/rs256-db/proof_spec.json` contains 
+```
+{
+    "revealed" : ["family_name", "tenant_ctry", "auth_time", "aud"],
+    "device_bound" : true, 
+    "presentation_message" : [1, 2, 3, 4]
+}
+```
+which specifies a subset of attributes to disclose, as in the `rs256-sd` example.  The `device-bound` flag is also set here, and the `presentation_message` is a byte string that that encodes a challenge from the verifier. The `presentation_message` is sent to the device, then the show proof creates a proof of knowledge of the device signature (unlinkably). 
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
