@@ -716,7 +716,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prep_inputs::{parse_config, prepare_prover_inputs};
+    use crate::{device::TestDevice, prep_inputs::{parse_config, prepare_prover_inputs}};
     use serial_test::serial;
 
     const MDL_AGE_GT : usize = 18; 
@@ -726,8 +726,13 @@ mod tests {
 
     #[test]
     #[serial]
-    pub fn end_to_end_test_rs256() {
-        run_test("rs256", "jwt");
+    pub fn end_to_end_test_rs256_sd() {
+        run_test("rs256-sd", "jwt");
+    }
+    #[test]
+    #[serial]
+    pub fn end_to_end_test_rs256_db() {
+        run_test("rs256-db", "jwt");
     }
 
     #[test]
@@ -752,20 +757,20 @@ mod tests {
         let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
         let config = parse_config(&config_str).expect("Failed to parse config");
     
-        let prover_inputs = 
+        let (prover_inputs, prover_aux) = 
         if cred_type == "mdl" {
-            GenericInputsJSON::new(&paths.mdl_prover_inputs)
+            (GenericInputsJSON::new(&paths.mdl_prover_inputs), None)
         }
         else {
             let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
             let issuer_pem = fs::read_to_string(&paths.issuer_pem).unwrap_or_else(|_| panic!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
             let device_pub_pem = fs::read_to_string(&paths.device_pub_pem).ok();
-            let (prover_inputs_json, _prover_aux_json, _public_ios_json) = 
+            let (prover_inputs_json, prover_aux_json, _public_ios_json) = 
                 prepare_prover_inputs(&config, &jwt, &issuer_pem, device_pub_pem.as_deref()).expect("Failed to prepare prover inputs");    
-            GenericInputsJSON{prover_inputs: prover_inputs_json}
+            (GenericInputsJSON{prover_inputs: prover_inputs_json}, Some(json!(prover_aux_json).to_string()))
         };
             
-        let client_state = create_client_state(&paths, &prover_inputs, None, cred_type).unwrap();
+        let client_state = create_client_state(&paths, &prover_inputs, prover_aux.as_ref(), cred_type).unwrap();
         // We read and write the client state and proof to disk for testing, to be consistent with the command-line tool
         write_to_file(&client_state, &paths.client_state);
         let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
@@ -777,9 +782,20 @@ mod tests {
         let show_proof = if client_state.credtype == "mdl" {
             create_show_proof_mdl(&mut client_state, &range_pk, Some(pm.as_bytes()), &io_locations, MDL_AGE_GT)  
         } else {
-            let mut proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
+            assert!(PathBuf::from(&paths.proof_spec).exists());
+            let ps_raw = fs::read_to_string(&paths.proof_spec).expect("Proof spec file exists, but failed while reading it");
+            let mut proof_spec : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
             proof_spec.presentation_message = Some(pm.as_bytes().to_vec());
-            let proof = create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, None);
+
+            let device_signature = 
+            if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
+                let device = TestDevice::new_from_file(&paths.device_prv_pem);
+                Some(device.sign(&proof_spec.presentation_message.as_ref().unwrap()))
+            } else {
+                None
+            };
+
+            let proof = create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature);
             assert!(proof.is_ok());
             proof.unwrap()
         };
@@ -799,7 +815,9 @@ mod tests {
         let (verify_result, _data) = if show_proof.show_range2.is_some() {
             verify_show_mdl(&vp, &show_proof, Some(pm.as_bytes()), MDL_AGE_GT)
         } else {
-            let mut proof_spec: ProofSpec = serde_json::from_str(DEFAULT_PROOF_SPEC).unwrap();
+            assert!(PathBuf::from(&paths.proof_spec).exists());
+            let ps_raw = fs::read_to_string(&paths.proof_spec).expect("Proof spec file exists, but failed while reading it");
+            let mut proof_spec : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
             proof_spec.presentation_message = Some(pm.as_bytes().to_vec());
             verify_show(&vp, &show_proof, &proof_spec)
         };

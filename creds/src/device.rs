@@ -14,9 +14,9 @@ use ark_serialize::CanonicalDeserialize;
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use p256::ecdsa::signature::hazmat::PrehashSigner;
 
-const ADAPTER_CONTEXT_E : &[u8] = "computing challenge for adapter".as_bytes();
-const ADAPTER_CONTEXT_PI0 : &[u8] = "creating sigma proof pi0 for adapter".as_bytes();
-const ADAPTER_CONTEXT_PI1 : &[u8] = "creating sigma proof pi1 for adapter".as_bytes();
+const CONTEXT_E : &[u8] = "computing challenge for linking proof".as_bytes();
+const CONTEXT_PI0 : &[u8] = "creating sigma proof pi0 for linking proof".as_bytes();
+const CONTEXT_PI1 : &[u8] = "creating sigma proof pi1 for linking proof".as_bytes();
 
 pub struct ECDSASig {
     pub r: BigUint, 
@@ -118,10 +118,10 @@ impl<G: Group> DeviceProof<G> {
         let bases2 = vec![com0.bases[0].into(), com0.bases[1].into()];
         let scalars1 = vec![com1_orig.m, com1_orig.r];
         let scalars2 = vec![com1.m, com1.r];
-        let pi0 = DLogPoK::prove(Some(ADAPTER_CONTEXT_PI0), &[com1_orig.c, com1.c], &[bases1, bases2], &[scalars1, scalars2], Some(vec![(0,0)]));
+        let pi0 = DLogPoK::prove(Some(CONTEXT_PI0), &[com1_orig.c, com1.c], &[bases1, bases2], &[scalars1, scalars2], Some(vec![(0,0)]));
 
         let mut sha2 = Sha256::new();
-        sha2.update(ADAPTER_CONTEXT_E);
+        sha2.update(CONTEXT_E);
         sha2.update(pi0.c.to_string());
         sha2.update(com0.c.to_string());
         sha2.update(com1.c.to_string());
@@ -154,7 +154,7 @@ impl<G: Group> DeviceProof<G> {
         let lhs2 = comz.c;
         let bases2 : Vec<G> = vec![g, h];
         let scalars2 = vec![z, comz.r];
-        let pi1 = DLogPoK::prove(Some(ADAPTER_CONTEXT_PI1), &[lhs1, lhs2], &[bases1, bases2], &[scalars1, scalars2], None);
+        let pi1 = DLogPoK::prove(Some(CONTEXT_PI1), &[lhs1, lhs2], &[bases1, bases2], &[scalars1, scalars2], None);
 
         // Call the snark part
         let (r_x, r_y, pi2) = ECDSAProof::prove(&params, pubkey_x, pubkey_y, &sig.r, &sig.s, &sig.digest, &h_Q, &scalar_to_biguint(&m), e1_bytes, e2_bytes, &scalar_to_biguint(&z), false);
@@ -162,7 +162,6 @@ impl<G: Group> DeviceProof<G> {
         DeviceProof { r_x, r_y, digest: sig.digest.clone(), com1: com1.c, comz: comz.c, h_Q, m, pi0, pi1, pi2 }     
     }
 
-    #[allow(dead_code)] // TODO: verify is only used in unit tests for now
     pub fn verify(proof: &DeviceProof<G>, com0: &G::Affine, com1: &G::Affine, bases: &[G::Affine], bases_com1: &[G::Affine]) -> bool
         where 
             G: CurveGroup + VariableBaseMSM, 
@@ -172,7 +171,7 @@ impl<G: Group> DeviceProof<G> {
         //  {(m, r0, r1) : com1_orig = G1^m H1^r1  AND  com1 = G0^m H0^r0}
         let bases1 = vec![bases_com1[0].into(), bases_com1[1].into()];
         let bases2 = vec![bases[0].into(), bases[1].into()];
-        let pi0_valid = DLogPoK::verify(&proof.pi0, Some(ADAPTER_CONTEXT_PI0), &[bases1, bases2], &[com1.clone().into(), proof.com1], Some(vec![(0,0)]));
+        let pi0_valid = DLogPoK::verify(&proof.pi0, Some(CONTEXT_PI0), &[bases1, bases2], &[com1.clone().into(), proof.com1], Some(vec![(0,0)]));
         if !pi0_valid {
             println!("Failed to verify device proof, proof.pi0 did not verify");
             return false;
@@ -181,7 +180,7 @@ impl<G: Group> DeviceProof<G> {
 
         // Re-compute e1, e2
         let mut sha2 = Sha256::new();
-        sha2.update(ADAPTER_CONTEXT_E);
+        sha2.update(CONTEXT_E);
         sha2.update(proof.pi0.c.to_string());
         sha2.update(com0.to_string());
         sha2.update(com1.to_string());
@@ -203,7 +202,7 @@ impl<G: Group> DeviceProof<G> {
         let bases1 : Vec<G> = vec![h];
         let lhs2 = proof.comz;
         let bases2 : Vec<G> = vec![g, h];
-        let pi1_valid = proof.pi1.verify(Some(ADAPTER_CONTEXT_PI1), &[bases1, bases2], &[lhs1, lhs2], None);
+        let pi1_valid = proof.pi1.verify(Some(CONTEXT_PI1), &[bases1, bases2], &[lhs1, lhs2], None);
 
         if !pi1_valid {
             println!("Failed to verify device proof, proof.pi1 did not verify");

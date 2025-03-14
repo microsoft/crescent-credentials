@@ -15,7 +15,10 @@ use ark_serialize::Write;
 #[macro_export]
 macro_rules! return_error {
     ($msg:expr) => {
-        return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, $msg)))
+        {
+            println!("{}", $msg);
+            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, $msg)));
+        }
     };
 }
 
