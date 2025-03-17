@@ -230,7 +230,7 @@ pub(crate) fn find_value_digest_info(
                 info.value = item.as_ref().element_value.clone();
                 println!("value: {:?}", info.value);
                 info.id = item.as_ref().digest_id;
-                info.preimage = ByteStr::from(serde_cbor::to_vec(item).expect("unable to encode IssuerSigned as cbor bytes"));
+                info.preimage = ByteStr::from(isomdl::cbor::to_vec(item).expect("unable to encode IssuerSigned as cbor bytes"));
                 let mut hasher = Sha256::new();
                 hasher.update(&info.preimage);
                 let recomputed_value_digest = hasher.finalize().to_vec();
@@ -246,7 +246,7 @@ pub(crate) fn find_value_digest_info(
                     println!("Digest mismatch");
                     println!("Recomputed: {}", hex::encode(&recomputed_value_digest));
                     println!("Signed    : {}", hex::encode(&signed_value_digest));
-                    // panic!("Digest mismatch"); FIXME: this should not happen but currently it does when using our freshly generated mDL. Investigate...
+                    panic!("Digest mismatch");
                 } else {
                     println!("Digest: {}", hex::encode(&recomputed_value_digest));
                 }
