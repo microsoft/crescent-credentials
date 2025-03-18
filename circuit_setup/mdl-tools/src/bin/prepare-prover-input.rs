@@ -386,10 +386,9 @@ fn main() {
         std::process::exit(-1);
     }
 
-    let mut padded_m_extended = padded_m.clone();
-    while padded_m_extended.len() < config_max_cred_len {
-        padded_m_extended.push(0);
-    }
+    let mut padded_m_extended = Vec::with_capacity(config_max_cred_len);
+    padded_m_extended.extend_from_slice(&padded_m);
+    padded_m_extended.resize(config_max_cred_len, 0);
 
     let mut hasher = Sha256::new();
     hasher.update(&tbs_data_ints);
@@ -413,8 +412,7 @@ fn main() {
 
     // begin output of prover's inputs
     let mut prover_inputs = Map::new();
-    println!("prover_inputs: {:?}", padded_m);
-    prover_inputs.insert("message".to_string(), serde_json::json!(padded_m));
+    prover_inputs.insert("message".to_string(), serde_json::json!(padded_m_extended));
     prover_inputs.insert("valid_until_value".to_string(), serde_json::json!(valid_until_unix_timestamp));
     let valid_until_prefix_l = valid_until_prefix_pos / 2;
     prover_inputs.insert("valid_until_prefix_l".to_string(), valid_until_prefix_l.into());
@@ -471,7 +469,7 @@ fn main() {
     let y_limb = bytes_to_circom_limbs(issuer_key_y, CIRCOM_ES256_LIMB_BITS);
     prover_inputs.insert("pubkey_x".to_string(), serde_json::json!(x_limb));
     prover_inputs.insert("pubkey_y".to_string(), serde_json::json!(y_limb));
-    prover_inputs.insert("message_padded_bytes".to_string(),msg_len_after_sha2_padding.into());
+    prover_inputs.insert("message_padded_bytes".to_string(), msg_len_after_sha2_padding.into());
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
 
     // the python script defines a public_IOs and prover_aux_data dictionaries, but never write them out (FIXME) 
