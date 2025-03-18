@@ -126,8 +126,8 @@ def find_value_digest_info(mdoc, name):
         print("Digest: {}".format(binascii.hexlify(recomputed_value_digest).decode('utf-8')))
 
     # Now we need an encoded version of the digest, that we can match against the CBOR-encoded cred
-    # The format, for birth_date (number 19), is:
-    # 13     unsigned(19)
+    # The format is:
+    # unsigned(digestID)
     # 58 20  bytes(32)
     # (32-byte SHA-256 digest)
     cbored_digest = "{:02x}{}{}".format(element_digest_ids[name], "5820", binascii.hexlify(recomputed_value_digest).decode('utf-8'))
@@ -304,6 +304,7 @@ print_debug("number of SHA blocks to hash: " + str(msg_len_after_SHA2_padding //
 
 # Write out prover inputs, public IOs, prover aux data. Always create a file, even if they're empty
 
+# FIXME: public_IOs and prover_aux_data are not written to file
 if len(public_IOs.keys()) == 0:
     public_IOs["_placeholder"] = "empty file"
 if len(prover_aux_data.keys()) == 0:
