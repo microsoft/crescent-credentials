@@ -11,7 +11,6 @@ anyhow = "1.0"
 pem = "1.0"
 ecdsa = { version = "0.16.9", features = ["serde", "verifying", "pem"] }
 p256 = { version = "0.13.0", features = ["serde", "ecdh", "pem"] }
-p384 = { version = "0.13.0", features = ["serde", "ecdh", "pem"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
 sha2 = { version = "0.10.8", features = ["oid"] }
 elliptic-curve = "0.13.1"
@@ -24,5 +23,5 @@ num-bigint = "0.4"
 num-traits = "0.2"
 chrono = "0.4"
 
-# Pull isomdl directly from GitHub, main branch
-isomdl = { git = "https://github.com/spruceid/isomdl", branch = "main" }
+# Pull isomdl directly from our GitHub fork
+isomdl = { git = "https://github.com/christianpaquin/isomdl", branch = "crescent-mods" }
