@@ -21,6 +21,9 @@ A report describing Crescent is available on the IACR ePrint Archive.
 Christian Paquin, Guru-Vamsi Policharla and Greg Zaverucha   
 December 2024  
 
+Also check out the [blog post](https://christianpaquin.github.io/2024-12-19-crescent-creds.html)
+for an overview, a decription and video of the samples.
+
 ## Setting up
 
 To setup the library, see the instructions in [`/circuit_setup/README.md`](./circuit_setup/README.md);
