@@ -6,25 +6,26 @@ default-run = "crescent"
 
 [dependencies]
 ark-crypto-primitives = { version = "=0.4.0" }
-ark-ec = { version = "=0.4.1", default-features = false, features = [
+ark-ec = { version = "0.4.2", default-features = false, features = [
     "parallel",
 ] }
-ark-ff = { version = "=0.4.1", default-features = false, features = [
+ark-ff = { version = "0.4.1", default-features = false, features = [
     "parallel",
     "asm",
 ] }
-ark-std = { version = "=0.4.0", default-features = false, features = [
+ark-std = { version = "0.4.0", default-features = false, features = [
     "parallel",
 ] }
-ark-bn254 = { version = "=0.4.0" }
+ark-bn254 = { version = "0.4.0" }
 
-ark-poly = { version = "=0.4.1", default-features = false, features = [
+ark-poly = { version = "0.4.1", default-features = false, features = [
     "parallel",
 ] }
-ark-relations = { version = "=0.4.0", default-features = false }
-ark-serialize = { version = "=0.4.1", default-features = false }
+ark-relations = { version = "0.4.0", default-features = false }
+ark-serialize = { version = "0.4.1", default-features = false }
 
 merlin = { version = "3.0", default-features = false }
+hex = "0.4.3"
 
 # json parsing
 serde_json = {version = "1.0", features = ["preserve_order"]}
@@ -36,7 +37,10 @@ num-bigint = { version = "=0.4.3", default-features = false, features = [
 ] }
 num-traits = "0.2.14"
 
-rand = ">=0.8.5"
+# wasm
+wasm-bindgen = { version = "0.2", optional = true }
+
+rand = "~0.8.5"
 sha2 = "0.10.8"
 rayon = "1.7"
 structopt = "0.3"
@@ -46,7 +50,7 @@ jwt-simple = "0.12.10"
 chrono = "0.4"
 
 # Local dependencies
-ark-circom = { path = "../forks/circom-compat" }
+ark-circom = { path = "../forks/circom-compat", optional = true }
 ark-groth16 = { path = "../forks/groth16", default-features = false, features = [
     "parallel",
 ] }
@@ -54,17 +58,24 @@ ark-poly-commit = { path = "../forks/ark-poly-commit", default-features = false,
     "parallel",
 ] }
 
+# Device binding
+ecdsa-pop = {path="../ecdsa-pop"}
+p256 = { version = "0.13.2", features = ["ecdsa", "pem"]}
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 serial_test = "*"
 ark-bls12-381 = "0.4.0"
 
+
+
 [build-dependencies]
 cargo-patch = "0.3"
 
 [features]
 print-trace = ["ark-std/print-trace"]
+default = ["ark-circom"]  # Native builds are the default
+wasm = ["wasm-bindgen"]  # Wasm feature explicitly excludes ark-circom
 
 [[bench]]
 name = "proof_benchmark"
@@ -78,8 +89,9 @@ harness = false
 name = "ecc_bench"
 harness = false
 
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [profile.dev.package."*"]
-opt-level = 3               # optimize dependencies, even in dev builds
+#opt-level = 3               # optimize dependencies, even in dev builds
 debug-assertions = false    # We need this to work around a bug in Wasmer
-

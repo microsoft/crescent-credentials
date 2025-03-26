@@ -23,6 +23,10 @@ struct Opts {
     #[structopt(parse(from_os_str), long)]
     jwk: PathBuf,
 
+    /// The device public key (optional, for device-bound credentials)
+    #[structopt(parse(from_os_str), long)]
+    device_key: Option<PathBuf>,
+
     /// The prover's JWT token
     #[structopt(parse(from_os_str), long)]
     jwt: PathBuf,
@@ -72,8 +76,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("Claims are not a JSON object");
     }
 
+    // Load the device public key, if present
+    let device_key_pem = if opts.device_key.is_some() {
+        Some(fs::read_to_string(opts.device_key.unwrap())?)
+    } else {
+        None
+    };
+
     let (mut prover_inputs_json, mut prover_aux_json, mut public_ios_json) = 
-        prepare_prover_inputs(&config, &token_str, &issuer_pem)?;
+        prepare_prover_inputs(&config, &token_str, &issuer_pem, device_key_pem.as_deref())?;
 
     // Check if outpath is a directory and is writable
     if !opts.outpath.is_dir() {

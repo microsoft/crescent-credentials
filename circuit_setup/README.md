@@ -68,7 +68,6 @@ cd pyMDL-MDOC
 sed -i "s|i.replace(f'{_pkg_name}/', '')|i.replace(f'{_pkg_name}\\\\\\\\', '')|g" setup.py
 pip install .
 ```
-
 ## Sample JWT and mDL
 
 To work with Crescent, the prover and verifier both need the issuer's public key, and the prover needs a JWT.
@@ -98,6 +97,23 @@ as the setup steps of the ZK proof system to get the prover and verifier paramet
 Overall this is slow, but only needs to be run once for a given token issuer and proof specification.
 
 Once this script completes, all files required for showing and verifying proofs will have copied to `creds/test-vectors/rs256`.
+
+## Enabling symlinks with git on Windows
+
+This project uses symlinks to share directories within the project. On Windows, symlinks require administrator privileges. Git can be configured to create project symlinks when cloning the repository.
+To enable symlinks with git, run the following command:
+
+```bash
+git config --global core.symlinks true
+```
+
+If you have already cloned the repository, you can delete and re-clone the repository for the symlinks to be created or manually create the link by running the following CMD command in the project root directory:
+
+```cmd
+mklink /J circuit_setup\circuits-mdl\circomlib circuit_setup\circuits\circomlib
+```
+
+Verify `circuit_setup\circuits-mdl\circomlib` is now a directory.
 
 # Troubleshooting
 

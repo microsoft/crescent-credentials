@@ -311,7 +311,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     let disclosed_info;
     if cred_type == "jwt" {
         let mut ps : ProofSpec = serde_json::from_str(&JWT_DEMO_PROOF_SPEC).unwrap();    
-        ps.presentation_message = crescent::utils::string_to_byte_vec(Some(challenge));        
+        ps.presentation_message = Some(challenge);       
         let (valid, info) = verify_show(&vp, &show_proof, &ps);
         is_valid = valid;
         disclosed_info = Some(info);

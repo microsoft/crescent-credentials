@@ -21,6 +21,9 @@ A report describing Crescent is available on the IACR ePrint Archive.
 Christian Paquin, Guru-Vamsi Policharla and Greg Zaverucha   
 December 2024  
 
+Also check out the [blog post](https://christianpaquin.github.io/2024-12-19-crescent-creds.html)
+for an overview, a decription and video of the samples.
+
 ## Setting up
 
 To setup the library, see the instructions in [`/circuit_setup/README.md`](./circuit_setup/README.md);
@@ -32,23 +35,6 @@ To check that the library has been setup correctly, run
 cd creds
 cargo test --release
 ```
-
-### Enabling symlinks with git on Windows
-
-This project uses symlinks to share directories within the project. On Windows, symlinks require administrator privileges. Git can be configured to create project symlinks when cloning the repository.
-To enable symlinks with git, run the following command:
-
-```bash
-git config --global core.symlinks true
-```
-
-If you have already cloned the repository, you can delete and re-clone the repository for the symlinks to be created or manually create the link by running the following CMD command in the project root directory:
-
-```cmd
-mklink /J circuit_setup\circuits-mdl\circomlib circuit_setup\circuits\circomlib
-```
-
-Verify `circuit_setup\circuits-mdl\circomlib` is now a directory.
 
 ## Running the demo steps from the command line
 
@@ -98,6 +84,20 @@ which means that the proof will disclose those attributes to the verifier.  The 
 The `reveal_digest` option is used for values that may be larger than 31 bytes; they will get hashed first.  Setting this flag changes how the circuit setup phase handles those attributes, allowing them to be optionally revealed during `show`.
 
 As example ways to experiment with selective disclosure, try removing `aud` from the list of revealed attributes, or adding `given_name` to the list of revealed attributes in the proof specification file. 
+
+### Device-Bound Credentials
+The example `rs256-db` demonstrates a JWT credential that is *device bound*.  This means that the JWT encodes the public key of an ECDSA signing key, where the private key is stored by a device (such as a hardware security module), and the device exposes only a signing API. 
+When the credential is used, the verifier expects the holder to demonstrate possession of the device key, by signing a challenge.  During circuit setup, the file `circuit_setup/inputs/rs256-db/config.json` has the line `"device_bound": true`, which indicates the sample credential should be generated with a device key.  In the demo, a fresh ECDSA key pair is generated in software, no special hardware is required.
+
+For show proofs, The file `creds/test-vectors/rs256-db/proof_spec.json` contains 
+```
+{
+    "revealed" : ["family_name", "tenant_ctry", "auth_time", "aud"],
+    "device_bound" : true, 
+    "presentation_message" : [1, 2, 3, 4]
+}
+```
+which specifies a subset of attributes to disclose, as in the `rs256-sd` example.  The `device-bound` flag is also set here, and the `presentation_message` is a byte string that that encodes a challenge from the verifier. The `presentation_message` is sent to the device, then the show proof creates a proof of knowledge of the device signature (unlinkably). 
 
 ## Contributing
 

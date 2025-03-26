@@ -1,0 +1,5 @@
+{
+    "revealed" : ["family_name", "tenant_ctry", "auth_time", "aud"],
+    "device_bound" : true, 
+    "presentation_message" : [1, 2, 3, 4]
+}

@@ -3,11 +3,13 @@
 
 use ark_ff::PrimeField;
 use jwt_simple::prelude::*;
+use p256::ecdsa::VerifyingKey;
+use p256::pkcs8::DecodePublicKey;
 use serde_json::Value;
 use serde_json::json;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use num_traits::FromPrimitive;
 use std::ops::{Shl, BitAnd};
 use std::error::Error;
@@ -15,7 +17,6 @@ use std::fs;
 use ark_std::path::PathBuf;
 use ark_ff::BigInteger;
 use crate::return_error;
-use crate::utils::string_to_byte_vec;
 use crate::ProofSpec;
 use crate::ProofSpecInternal;
 
@@ -23,6 +24,7 @@ use crate::ProofSpecInternal;
 const DEFAULT_MAX_TOKEN_LENGTH : usize = 2048;
 const CIRCOM_RS256_LIMB_BITS : usize = 121;
 const CIRCOM_ES256_LIMB_BITS : usize = 43;  // Limb size required by ecdsa-p256 circuit
+const MAX_FIELD_BYTE_LEN : usize = 31;  
 lazy_static! {
     static ref CRESCENT_SUPPORTED_ALGS: HashSet<&'static str> = {
         let mut set = HashSet::new();
@@ -37,6 +39,7 @@ lazy_static! {
         set.insert("alg");
         set.insert("credtype");
         set.insert("max_cred_len");
+        set.insert("device_bound");
         set
     };
 }
@@ -90,7 +93,7 @@ pub fn pem_to_inputs<F>(issuer_pem : &str) -> Result<Vec<F>, Box<dyn std::error:
 
 type JsonMap = serde_json::Map<String, Value>;
 
-pub fn prepare_prover_inputs(config : &serde_json::Map<String, Value>, token_str : &str, issuer_pem : &str) -> 
+pub fn prepare_prover_inputs(config : &serde_json::Map<String, Value>, token_str : &str, issuer_pem : &str, device_pub_pem : Option<&str>) -> 
 Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 {
 
@@ -179,7 +182,7 @@ Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
     let header_pad = base_64_decoded_header_padding(period_idx)?;
     let header_and_payload = format!("{}{}{}", jwt_header_decoded, header_pad, claims_decoded);
     prepare_prover_claim_inputs(&header_and_payload, config, &claims, &mut prover_inputs_json)?;
-    prepare_prover_aux(&header_and_payload, config, &claims, &mut prover_aux_json)?;
+    prepare_prover_aux(&header_and_payload, config, &claims, device_pub_pem, &mut prover_aux_json)?;
 
     Ok((prover_inputs_json, prover_aux_json, public_ios_json))
 
@@ -247,12 +250,13 @@ fn prepare_prover_claim_inputs(header_and_payload: &str, config: &serde_json::Ma
     Ok(())
 }
 
-// For now the only auxiliary information the prover needs are the pre-images of the hashed attributes.
+// The prover needs the pre-images of the hashed attributes, and optionally, the device public key.
 // The digests are outputs of the circuit and made available to the prover during witness generation. 
 // When showing the credential, if the prover selectively discloses a hashed attribute, they need the
 // preimage to send to the verifier.
-fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String, Value>, claims: &Value, prover_aux_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
-    
+fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String, Value>, claims: &Value, device_key_pem : Option<&str>, prover_aux_json : &mut  serde_json::Map<String, Value>) -> Result<(), Box<dyn Error>> {
+
+    // Get the preimages for the hashed attributes
     for key in config.keys() {
         if CRESCENT_CONFIG_KEYS.contains(key.as_str()) {
             continue;
@@ -272,8 +276,8 @@ fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String
                     }
                     "string" => {
                         let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().unwrap();    // validated by load_config
-                        let claim_value = claims[name].as_str().ok_or("invalid_type")?; // TODO: make sure it's quoted
-                        if claim_value.len() > max_claim_byte_len.try_into().unwrap() {
+                        let claim_value = claims[name].as_str().ok_or("invalid_type")?;
+                        if claim_value.len() > max_claim_byte_len as usize {
                             return_error!(format!("Claim too large ({} bytes), largest allowed by configuration is {} bytes", claim_value.len(), max_claim_byte_len));
                         }
                         prover_aux_json.insert(name.to_string(), json!(claim_value));
@@ -284,6 +288,17 @@ fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String
                 }
             }
         }
+    }
+
+    // Get the device public key
+    if device_key_pem.is_some() {
+
+        let device_pub = VerifyingKey::from_public_key_pem(device_key_pem.unwrap())?;
+        let device_pub = device_pub.to_encoded_point(false);
+        let x = BigUint::from_bytes_be(device_pub.x().unwrap());
+        let y = BigUint::from_bytes_be(device_pub.y().unwrap());
+        prover_aux_json.insert("device_pub_x".to_string(), json!(x.to_str_radix(10)));
+        prover_aux_json.insert("device_pub_y".to_string(), json!(y.to_str_radix(10)));
     }
 
 
@@ -532,6 +547,23 @@ pub fn parse_config(config_str: &str) -> Result<serde_json::Map<String, Value>, 
         }
     }
 
+    if !config.contains_key("device_bound") {
+        config.insert("device_bound".to_string(), json!(false));
+    }
+
+    if config.get("device_bound").unwrap().as_bool().ok_or("expected bool type")? {
+        let device_key_entry = format!(r#" 
+            {{
+            "type": "number",
+            "reveal": true,
+            "max_claim_byte_len": {}
+            }}
+        "#,
+         2*MAX_FIELD_BYTE_LEN);
+        config.insert("device_key_0".to_string(), serde_json::from_str(&device_key_entry)?);
+        config.insert("device_key_1".to_string(), serde_json::from_str(&device_key_entry)?);
+    }
+
     // For all the config entries about claims (e.g, "email", "exp", etc.) make sure that if the claim 
     // is to be revealed, that max_claim_byte_len is set
     for (key, _) in config.clone() {
@@ -563,7 +595,13 @@ pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &st
             revealed.push(attr.to_string());
         }
     }
-    let presentation_message_bytes = string_to_byte_vec(proof_spec.presentation_message.clone());
+    let presentation_message_bytes = proof_spec.presentation_message.clone();
+    let device_bound = proof_spec.device_bound.unwrap_or(false);
 
-    Ok(ProofSpecInternal {revealed, hashed, presentation_message : presentation_message_bytes, config_str: config_str.to_owned()})
+    if device_bound && proof_spec.presentation_message.is_none() {
+        return_error!("Proof spec indicates the credential is device bound, but is missing the presentation message");
+    }
+
+
+    Ok(ProofSpecInternal {revealed, hashed, presentation_message : presentation_message_bytes, device_bound, config_str: config_str.to_owned()})
 }

@@ -3,12 +3,15 @@
 
 use crate::utils::bigint_from_str;
 use ark_bn254::Bn254 as ECPairing;
-use ark_circom::CircomBuilder;
 use num_bigint::BigUint;
 use num_traits::FromPrimitive;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, io::ErrorKind};
 
+#[cfg(not(feature = "wasm"))]
+use ark_circom::CircomBuilder;
+
+#[cfg(not(feature = "wasm"))]
 pub trait ProverInput {
     fn new(path: &str) -> Self;
     fn push_inputs(&self, builder: &mut CircomBuilder<ECPairing>);
@@ -95,6 +98,7 @@ impl IOLocations {
     }
 }
 
+#[cfg(not(feature = "wasm"))]
 impl ProverInput for GenericInputsJSON {
     fn new(path: &str) -> Self {
         let prover_inputs = serde_json::from_str::<Value>(&std::fs::read_to_string(path).unwrap())

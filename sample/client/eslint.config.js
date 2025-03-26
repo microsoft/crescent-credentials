@@ -15,7 +15,8 @@ const standardJsRules = {
   '@stylistic/space-before-function-paren': ['error', 'always'],
   'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
   '@typescript-eslint/no-unused-vars': 'off', // This rule is covered by no-unused-vars,
-  '@typescript-eslint/no-deprecated': 'off'
+  '@typescript-eslint/no-deprecated': 'off',
+  '@typescript-eslint/no-magic-numbers': 'off'
 }
 
 export default [

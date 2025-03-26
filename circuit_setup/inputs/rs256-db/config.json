@@ -1,0 +1,45 @@
+{
+    "alg": "RS256",
+    "device_bound": true,
+    "exp": {
+        "type" : "number",
+        "reveal" : true,
+        "max_claim_byte_len" : 31
+    },
+    "email": {
+        "type" : "string",
+        "reveal" : true,
+        "max_claim_byte_len" : 31
+    },
+    "family_name": {
+        "type" : "string",
+        "reveal" : true,
+        "max_claim_byte_len" : 31
+    },
+    "given_name": {
+        "type" : "string",
+        "reveal" : true,
+        "max_claim_byte_len" : 31
+    },
+    "tenant_ctry": {
+        "type" : "string",
+        "reveal" : true,
+        "max_claim_byte_len" : 31
+    },    
+    "tenant_region_scope": {
+        "type" : "string",
+        "reveal" : true,
+        "max_claim_byte_len" : 31
+    }, 
+    "aud": {
+        "type" : "string",
+        "reveal_digest" : true,
+        "max_claim_byte_len" : 62
+    },
+    "auth_time": {
+        "type" : "number",
+        "reveal_digest" : true,
+        "max_claim_byte_len" : 31
+    }
+
+}

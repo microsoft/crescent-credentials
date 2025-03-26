@@ -241,7 +241,7 @@ impl<E: Pairing> RangeProof<E> {
                 com_f_basis.clone(),
             ],
             &[vec![ped_open.m, ped_open.r], com_f_scalars],
-            Some(vec![(0, 0), (1, 3)]),
+            Some(vec![(0, 3)]),
         );
 
         // create a commitment to g
@@ -419,7 +419,7 @@ impl<E: Pairing> RangeProof<E> {
                 None, // TODO: should we add a presentation message here?
                 &[bases.to_vec(), vk.com_f_basis.to_vec(),],
                 &[*ped_com, self.com_f.0.into()],
-                Some(vec![(0, 0), (1, 3)]),
+                Some(vec![(0, 3)]),
             )
     }
 }
@@ -540,7 +540,7 @@ mod tests {
         io_locations_map.insert(String::from("committed_value"), 2_usize);
         let io_locations = IOLocations{public_io_locations: io_locations_map.clone()};
     
-        show_range.verify(
+        let res = show_range.verify(
             &client_state.committed_input_openings[0].c,
             32,
             &range_vk,
@@ -548,6 +548,7 @@ mod tests {
             &client_state.pvk,
             "committed_value",
         );
+        assert!(res);
     
         println!(
             "Time taken for range proof verification: {:?}",

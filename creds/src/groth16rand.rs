@@ -196,22 +196,30 @@ impl<E: Pairing> ClientState<E> {
         n: usize,
         range_pk: &RangeProofPK<E>,
     ) -> ShowRange<E> {
-        // force the range proof to run in single-threaded mode
-        let pool = ThreadPoolBuilder::new()
-            .num_threads(1)
-            .build()
-            .expect("Failed to create thread pool");
+        let mut range_proof = RangeProof::default();
 
         // prove that input is in [0, 2^n)
-        let mut range_proof = RangeProof::default();
         assert!(n < 64);
         let bound = <E as Pairing>::ScalarField::from(1u64 << n);
         assert!(ped_open.m < bound);
 
-        // Use the custom thread pool for parallel operations
-        pool.install(|| {
+        #[cfg(feature = "wasm")]
+        {
             range_proof = RangeProof::prove_n_bits(ped_open, n, &range_pk.powers);
-        });
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            // force the range proof to run in single-threaded mode
+            let pool = ThreadPoolBuilder::new()
+                .num_threads(1)
+                .build()
+                .expect("Failed to create thread pool");
+
+            // Use the custom thread pool for parallel operations
+            pool.install(|| {
+                range_proof = RangeProof::prove_n_bits(ped_open, n, &range_pk.powers);
+            });        
+        }
 
         ShowRange { range_proof }
     }

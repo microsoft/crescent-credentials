@@ -8,6 +8,7 @@ import { Credential } from './cred'
 import config from './config'
 import { MSG_BACKGROUND_CONTENT_SEND_PROOF, MSG_POPUP_BACKGROUND_DISCLOSE } from './constants'
 import { sendMessage, setListener } from './listen'
+import init, { create_show_proof_wasm } from 'crescent'
 
 export interface ClientHelperShowResponse {
   client_state_b64: string
@@ -17,8 +18,15 @@ export interface ClientHelperShowResponse {
 
 export type ShowProof = string
 
+// required for wasm now()
+declare global {
+  // eslint-disable-next-line @typescript-eslint/naming-convention, no-unused-vars
+  function js_now_seconds (): bigint
+}
+globalThis.js_now_seconds = (): bigint => BigInt(Math.floor(Date.now() / 1000))
+
 export async function show (cred: Credential, disclosureUid: string, challenge: string): Promise<RESULT<ShowProof, Error>> {
-  const response = await fetchText(`${config.clientHelperUrl}/show`, { cred_uid: cred.id, disc_uid: disclosureUid, challenge: challenge }, 'GET')
+  const response = await fetchText(`${config.clientHelperUrl}/show`, { cred_uid: cred.id, disc_uid: disclosureUid, challenge }, 'GET')
   if (!response.ok) {
     console.error('Failed to show:', response.error)
     return response
@@ -30,11 +38,18 @@ async function handleDisclose (id: string, destinationUrl: string, disclosureUid
   const cred = Credential.get(id)
   assert(cred)
 
-  const showProof = await show(cred, disclosureUid, challenge)
-  if (!showProof.ok) {
-    console.error('Failed to show proof:', showProof.error)
-    return
-  }
+  await init(/* wasm module */)
+
+  const showParams = cred.data.showData as ClientHelperShowResponse
+
+  const showProof = create_show_proof_wasm(
+    showParams.client_state_b64,
+    showParams.range_pk_b64,
+    showParams.io_locations_str,
+    disclosureUid,
+    challenge
+  ).replace('show_proof_b64: ', '').replace(/"/g, '')
+  assert(showProof)
 
   const params = {
     url: destinationUrl,
@@ -42,7 +57,7 @@ async function handleDisclose (id: string, destinationUrl: string, disclosureUid
     issuer_url: cred.data.issuer.url,
     schema_uid: cred.data.token.schema,
     session_id: challenge,
-    proof: showProof.value
+    proof: showProof
   }
 
   void messageToActiveTab(MSG_BACKGROUND_CONTENT_SEND_PROOF, params)

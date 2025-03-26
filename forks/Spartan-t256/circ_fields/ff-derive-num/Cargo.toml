@@ -1,0 +1,23 @@
+[package]
+name = "ff-derive-num"
+version = "0.3.0"
+edition = "2018"
+authors = ["kwantam <kwantam@gmail.com>"]
+description = "Procedural macro library to add the Num trait to Field implementations for ff"
+homepage = "https://github.com/kwantam/ff-derive-num"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/kwantam/ff-derive-num"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+num-traits = "0.2"
+proc-macro2 = "1"
+quote = "1"
+syn = "1"
+
+[dev-dependencies]
+ff = { version = "0.13", features = ["derive"] }
