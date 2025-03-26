@@ -127,6 +127,7 @@ fn mdoc_builder(claims: String, device_priv_key: String) -> Builder {
         .validity_info(validity_info)
         .digest_algorithm(digest_algorithm)
         .device_key_info(device_key_info)
+        .enable_decoy_digests(false)
 }
 
 fn generate_mdl(claims: String, device_pub_key: String, private_key_pem: String, x5chain_pem: String) -> Vec<u8> {

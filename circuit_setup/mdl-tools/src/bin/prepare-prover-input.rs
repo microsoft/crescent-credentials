@@ -159,7 +159,7 @@ struct  ValueDigestInfo {
 /// Returns (encoded_l, encoded_r) as computed from tbs_data.
 ///
 /// The CBOR format is:
-/// - 2-digit hex for the digest id (e.g. "13" for 19)
+/// - 2-digit hex for the digest id (e.g. "13" for 19) // FIXME: this assumes the id is < 23 (otherwise CBOR encodes it in 2 bytes)
 /// - Literal "5820" for a 32-byte byte string indicator
 /// - The 32-byte SHA-256 digest in hex (64 hex digits)
 ///
@@ -353,7 +353,7 @@ fn main() {
         .unwrap();
 
     let issuer_pub_key = x5chain.end_entity_public_key::<NistP256>().unwrap();
-    let pem = issuer_pub_key
+    let _pem = issuer_pub_key
         .to_public_key_pem(Default::default())
         .unwrap();
 

@@ -3,7 +3,6 @@
         "family_name": "Smith",
         "given_name": "Alice",
         "birth_date": "1980-02-05",
-
         "issue_date": "2020-01-01",
         "expiry_date": "2030-01-01",
         "issuing_country": "US",
@@ -27,16 +26,11 @@
         "sex": 1,
         "height": 170,
         "weight": 70,
-        "eye_colour": "hazel",
-        "hair_colour": "brown",
         "birth_place": "USA",
         "resident_address": "138 Eagle Street",
         "portrait_capture_date": "2020-01-01T12:00:00Z",
-        "issuing_jurisdiction": "US-NY",
-        "nationality": "US",
         "resident_city": "Albany",
         "resident_state": "New York",
-        "resident_postal_code": "12202-1719",
-        "resident_country": "US"
+        "resident_postal_code": "12202-1719"
     }
 }
