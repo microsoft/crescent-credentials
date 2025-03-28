@@ -105,13 +105,11 @@ async fn fetch_and_save_jwk(issuer_url: &str, cred_folder: &str) -> Result<(), S
 
 fn compute_cred_uid(_cred : &str) -> String {
     // for now, we just generate a random UUID as the cred_uid
-    
-
     Uuid::new_v4().to_string()
 }
 
 #[post("/prepare", format = "json", data = "<cred_info>")]
-async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> String {
+async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<(String, Option<Vec<String>>)> {
     println!("*** /prepare called");
     println!("Schema UID: {}", cred_info.schema_uid);
     println!("Issuer URL: {}", cred_info.issuer_url);
@@ -120,12 +118,10 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
 
     // verify if the schema_uid is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&cred_info.schema_uid.as_str()) {
-        return "Unsupported schema UID".to_string();
+        println!("Unsupported schema UID: {}", cred_info.schema_uid);
+        return Json(("error".to_string(), None)); // FIXME: not the right way to handler errors
     }
     let cred_type = cred_type_from_schema(&cred_info.schema_uid).unwrap();
-
-    let cred_uid = compute_cred_uid(&cred_info.cred);
-    println!("Generated credential UID: {}", cred_uid);
 
     let cred_uid = compute_cred_uid(&cred_info.cred);
     println!("Generated credential UID: {}", cred_uid);
@@ -153,6 +149,26 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
     let state = state.inner().0.clone();
     let cred_uid_clone = cred_uid.clone();
     let issuer_url = cred_info.issuer_url.clone();
+
+    let mut sd_claims: Option<Vec<String>> = None;
+    // if the credential is a JWT with selective disclosure, we need to parse the claims that are available
+    // to selectively disclose in the credential
+    if cred_type == "jwt" && cred_info.schema_uid == "jwt_sd" {
+        println!("Parsing claims from jwt_sd credential");
+    
+        // Get the payload part of the JWT
+        let b64url_payload = cred_info.cred.split('.').nth(1).unwrap();
+        let payload = base64_url::decode(b64url_payload).unwrap();
+        let payload_str = String::from_utf8(payload).unwrap();
+    
+        // Parse the payload into a JSON object and collect keys
+        let payload_json: serde_json::Value = serde_json::from_str(&payload_str).unwrap();
+        let claims = payload_json.as_object().unwrap();
+    
+        // Collect the JSON keys into a vector
+        sd_claims = Some(claims.keys().cloned().collect::<Vec<String>>());
+        println!("Parsed claims: {:?}", sd_claims);    
+    }
 
     rocket::tokio::spawn(async move {
         let task_result: Result<(), String> = async {
@@ -188,13 +204,12 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
                 println!("Loading issuer public key");
                 let issuer_pem = fs::read_to_string(&paths.issuer_pem).map_err(|_| "Unable to read issuer public key PEM")?;                
                 println!("Creating prover inputs");
-                let (prover_inputs_json, prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &cred_info.cred, &issuer_pem).map_err(|_| "Failed to prepare prover inputs")?;
+                let (prover_inputs_json, prover_aux_json, _public_ios_json) = prepare_prover_inputs(&config, &cred_info.cred, &issuer_pem, None).map_err(|_| "Failed to prepare prover inputs")?;
                 let prover_inputs = GenericInputsJSON { prover_inputs: prover_inputs_json };
                 let prover_aux_string = json!(prover_aux_json).to_string();
 
                 println!("Creating client state... this is slow...");
-                
-                
+
                 create_client_state(&paths, &prover_inputs, Some(&prover_aux_string), "jwt").map_err(|_| "Failed to create client state")?
             };
 
@@ -220,7 +235,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Strin
         }
     });
 
-    cred_uid
+    Json((cred_uid, sd_claims))
 }
 
 #[get("/status?<cred_uid>")]
@@ -248,9 +263,9 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
     }
 }
 
-#[get("/show?<cred_uid>&<disc_uid>&<challenge>")]
-async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, state: &State<SharedState>) -> Result<String, String> {
-    println!("*** /show called with credential UID {}, disc_uid {}, and challenge {}", cred_uid, disc_uid, challenge);
+#[get("/show?<cred_uid>&<disc_uid>&<challenge>&<proof_spec>")]
+async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_spec: String, state: &State<SharedState>) -> Result<String, String> {
+    println!("*** /show called with credential UID {}, disc_uid {}, challenge {}, and proof_spec {}", cred_uid, disc_uid, challenge, proof_spec);
     let tasks = state.inner().0.lock().await;
     // Parse the challenge as a byte array for the presentation message
     let pm = challenge.as_bytes();
@@ -272,6 +287,13 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, state: 
                 return Err(msg);
             }
 
+            // parse the proof spec from base64url
+            let proof_spec_string = String::from_utf8(base64_url::decode(&proof_spec).unwrap()).unwrap();
+            println!("Parsed proof spec from b64: {:?}", proof_spec_string);
+            let mut proof_spec: ProofSpec = serde_json::from_str(&proof_spec_string)
+                .map_err(|_| "Failed to parse proof spec".to_string())?;
+            println!("Parsed proof spec: {:?}", proof_spec);
+
             // Create the show proof
             let show_proof =
             if &client_state.credtype == "mdl" {
@@ -279,9 +301,8 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, state: 
                 create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, age)
             }
             else {
-                let mut ps : ProofSpec = serde_json::from_str(&JWT_DEMO_PROOF_SPEC).unwrap();    
-                ps.presentation_message = Some(challenge);
-                create_show_proof(&mut client_state, &range_pk, &io_locations, &ps).map_err(|e| format!("Failed to create show proof. {:?}", e))?
+                proof_spec.presentation_message = Some(challenge.into());
+                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, None).map_err(|e| format!("Failed to create show proof. {:?}", e))?
             };
             
             // Return the show proof as a base64-url encoded string

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the source and target directories as arrays
-SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/mdl1")
-TARGET_DIRS=("./data/creds/jwt_corporate_1/shared" "./data/creds/mdl_1/shared")
+SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/rs256-sd" "../../creds/test-vectors/mdl1")
+TARGET_DIRS=("./data/creds/jwt_corporate_1/shared" "./data/creds/jwt_sd/shared" "./data/creds/mdl_1/shared")
 # Directory to clean up before copying new files
 CLEANUP_DIR="./data/creds"
 
@@ -49,6 +49,7 @@ if [ ! -f "../../creds/test-vectors/mdl1/cache/client_state.bin" ]; then
     echo "WARNING: mDL demos will not work"
 else
     echo "Copying client_state for mDL demo"
+    mkdir -p "./data/creds/mdl_1/shared/cache"
     cp "../../creds/test-vectors/mdl1/cache/client_state.bin" "./data/creds/mdl_1/shared/cache/"
 fi
 
