@@ -152,6 +152,7 @@ fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) ->
         Template::render("resource", context! {
             site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
             email_domain: "TEST",
+            country: "US",
         })
     } else {
         let validation_result = verifier_config
@@ -165,6 +166,7 @@ fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) ->
             Template::render("resource", context! {
                 site1_verifier_name: verifier_config.site1_verifier_name.as_str(),               
                 email_domain: get_email_domain(&result.disclosed_info),
+                country: get_disclosed_claim("tenant_ctry_value", &result.disclosed_info),
             })
         } else {
             Template::render("error", context! { error: "Invalid session ID" })
@@ -212,13 +214,12 @@ fn signup2_page(session_id: String, verifier_config: &State<VerifierConfig>) -> 
     }
 }
 
-fn get_disclosed_claims(disclsosed_info : &Option<String>) -> String {
-
+fn get_disclosed_claim(claim: &str, disclsosed_info : &Option<String>) -> String {
     match disclsosed_info {
         Some(info) => {
             match serde_json::from_str::<Value>(&info) {
                 Ok(j) =>{
-                    j.get("disclosed_claims").unwrap_or(&json!("ERROR: disclosed claims not found")).as_str().unwrap_or("ERROR: disclosed claims is not a string").to_string()
+                    j.get(claim).unwrap_or(&json!("ERROR: disclosed claims not found")).as_str().unwrap_or("ERROR: disclosed claims is not a string").to_string()
                 }
                 Err(_) => "ERROR: disclosed claims not found".to_string()
             }
