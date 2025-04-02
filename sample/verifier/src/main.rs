@@ -4,7 +4,6 @@
 #[macro_use] extern crate rocket;
 
 use crescent::{verify_show_mdl, ProofSpec};
-use crescent::utils::write_to_b64url;
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
 use rocket_dyn_templates::{context, Template};
@@ -81,8 +80,8 @@ fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, Stri
     let site2_proof_spec_str = verifier_config.site2_proof_spec.clone();
 
     // encode the proof spec in b64url
-    let site1_proof_spec_b64url = write_to_b64url(&site1_proof_spec_str);
-    let site2_proof_spec_b64url = write_to_b64url(&site2_proof_spec_str);
+    let site1_proof_spec_b64url = base64_url::encode(site1_proof_spec_str.as_bytes());
+    let site2_proof_spec_b64url = base64_url::encode(site2_proof_spec_str.as_bytes());
 
     let session_id = Uuid::new_v4().to_string();
     verifier_config.active_session_ids.lock().unwrap().insert(session_id.clone());
