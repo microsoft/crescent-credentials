@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
 import {
-  MSG_BACKGROUND_POPUP_ACTIVE_TAB_UPDATE, MSG_BACKGROUND_POPUP_IS_OPEN, MSG_BACKGROUND_POPUP_PREPARED,
+  MSG_BACKGROUND_POPUP_ACTIVE_TAB_UPDATE, MSG_BACKGROUND_POPUP_ERROR, MSG_BACKGROUND_POPUP_IS_OPEN, MSG_BACKGROUND_POPUP_PREPARED,
   MSG_BACKGROUND_POPUP_PREPARE_STATUS, MSG_POPUP_BACKGROUND_UPDATE, MSG_POPUP_CONTENT_SCAN_DISCLOSURE
 } from './constants.js'
 import { ping } from './clientHelper.js'
@@ -143,11 +143,11 @@ async function init (): Promise<void> {
 }
 
 async function scanForDisclosureRequest (): Promise<void> {
-  const disclosureRequest = await messageToActiveTab<{ url: string, uid: string, challenge: string } | null>(MSG_POPUP_CONTENT_SCAN_DISCLOSURE)
+  const disclosureRequest = await messageToActiveTab<{ url: string, uid: string, challenge: string, proofSpec: string } | null>(MSG_POPUP_CONTENT_SCAN_DISCLOSURE)
   console.debug('disclosureRequest', disclosureRequest)
   if (disclosureRequest != null) {
     CredentialWithCard.creds.forEach((cred) => {
-      cred.discloserRequest(disclosureRequest.url, disclosureRequest.uid, disclosureRequest.challenge)
+      cred.discloserRequest(disclosureRequest.url, disclosureRequest.uid, disclosureRequest.challenge, disclosureRequest.proofSpec)
     })
   }
 }
@@ -294,6 +294,10 @@ listener.handle(MSG_BACKGROUND_POPUP_PREPARED, async (credUid: string) => {
 
 listener.handle(MSG_BACKGROUND_POPUP_ACTIVE_TAB_UPDATE, () => {
   void scanForDisclosureRequest()
+})
+
+listener.handle(MSG_BACKGROUND_POPUP_ERROR, async (error: string) => {
+  console.error('MSG_BACKGROUND_POPUP_ERROR', error)
 })
 
 void init().then(() => {

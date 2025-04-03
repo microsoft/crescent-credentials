@@ -21,6 +21,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "15.3.0",
     "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-virtual": "^3.0.2",
     "@stylistic/eslint-plugin": "^2.8.0",
     "@types/chrome": "0.0.272",
     "crescent": "file:../../creds/pkg",

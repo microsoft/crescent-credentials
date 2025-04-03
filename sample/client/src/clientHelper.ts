@@ -47,6 +47,34 @@ async function _prepare (issuerUrl: string, jwt: string, schemaUid: string): Pro
   return { ok: true, value: credUid }
 }
 
+async function _prepareComplete (cred: Credential): Promise<void> {
+  const credUid = cred.id
+
+  cred.progress = 100
+  cred.status = 'PREPARED'
+  await cred.save()
+  await Credential.load()
+
+  if (config.wasmShowProof) {
+    // Request client state from client helper
+    const result = await fetchShowData(credUid)
+
+    if (!result.ok) {
+      console.error('Failed to fetch show data:', result.error)
+      cred.status = 'ERROR'
+      await cred.save()
+      void sendMessage('popup', MSG_BACKGROUND_POPUP_ERROR, credUid)
+      return
+    }
+
+    cred.data.showData = result.value
+    await cred.save()
+    await Credential.load()
+  }
+
+  void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARED, credUid)
+}
+
 export async function fetchPrepareStatus (credUid: string, progress: () => void): Promise<RESULT<string, Error>> {
   return await new Promise((resolve) => {
     const intervalId = setInterval(
@@ -93,6 +121,26 @@ export async function fetchShowData (credUid: string): Promise<RESULT<ShowData, 
   })
 }
 
+export async function fetchShowProof (credUid: string, discUid: string, challenge: string, proofSpec: string): Promise<RESULT<string, Error>> {
+  // eslint-disable-next-line no-async-promise-executor
+  return await new Promise((resolve) => {
+    void (async () => {
+      const response = await fetch(`${config.clientHelperUrl}/show?cred_uid=${credUid}&disc_uid=${discUid}&challenge=${challenge}&proof_spec=${proofSpec}`).catch((error) => {
+        return { text: () => `Error: ${error.message}` }
+      })
+
+      const showProof = await response.text()
+
+      if (showProof === 'unknown' || showProof.startsWith('Error:')) {
+        resolve({ ok: false, error: new Error(showProof) })
+        return
+      }
+
+      resolve({ ok: true, value: showProof })
+    })()
+  })
+}
+
 async function _deleteCred (credUid: string): Promise<boolean> {
   const response = await fetch(`${config.clientHelperUrl}/delete?cred_uid=${credUid}`).catch((_error) => {
     console.error('Failed to delete cred:', credUid)
@@ -131,26 +179,7 @@ async function pollStatus (cred: Credential): Promise<void> {
     return
   }
 
-  cred.progress = 100
-  cred.status = 'PREPARED'
-  await cred.save()
-  await Credential.load()
-
-  // Request client state from client helper
-  const result1 = await fetchShowData(credUid)
-
-  if (!result1.ok) {
-    console.error('Failed to fetch show data:', result1.error)
-    cred.status = 'ERROR'
-    await cred.save()
-    void sendMessage('popup', MSG_BACKGROUND_POPUP_ERROR, credUid)
-    return
-  }
-
-  cred.data.showData = result1.value
-  await cred.save()
-  await Credential.load()
-  void sendMessage('popup', MSG_BACKGROUND_POPUP_PREPARED, credUid)
+  await _prepareComplete(cred)
 }
 
 export async function prepare (cred: Credential): Promise<clientUid> {
@@ -162,6 +191,14 @@ export async function prepare (cred: Credential): Promise<clientUid> {
   return newCredUid
 }
 
+export async function remove (cred: Credential): Promise<void> {
+  // Client helper will have no record of this credential if it is still in PENDING status
+  if (['PENDING', 'PREPARING'].includes(cred.status)) {
+    return
+  }
+  void sendMessage('background', MSG_POPUP_BACKGROUND_DELETE, cred.id)
+}
+
 async function handlePrepare (id: string): Promise<RESULT<string, Error>> {
   const cred = Credential.get(id)
   assert(cred)
@@ -171,8 +208,10 @@ async function handlePrepare (id: string): Promise<RESULT<string, Error>> {
     return { ok: false, error: { message: 'Prepare failed. Check Client-Helper service.', name: 'Error' } }
   }
 
-  // Update the credUid and save to storage as a new entry
-  cred.data.credUid = result.value
+  const [credUid, sdClaims] = JSON.parse(result.value) as [string, string[] | null]
+
+  cred.data.credUid = credUid
+  cred.data.sdClaims = sdClaims ?? []
   cred.status = 'PREPARING'
   await cred.save()
 
@@ -181,15 +220,7 @@ async function handlePrepare (id: string): Promise<RESULT<string, Error>> {
 
   void pollStatus(cred)
 
-  return result
-}
-
-export async function remove (cred: Credential): Promise<void> {
-  // Client helper will have no record of this credential if it is still in PENDING status
-  if (['PENDING', 'PREPARING'].includes(cred.status)) {
-    return
-  }
-  void sendMessage('background', MSG_POPUP_BACKGROUND_DELETE, cred.id)
+  return { ok: true, value: credUid }
 }
 
 async function handleRemove (id: string): Promise<void> {

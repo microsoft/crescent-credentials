@@ -17,18 +17,23 @@ async function scanForCredential (): Promise<void> {
     const metaValue = metaTagJwt.getAttribute('content')
     console.log('Detected meta value:', metaValue)
     const domain = new URL(window.location.href).origin
-    await sendMessage('background', MSG_CONTENT_BACKGROUND_IMPORT_CARD, domain, 'jwt_corporate_1', metaValue)
+    await sendMessage('background', MSG_CONTENT_BACKGROUND_IMPORT_CARD, domain, 'jwt_sd', metaValue)
   }
 }
 
-function queryDisclosureRequest (): { url: string, uid: string, challenge: string } | null {
-  const verifyUrl = document.querySelector('meta[crescent_verify_url]')?.getAttribute('crescent_verify_url') ?? ''
-  const disclosureUid = document.querySelector('meta[crescent_disclosure_uid]')?.getAttribute('crescent_disclosure_uid') ?? ''
-  const challenge = document.querySelector('meta[crescent_challenge]')?.getAttribute('crescent_challenge') ?? ''
+function queryDisclosureRequest (): { url: string, uid: string, challenge: string, proofSpec: string } | null {
+  const verifyUrl = getMetaTag('crescent_verify_url')
+  const disclosureUid = getMetaTag('crescent_disclosure_uid')
+  const challenge = getMetaTag('crescent_challenge')
+  const proofSpec = getMetaTag('crescent_proof_spec')
   if (verifyUrl.length > 0 && disclosureUid.length > 0 && challenge.length > 0) {
-    return { url: verifyUrl, uid: disclosureUid, challenge: challenge }
+    return { url: verifyUrl, uid: disclosureUid, challenge, proofSpec }
   }
   return null
+}
+
+function getMetaTag (name: string): string {
+  return document.querySelector(`meta[${name}]`)?.getAttribute(`${name}`) ?? ''
 }
 
 // Function to create and insert a banner at the top of the page

@@ -18,7 +18,7 @@ export class CardElement extends LitElement {
   private _ready = false
   private readonly _status: Card_status = 'PENDING'
   private readonly _progress = 0
-  public _disclosureParams: { verifierUrl: string, disclosureValue: string, disclosureUid: string, disclosureChallenge: string } | null = null
+  public _disclosureParams: { verifierUrl: string, disclosureValue: string, disclosureUid: string, disclosureChallenge: string, proofSpec: string } | null = null
 
   @property({ type: Object })
   private _credential: CredentialWithCard | null = null
@@ -227,7 +227,8 @@ export class CardElement extends LitElement {
     (getElementById<HTMLDivElement>('errorMessage')).innerText = message
   }
 
-  discloseRequest (verifierUrl: string, disclosureValue: string, disclosureUid: string, disclosureChallenge: string): void {
+  // eslint-disable-next-line @typescript-eslint/max-params
+  discloseRequest (verifierUrl: string, disclosureValue: string, disclosureUid: string, disclosureChallenge: string, proofSpec: string): void {
     assert(this.shadowRoot)
     const disclosePropertyLabel = this.shadowRoot.querySelector<HTMLParagraphElement>('#disclosePropertyLabel')
     assert(disclosePropertyLabel)
@@ -235,7 +236,7 @@ export class CardElement extends LitElement {
     assert(discloseVerifierLabel)
     disclosePropertyLabel.innerText = `${disclosureValue}`
     discloseVerifierLabel.innerText = `to ${verifierUrl.replace(/:\d+.+$/g, '')}?`
-    this._disclosureParams = { verifierUrl, disclosureValue, disclosureUid, disclosureChallenge }
+    this._disclosureParams = { verifierUrl, disclosureValue, disclosureUid, disclosureChallenge, proofSpec }
   }
 
   get progress (): { show: () => void, hide: () => void, value: number, label: string } {
@@ -303,7 +304,8 @@ export class CardElement extends LitElement {
     assert(this._disclosureParams?.verifierUrl)
     assert(this._disclosureParams.disclosureUid)
     assert(this._disclosureParams.disclosureChallenge)
-    this._credential.disclose(this._disclosureParams.verifierUrl, this._disclosureParams.disclosureUid, this._disclosureParams.disclosureChallenge)
+    assert(this._disclosureParams.proofSpec)
+    this._credential.disclose(this._disclosureParams.verifierUrl, this._disclosureParams.disclosureUid, this._disclosureParams.disclosureChallenge, this._disclosureParams.proofSpec)
   }
 
   get credential (): CredentialWithCard {
