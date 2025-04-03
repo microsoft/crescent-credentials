@@ -31,19 +31,20 @@ macro_rules! def_field {
             pub struct Ft([u64; $limbs]);
 
             use lazy_static::lazy_static;
-            use rug::Integer;
+            use num_bigint::BigInt as Integer;
+            use num_integer::Integer as NumInteger;
             use std::sync::Arc;
+            use std::str::FromStr;
             lazy_static! {
                 /// Field modulus
-                pub static ref FMOD: Integer = Integer::from_str_radix($mod, 10).unwrap();
+                pub static ref FMOD: Integer = Integer::from_str($mod).unwrap();
                 pub static ref FMOD_ARC: Arc<Integer> = Arc::new(FMOD.clone());
             }
 
-            use rug::integer::Order;
             impl std::convert::From<&Ft> for Integer {
                 fn from(f: &Ft) -> Self {
                     use ff::PrimeField;
-                    Self::from_digits(f.to_repr().as_ref(), Order::Lsf)
+                    Integer::from_bytes_le(num_bigint::Sign::Plus, f.to_repr().as_ref())
                 }
             }
 
@@ -53,13 +54,13 @@ macro_rules! def_field {
                 fn try_from(i: &Integer) -> Result<Self, Self::Error> {
                     use ff::PrimeField;
                     let len = 8 * $limbs;
-                    if i.significant_digits::<u8>() > len {
+                    let (sign, bytes) = i.to_bytes_le();
+                    if sign == num_bigint::Sign::Minus || bytes.len() > len {
                         return Err("Tried to convert un-reduced Integer to Ft");
                     }
-                    let mut bytes = [0u8; 8 * $limbs];
-                    i.write_digits(&mut bytes, Order::Lsf);
-                    Self::from_repr_vartime(FtRepr(bytes))
-                        .ok_or("Tried to convert un-reduced Integer to Ft")
+                    let mut padded = [0u8; 8 * $limbs];
+                    padded[..bytes.len()].copy_from_slice(&bytes);
+                    Self::from_repr_vartime(FtRepr(padded)).ok_or("Conversion failed")
                 }
             }
 
@@ -67,16 +68,17 @@ macro_rules! def_field {
                 #[track_caller]
                 fn from(mut i: Integer) -> Self {
                     use ff::PrimeField;
-                    use rug::ops::RemRoundingAssign;
-                    use std::cmp::Ordering::Less;
 
                     let len = 8 * $limbs;
-                    let mut bytes = [0u8; 8 * $limbs];
-                    if i.significant_digits::<u8>() > len || i.cmp0() == Less {
-                        i.rem_floor_assign(&*FMOD);
+                    let (sign, mut bytes) = i.to_bytes_le();
+                    if sign == num_bigint::Sign::Minus || bytes.len() > len {
+                        i = i.mod_floor(&*FMOD_ARC);
+                        bytes = i.to_bytes_le().1;
                     }
-                    i.write_digits(&mut bytes, Order::Lsf);
-                    Self::from_repr_vartime(FtRepr(bytes)).unwrap()
+
+                    let mut padded = [0u8; 8 * $limbs];
+                    padded[..bytes.len()].copy_from_slice(&bytes);
+                    Self::from_repr_vartime(FtRepr(padded)).unwrap()
                 }
             }
 
@@ -103,7 +105,7 @@ macro_rules! def_field {
                 use super::{Ft, FMOD};
                 use ff::{Field,PrimeFieldBits};
                 use rand::thread_rng;
-                use rug::Integer;
+                use num_bigint::BigInt as Integer;
 
                 #[test]
                 fn test_ff_roundtrip() {
@@ -115,7 +117,7 @@ macro_rules! def_field {
                         assert_eq!(a0, a2);
 
                         let ainv0 = a0.invert().unwrap();
-                        let ainv1 = Integer::from(a1.invert_ref(&*FMOD).unwrap());
+                        let ainv1 = a1.modinv(&*FMOD).unwrap();
                         let ainv2 = Ft::try_from(&ainv1).unwrap();
                         assert_eq!(ainv0, ainv2);
 
