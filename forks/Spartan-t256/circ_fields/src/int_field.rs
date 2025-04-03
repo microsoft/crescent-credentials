@@ -3,10 +3,9 @@
 
 use datasize::DataSize;
 use paste::paste;
-use rug::{
-    ops::{RemRounding, RemRoundingAssign},
-    Integer,
-};
+use num_bigint::{BigInt as Integer, Sign};
+use num_integer::Integer as NumInteger;
+use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
@@ -21,7 +20,7 @@ pub struct IntField {
 
 impl Display for IntField {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if self.i.significant_bits() + 1 < self.m.significant_bits() {
+        if self.i.bits() + 1 < self.m.bits() {
             write!(f, "#f{}m{}", self.i, self.m)
         } else {
             write!(f, "#f-{}m{}", self.m.deref().clone() - &self.i, self.m)
@@ -49,7 +48,7 @@ impl IntField {
     /// Check value in-range (debug only)
     pub fn check(&self, location: &str) {
         debug_assert!(
-            self.i >= 0,
+            self.i >= Integer::zero(),
             "Negative field elem: {}\nat {}",
             self,
             location
@@ -74,8 +73,9 @@ impl IntField {
 
     /// Invert mod p
     pub fn recip(self) -> Self {
+        print!("recip: {}", self);
         let r = Self {
-            i: self.i.invert(&self.m).expect("no inverse!"),
+            i: self.i.modinv(&self.m).expect("no inverse!"),
             m: self.m,
         };
         r.check("recip");
@@ -83,9 +83,13 @@ impl IntField {
     }
 
     /// Construct a new IntField
-    pub fn new(mut i: Integer, m: Arc<Integer>) -> Self {
-        if i < 0 || i > *m {
-            i.rem_floor_assign(&*m);
+    pub fn new(i_in: Integer, m: Arc<Integer>) -> Self {
+        let i_str = i_in.to_string();
+        let mut i: Integer = i_str
+            .parse()
+            .expect("Failed to parse BigInt from string");
+        if i.sign() == Sign::Minus || i >= *m {
+            i = i.mod_floor(&*m);
         }
         Self { i, m }
     }
@@ -101,8 +105,8 @@ impl IntField {
 
     /// Update the value or the modulus
     pub fn update(&mut self, mut new_i: Integer, m: Arc<Integer>) {
-        if new_i < 0 || new_i > *m {
-            new_i.rem_floor_assign(&*m);
+        if new_i.sign() == Sign::Minus || new_i >= *m {
+            new_i = new_i.mod_floor(&*m);
         }
         self.i = new_i;
         self.m = m;
@@ -111,7 +115,7 @@ impl IntField {
     /// Check if this value is equal to zero
     pub fn is_zero(&self) -> bool {
         self.check("is_zero");
-        self.i == 0
+        self.i.is_zero()
     }
 }
 
@@ -122,7 +126,7 @@ macro_rules! arith_impl {
             fn $fn(self, other: Self) -> Self {
                 assert_eq!(self.m, other.m);
                 let r = Self {
-                    i: (self.i.$fn(other.i)).rem_floor(&*self.m),
+                    i: (self.i.$fn(other.i)).mod_floor(&*self.m),
                     m: self.m,
                 };
                 r.check(std::stringify!($fn));
@@ -135,7 +139,7 @@ macro_rules! arith_impl {
             fn $fn(self, other: &Self) -> Self {
                 assert_eq!(self.m, other.m);
                 let r = Self {
-                    i: (self.i.$fn(&other.i)).rem_floor(&*self.m),
+                    i: (self.i.$fn(&other.i)).mod_floor(&*self.m),
                     m: self.m,
                 };
                 r.check(std::stringify!($fn));
@@ -148,7 +152,7 @@ macro_rules! arith_impl {
             fn $fn(self, other: IntField) -> IntField {
                 assert_eq!(self.m, other.m);
                 let r = IntField {
-                    i: ((&self.i).$fn(other.i)).rem_floor(&*self.m),
+                    i: ((&self.i).$fn(other.i)).mod_floor(&*self.m),
                     m: other.m,
                 };
                 r.check(std::stringify!($fn));
@@ -161,7 +165,7 @@ macro_rules! arith_impl {
                 fn [<$fn _assign>](&mut self, other: &IntField) {
                     assert_eq!(self.m, other.m);
                     self.i.[<$fn _assign>](&other.i);
-                    self.i.rem_floor_assign(&*self.m);
+                    self.i = self.i.mod_floor(&*self.m);
                 }
             }
         }
@@ -169,8 +173,8 @@ macro_rules! arith_impl {
         paste! {
             impl [<$Trait Assign>]<i64> for IntField {
                 fn [<$fn _assign>](&mut self, other: i64) {
-                    self.i.[<$fn _assign>](&other);
-                    self.i.rem_floor_assign(&*self.m);
+                    self.i.[<$fn _assign>](Integer::from(other));
+                    self.i = self.i.mod_floor(&*self.m);
                 }
             }
         }
@@ -186,7 +190,7 @@ impl Neg for IntField {
     type Output = Self;
     fn neg(self) -> Self {
         let r = Self {
-            i: (-self.i).rem_floor(&*self.m),
+            i: (-self.i).mod_floor(&*self.m),
             m: self.m,
         };
         r.check("neg");

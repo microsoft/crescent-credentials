@@ -19,7 +19,9 @@ use int_field::IntField;
 use datasize::DataSize;
 use ff::Field;
 use paste::paste;
-use rug::Integer;
+use num_bigint::{BigInt as Integer, RandBigInt};
+use rand::RngCore;
+use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
@@ -129,8 +131,8 @@ impl FieldT {
 
     /// Random value of this type
     #[inline]
-    pub fn random_v(&self, rng: impl rand::RngCore) -> FieldV {
-        FieldV::random(self.clone(), rng)
+    pub fn random_v(&self, rng: impl rand::RngCore + RandBigInt) -> FieldV {
+         FieldV::random(self.clone(), rng)
     }
 
     /// New value of this type
@@ -460,7 +462,7 @@ impl FullFieldV {
             FullFieldV::FBls12381(f) => FullFieldV::FBls12381(f.pow_vartime(&[u])),
             FullFieldV::FBn254(f) => FullFieldV::FBn254(f.pow_vartime(&[u])),
             FullFieldV::IntField(i) => FullFieldV::IntField(IntField::new(
-                i.i.clone().pow_mod(&Integer::from(u), i.modulus()).unwrap(),
+                i.i.clone().modpow(&Integer::from(u), i.modulus()),
                 i.modulus_arc(),
             )),
         }
@@ -470,7 +472,7 @@ impl FullFieldV {
     #[inline]
     fn signed_int(&self) -> Integer {
         let mut i: Integer = self.into();
-        if i.significant_bits() >= self.ty().modulus().significant_bits() - 1 {
+        if i.bits() >= self.ty().modulus().bits() - 1 {
             i -= self.ty().modulus();
         }
         i
@@ -573,8 +575,23 @@ impl FieldV {
             Ok(InlineFieldV(i, _)) => i == 1,
             Err(FullFieldV::FBls12381(pf)) => bool::from(pf.is_one()),
             Err(FullFieldV::FBn254(pf)) => bool::from(pf.is_one()),
-            Err(FullFieldV::IntField(i)) => i.i == 1,
+            Err(FullFieldV::IntField(i)) => i.i == Integer::from(1),
         }
+    }
+
+    fn signed_bits(x: &Integer) -> u32 {
+        if x.sign() == num_bigint::Sign::Minus {
+            (x.bits() + 1) as u32
+        } else {
+            x.bits() as u32
+        }
+    }
+
+    fn to_i64_wrapping(x: &Integer) -> i64 {
+        use num_traits::ToPrimitive;    
+        // mask to the lowest 64 bits and interpret them as signed
+        let wrapped = (x & Integer::from(u64::MAX)).to_u64().unwrap_or(0);
+        wrapped as i64
     }
 
     #[inline]
@@ -583,16 +600,20 @@ impl FieldV {
         Integer: From<I>,
     {
         // TODO: relax interface.
-        let i = Integer::from(i);
-        if i.signed_bits() < 64 - N_TAG_BITS as u32 {
+        let j = Integer::from(i);
+        print!("FieldV::new_ty_long: j: {:?}\n", j);
+        if FieldV::signed_bits(&j) < (64 - N_TAG_BITS as u32) {
+            
             if let Some(t) = ty.inline_tag() {
-                return Self::from(InlineFieldV(i.to_i64_wrapping(), t));
+                let k = FieldV::to_i64_wrapping(&j);
+                print!("FieldV::new_ty_long: i: {}\n", k);
+                return Self::from(InlineFieldV(k, t));
             }
         }
         Self::from(match ty {
-            FieldT::FBls12381 => FullFieldV::FBls12381(FBls12381::from(i)),
-            FieldT::FBn254 => FullFieldV::FBn254(FBn254::from(i)),
-            FieldT::IntField(m) => FullFieldV::IntField(IntField::new(i, m)),
+            FieldT::FBls12381 => FullFieldV::FBls12381(FBls12381::from(j)),
+            FieldT::FBn254 => FullFieldV::FBn254(FBn254::from(j)),
+            FieldT::IntField(m) => FullFieldV::IntField(IntField::new(j, m)),
         })
     }
 
@@ -619,14 +640,12 @@ impl FieldV {
         })
     }
 
-    fn random(ty: FieldT, mut rng: impl rand::RngCore) -> Self {
+    fn random(ty: FieldT, mut rng: impl RngCore + RandBigInt) -> Self {
         Self::from(match ty {
             FieldT::FBls12381 => FullFieldV::FBls12381(FBls12381::random(rng)),
             FieldT::FBn254 => FullFieldV::FBn254(FBn254::random(rng)),
             FieldT::IntField(m) => {
-                let mut rug_rng = rug::rand::RandState::new_mersenne_twister();
-                rug_rng.seed(&Integer::from(rng.next_u64()));
-                let i = Integer::from(m.random_below_ref(&mut rug_rng));
+                let i = rng.gen_bigint_range(&Integer::zero(), m.as_ref());
                 FullFieldV::IntField(IntField::new(i, m))
             }
         })
@@ -659,7 +678,7 @@ impl FieldV {
     #[inline]
     pub fn signed_int(&self) -> Integer {
         let mut i = self.i();
-        if i.significant_bits() >= self.ty().modulus().significant_bits() - 1 {
+        if i.bits() >= self.ty().modulus().bits() - 1 {
             i -= self.ty().modulus();
         }
         i
