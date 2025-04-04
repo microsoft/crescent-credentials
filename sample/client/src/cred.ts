@@ -263,7 +263,6 @@ export class CredentialWithCard extends Credential {
 }
 
 const friendlyNames: Record<string, string> = {
-  'Claim name': 'Friendly name',
   'family_name': 'family name',
   'given_name': 'given name',
   'email': 'email',
