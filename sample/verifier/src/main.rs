@@ -152,6 +152,7 @@ fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) ->
             site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
             email_domain: "TEST",
             country: "US",
+            preferred_language: "en",
         })
     } else {
         let validation_result = verifier_config
@@ -166,6 +167,7 @@ fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) ->
                 site1_verifier_name: verifier_config.site1_verifier_name.as_str(),               
                 email_domain: get_email_domain(&result.disclosed_info),
                 country: get_disclosed_claim("tenant_ctry_value", &result.disclosed_info),
+                preferred_language: "en", // eventually, we can: get_disclosed_claim("xms_tpl_value", &result.disclosed_info),
             })
         } else {
             Template::render("error", context! { error: "Invalid session ID" })
