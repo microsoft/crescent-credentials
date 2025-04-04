@@ -252,7 +252,7 @@ export class CredentialWithCard extends Credential {
 
         return ps.revealed.map((claim: string) => {
           const value = (this.data.token.fields[claim] ?? '') as string
-          const friendlyName = freindlyNames[claim] ?? claim
+          const friendlyName = friendlyNames[claim] ?? claim
           return `${friendlyName}: ${value}`
         }).join('; ')
 
@@ -262,7 +262,7 @@ export class CredentialWithCard extends Credential {
   }
 }
 
-const freindlyNames: Record<string, string> = {
+const friendlyNames: Record<string, string> = {
   'Claim name': 'Friendly name',
   'family_name': 'family name',
   'given_name': 'given name',
