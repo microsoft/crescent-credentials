@@ -39,6 +39,7 @@ num-traits = "0.2.14"
 
 # wasm
 wasm-bindgen = { version = "0.2", optional = true }
+getrandom = { version = "0.3", features = ["wasm_js"], optional = true  }
 
 rand = "~0.8.5"
 sha2 = "0.10.8"
@@ -75,7 +76,7 @@ cargo-patch = "0.3"
 [features]
 print-trace = ["ark-std/print-trace"]
 default = ["ark-circom"]  # Native builds are the default
-wasm = ["wasm-bindgen"]  # Wasm feature explicitly excludes ark-circom
+wasm = ["wasm-bindgen", "getrandom"]  # Wasm feature explicitly excludes ark-circom
 
 [[bench]]
 name = "proof_benchmark"
