@@ -38,3 +38,9 @@ a {
 a:hover {
     color: #ffffff;
 }
+
+.flag-top-right {
+    position: absolute;
+    top: 1em;
+    right: 1em;
+}

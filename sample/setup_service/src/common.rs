@@ -17,16 +17,14 @@ use junction;
 //   disclosure_ids : [email_domain]Put all the disclosure UIDs and Schema UIDs in a json config file
 
 // define the supported cred schema UIDs. These are an opaque strings that identifies the setup parameters
-pub const SCHEMA_UIDS: [&str; 2] = ["jwt_corporate_1", "mdl_1"];
-
-pub const JWT_DEMO_PROOF_SPEC : &str = r#"{"revealed" : ["email"]}"#;
+pub const SCHEMA_UIDS: [&str; 3] = ["jwt_corporate_1", "jwt_sd", "mdl_1"];
 
 // TODO: this is not quite right; we need to also use the Schema ID. It assumes that all JWTs support the email_domain predicate
 // This is needed during show, in the client_helper, to check if we can actually create the proof with the cred we have.
 pub fn is_disc_uid_supported(disc_uid : &str, cred_type: &str) -> bool {
     match cred_type {
         "jwt" => {
-            matches!(disc_uid, "crescent://email_domain")
+            matches!(disc_uid, "crescent://email_domain" | "crescent://selective_disclosure")
         }
         "mdl" => {
             matches!(disc_uid, "crescent://over_18" | "crescent://over_21" | "crescent://over_65")
@@ -38,7 +36,8 @@ pub fn is_disc_uid_supported(disc_uid : &str, cred_type: &str) -> bool {
 pub fn is_disc_supported_by_schema(disc : &str, schema : &str) -> bool {
 
     matches!( (schema, disc),
-        ("jwt_corporate_1", "crescent://email_domain") | 
+        ("jwt_corporate_1", "crescent://email_domain") |
+        ("jwt_sd", "crescent://selective_disclosure") |
         ("mdl_1", "crescent://over_18") |
         ("mdl_1", "crescent://over_21") |
         ("mdl_1", "crescent://over_65")
@@ -56,12 +55,12 @@ pub fn disc_uid_to_age(disc_uid : &str) -> Result<usize, &'static str> {
 
 pub fn cred_type_from_schema(schema_uid : &str) -> Result<&'static str, &'static str> {
     match schema_uid {
-        "jwt_corporate_1" => Ok("jwt"), 
+        "jwt_corporate_1" => Ok("jwt"),
+        "jwt_sd" => Ok("jwt"),
         "mdl_1" => Ok("mdl"),
         _ => Err("cred_type_from_schema: Unknown schema UID"),
     }
 }
-
 
 #[cfg(windows)]
 fn symlink_any(src: &Path, dst: &Path) -> io::Result<()> {

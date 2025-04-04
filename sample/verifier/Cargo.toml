@@ -13,6 +13,7 @@ fs_extra = "1.2"
 jsonwebkey = { version = "0.3.5", features = ["pkcs-convert"] }
 ureq = "2.5"
 uuid = { version = "1", features = ["v4"] }
+base64-url = "3.0"
 crescent = {path="../../creds"}
 crescent-sample-setup-service = {path="../setup_service"}
 

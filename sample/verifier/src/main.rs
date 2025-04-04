@@ -40,11 +40,15 @@ struct VerifierConfig {
     site1_verify_url: String,
     site1_verifier_name: String,
     site1_verifier_domain: String,
-    
+    site1_disclosure_uid: String,
+    site1_proof_spec: String,
+
     // site 2 (mDL verifier)
     site2_verify_url: String,
     site2_verifier_name: String,
     site2_verifier_domain: String,
+    site2_disclosure_uid: String,
+    site2_proof_spec: String,
 
     // holds active session IDs (in a real system, these would be removed
     // after a timeout period)
@@ -68,8 +72,16 @@ struct ProofInfo {
 fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, String> {
     let site1_verifier_name_str = verifier_config.site1_verifier_name.clone();
     let site1_verify_url_str = verifier_config.site1_verify_url.clone();
+    let site1_disclosure_uid_str = verifier_config.site1_disclosure_uid.clone();
+    let site1_proof_spec_str = verifier_config.site1_proof_spec.clone();
     let site2_verifier_name_str = verifier_config.site2_verifier_name.clone();
     let site2_verify_url_str = verifier_config.site2_verify_url.clone();
+    let site2_disclosure_uid_str = verifier_config.site2_disclosure_uid.clone();
+    let site2_proof_spec_str = verifier_config.site2_proof_spec.clone();
+
+    // encode the proof spec in b64url
+    let site1_proof_spec_b64url = base64_url::encode(site1_proof_spec_str.as_bytes());
+    let site2_proof_spec_b64url = base64_url::encode(site2_proof_spec_str.as_bytes());
 
     let session_id = Uuid::new_v4().to_string();
     verifier_config.active_session_ids.lock().unwrap().insert(session_id.clone());
@@ -77,8 +89,12 @@ fn base_context(verifier_config: &State<VerifierConfig>) -> HashMap<String, Stri
     let mut context = HashMap::new();
     context.insert("site1_verifier_name".to_string(), site1_verifier_name_str);
     context.insert("site1_verify_url".to_string(), site1_verify_url_str);
+    context.insert("site1_disclosure_uid".to_string(), site1_disclosure_uid_str);
+    context.insert("site1_proof_spec_b64url".to_string(), site1_proof_spec_b64url);
     context.insert("site2_verifier_name".to_string(), site2_verifier_name_str);
     context.insert("site2_verify_url".to_string(), site2_verify_url_str);
+    context.insert("site2_disclosure_uid".to_string(), site2_disclosure_uid_str);
+    context.insert("site2_proof_spec_b64url".to_string(), site2_proof_spec_b64url);
     context.insert("session_id".to_string(), session_id);
     
     context
@@ -135,6 +151,8 @@ fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) ->
         Template::render("resource", context! {
             site1_verifier_name: verifier_config.site1_verifier_name.as_str(),
             email_domain: "TEST",
+            country: "US",
+            preferred_language: "en",
         })
     } else {
         let validation_result = verifier_config
@@ -148,6 +166,8 @@ fn resource_page(session_id: String, verifier_config: &State<VerifierConfig>) ->
             Template::render("resource", context! {
                 site1_verifier_name: verifier_config.site1_verifier_name.as_str(),               
                 email_domain: get_email_domain(&result.disclosed_info),
+                country: get_disclosed_claim("tenant_ctry_value", &result.disclosed_info),
+                preferred_language: "en", // eventually, we can: get_disclosed_claim("xms_tpl_value", &result.disclosed_info),
             })
         } else {
             Template::render("error", context! { error: "Invalid session ID" })
@@ -194,6 +214,22 @@ fn signup2_page(session_id: String, verifier_config: &State<VerifierConfig>) -> 
         }
     }
 }
+
+fn get_disclosed_claim(claim: &str, disclsosed_info : &Option<String>) -> String {
+    match disclsosed_info {
+        Some(info) => {
+            match serde_json::from_str::<Value>(&info) {
+                Ok(j) =>{
+                    j.get(claim).unwrap_or(&json!("ERROR: disclosed claims not found")).as_str().unwrap_or("ERROR: disclosed claims is not a string").to_string()
+                }
+                Err(_) => "ERROR: disclosed claims not found".to_string()
+            }
+            
+        }
+        None => "ERROR: disclosed claims not found".to_string()
+    }
+}
+
 async fn fetch_and_save_jwk(issuer_url: &str, issuer_folder: &str) -> Result<(), String> {
     // Prepare the JWK URL
     let jwk_url = format!("{}/.well-known/jwks.json", issuer_url);
@@ -310,8 +346,8 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     let is_valid;
     let disclosed_info;
     if cred_type == "jwt" {
-        let mut ps : ProofSpec = serde_json::from_str(&JWT_DEMO_PROOF_SPEC).unwrap();    
-        ps.presentation_message = Some(challenge);       
+        let mut ps : ProofSpec = serde_json::from_str(&verifier_config.site1_proof_spec).unwrap();    
+        ps.presentation_message = Some(challenge.into());       
         let (valid, info) = verify_show(&vp, &show_proof, &ps);
         is_valid = valid;
         disclosed_info = Some(info);
@@ -321,6 +357,8 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         is_valid = valid;
         disclosed_info = Some(info);
     }
+    println!("Proof is valid: {}", is_valid);
+    println!("Disclosed info: {:?}", disclosed_info);
 
     if is_valid {
         // Store the validation result in the hashmap
@@ -362,19 +400,27 @@ fn rocket() -> _ {
     let site1_verifier_name: String = figment.extract_inner("site1_verifier_name").unwrap_or_else(|_| "Example Verifier".to_string());
     let site1_verifier_domain: String = figment.extract_inner("site1_verifier_domain").unwrap_or_else(|_| "example.com".to_string());
     let site1_verify_url: String = format!("http://{}:{}/verify", site1_verifier_domain, port);
-
+    let site1_disclosure_uid: String = figment.extract_inner("site1_disclosure_uid").unwrap_or_else(|_| "{}".to_string());
+    let site1_proof_spec: String = figment.extract_inner("site1_proof_spec").unwrap_or_else(|_| "{}".to_string());
+    
     let site2_verifier_name: String = figment.extract_inner("site2_verifier_name").unwrap_or_else(|_| "Example Verifier".to_string());
     let site2_verifier_domain: String = figment.extract_inner("site2_verifier_domain").unwrap_or_else(|_| "example.com".to_string());
     let site2_verify_url: String = format!("http://{}:{}/verify", site2_verifier_domain, port);
-
+    let site2_disclosure_uid: String = figment.extract_inner("site2_disclosure_uid").unwrap_or_else(|_| "{}".to_string());
+    let site2_proof_spec: String = figment.extract_inner("site2_proof_spec").unwrap_or_else(|_| "{}".to_string());
+    
     let verifier_config = VerifierConfig {
         port,
         site1_verifier_name,
         site1_verifier_domain,
         site1_verify_url,
+        site1_disclosure_uid,
+        site1_proof_spec,
         site2_verifier_name,
         site2_verifier_domain,
         site2_verify_url,
+        site2_disclosure_uid,
+        site2_proof_spec,
         active_session_ids: Mutex::new(HashSet::new()),
         validation_results: Mutex::new(HashMap::new()),
     };

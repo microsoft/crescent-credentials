@@ -44,6 +44,13 @@ The sample defines the following *schema UIDs* expressing the credential type an
 * Supported disclosure UIDs:
   * `crescent://email_domain`: reveal the domain of an email claim
 
+### jwt_sd
+
+* Description: a JWT supporting selective disclosure of its encoded claims.
+* Credential type: JWT
+* Supported disclosure UIDs:
+  * `crescent://selective_disclosure`: supports the selective disclosure of the credential's claims
+
 ### mdl_1
 * Description: a mobile Driver's License
 * Credential type: mDL
@@ -67,7 +74,7 @@ sequenceDiagram
     I->>I: create, sign and return JWT
     I->>E: read JWT from <meta> tag
     E->>C: post {JWT, schema_uid, issuer_url} to /prepare
-    C->>E: return cred_UID
+    C->>E: return {cred_uid, optional sd_claims}
     par Client Helper prepares the cred for showing
         C->>S: fetch Crescent prove params from /prove_params/<schema_uid>
         C->>S: fetch Crescent show params from /show_params/<schema_uid>
@@ -75,7 +82,7 @@ sequenceDiagram
         C->>C: prepare JWT for proof
     and Browser Extension pings Client Helper until credential is ready
         loop Every 5 sec
-            E->>C: fetch credential status from /status?cred_uid=<cred_UID>
+            E->>C: fetch credential status from /status?cred_uid=<cred_uid>
             C->>E: return state
             E->>E: mark JWT as presentable when state = "ready"
         end
@@ -90,15 +97,14 @@ The following diagram illustrates the the credential deletion sequence.
 sequenceDiagram
     participant E as Browser Extension
     participant C as Client Helper
-    E->>E: user selects a credential to delete (identified by <cred_UID>)
-    E->>C: fetch /delete/?cred_uid=<cred_UID>
+    E->>E: user selects a credential to delete (identified by <cred_uid>)
+    E->>C: fetch /delete/?cred_uid=<cred_uid>
 ```
 
 
 ## Proof presentation
 
 The following diagram illustrates the proof presentation sequence.
-
 
 ```mermaid
 sequenceDiagram
@@ -109,13 +115,13 @@ sequenceDiagram
     participant V as Verifier
     participant I as Issuer
     B->>V: visit login page
-    V->>E: read {disclosure_UID, verify_URL, challenge} from <meta> tag
+    V->>E: read {disclosure_uid, verify_url, challenge, proof_spec} from <meta> tag
     E->>E: filter JWT that support disclosure_uid
     B->>E: user selects a JWT to present
-    E->>C: fetch show proof from /show?cred_uid=<cred_UID>&disc_uid=<disclosure_uid>&pm=<challenge>
+    E->>C: fetch show proof from /show?cred_uid=<cred_uid>&disc_uid=<disclosure_uid>&pm=<challenge>&ps=<proof_spec>
     C->>C: generate Crescent proof
     C->>E: return proof
-    E->>V: post {proof, schema_uid, issuer_UID, disclosure_uid} to verify_URL
+    E->>V: post {proof, schema_uid, issuer_url, disclosure_uid} to verify_url
     V->>S: fetch Crescent verify params from /verify_params/<schema_uid>
     V->>I: fetch JWK set from <issuer_url>/.well-known/jwks.json
     V->>V: verify proof

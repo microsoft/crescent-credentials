@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the source and target directories as arrays
-SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/mdl1")
-TARGET_DIRS=("./data/issuers/jwt_corporate_1/shared" "./data/issuers/mdl_1/shared")
+SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/rs256-sd" "../../creds/test-vectors/mdl1")
+TARGET_DIRS=("./data/issuers/jwt_corporate_1/shared" "./data/issuers/jwt_sd/shared" "./data/issuers/mdl_1/shared")
 # Directory to clean up before copying new files
 CLEANUP_DIR="./data/issuers"
 

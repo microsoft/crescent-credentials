@@ -16,6 +16,10 @@ cargo install wasm-pack
 RUSTFLAGS="-A unused-imports -A unused-assignments -A unused-variables" \
 wasm-pack build --target web --no-default-features --features wasm
 
+if [ $? -ne 0 ]; then
+    echo "[WARNING] wasm-pack build failed. Proceeding without it."
+fi
+
 ## Alternative way to build wasm package with temp install of wasm-pack but slower as it builds each time
 # TMP_DIR="$(mktemp -d)"
 # cargo install --root "$TMP_DIR" wasm-pack

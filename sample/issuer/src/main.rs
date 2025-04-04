@@ -40,6 +40,8 @@ struct UserClaims {
     sub: String,
     upn: String,
     uti: String,
+    tenant_ctry: String,
+    tenant_region_scope: String,
     verified_primary_email: Vec<String>,
     verified_secondary_email: Vec<String>,
 }
@@ -62,8 +64,6 @@ struct Claims {
     iss: String,
     jti: String,
     nbf: usize,
-    tenant_ctry: String,
-    tenant_region_scope: String,
     tid: String,
     ver: String,
     xms_pdl: String,
@@ -185,8 +185,6 @@ fn issue_token(
                 iss: format!("https://{}", issuer_domain_str),
                 jti: "fGYCO1mK2dBWTAfCjGAoTQ".to_string(),
                 nbf: current_time.timestamp() as usize,
-                tenant_ctry: "US".to_string(),
-                tenant_region_scope: "WW".to_string(),
                 tid: "12345678-1234-abcd-1234-abcdef124567".to_string(),
                 ver: "2.0".to_string(),
                 xms_pdl: "NAM".to_string(),
@@ -263,6 +261,8 @@ fn create_demo_users(issuer_config: &IssuerConfig) -> Vec<User> {
                 sub: "aaabbbbccccddddeeeeffffgggghhhh123456789012".to_string(),
                 upn: format!("alice@{}", user_domain),
                 uti: "AAABBBBccccdddd1234567".to_string(),
+                tenant_ctry: "US".to_string(), // United States
+                tenant_region_scope: "NA".to_string(), // North America
                 verified_primary_email: vec![format!("alice@{}", user_domain)],
                 verified_secondary_email: vec![format!("alice2@{}", user_domain)],
             },
@@ -284,6 +284,8 @@ fn create_demo_users(issuer_config: &IssuerConfig) -> Vec<User> {
                 sub: "aaabbbbccccddddeeeeffffgggghhhh123456789012".to_string(),
                 upn: format!("bob@{}", user_domain),
                 uti: "AAABBBBccccdddd1234567".to_string(),
+                tenant_ctry: "CA".to_string(), // Canada
+                tenant_region_scope: "NA".to_string(), // North America
                 verified_primary_email: vec![format!("bob@{}", user_domain)],
                 verified_secondary_email: vec![format!("bob2@{}", user_domain)],
             },

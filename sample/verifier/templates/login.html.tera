@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta crescent_verify_url="{{ site1_verify_url  | safe }}">
-    <meta crescent_disclosure_uid="crescent://email_domain">
+    <meta crescent_disclosure_uid="{{ site1_disclosure_uid | safe }}">
     <meta crescent_challenge="{{ session_id }}">
+    <meta crescent_proof_spec="{{ site1_proof_spec_b64url }}">
     <title>Login - {{ site1_verifier_name }}</title>
     <link rel="stylesheet" href="css/site1_style.css">
     <link rel="icon" href="img/site1-favicon.ico" type="image/x-icon">
@@ -28,14 +29,14 @@
             <p>
                 Plus, gain access to on-demand wellness exercises to help you sleep better and reduce stress.
             </p>
-                        <div style="display: flex; align-items: center;">
+            <div style="display: flex; align-items: center;">
             <img src="img/site1-calendar.png" style="width: 4em; margin-right: 1em;">
             <h2>Confidential Services</h2>
             </div>
             <p>
                 Schedule an appointment with a provider at a time that's convenient for you.
             </p>
-                        <div style="display: flex; align-items: center;">
+            <div style="display: flex; align-items: center;">
             <img src="img/site1-network.png" style="width: 4em; margin-right: 1em;">
             <h2>Excellent providers</h2>
             </div>
@@ -59,7 +60,7 @@
             <div style="display: flex; justify-content: center; align-items: center; padding: 1em; background-color: lightgray; border-radius: 8px; cursor: pointer; width: 80%; margin: 0 auto;">
                 Log in with your corporate credentials*
             </div>
-            <p style="text-align: center; font-size:90%">*Your employer may learn of your use of our services, and additional information such as your full name, email adress will be shared with us.</p>
+            <p style="text-align: center; font-size:90%">*Your employer may learn of your use of our services, and additional information such as your full name, email address will be shared with us.</p>
         </div>
     </div>
 

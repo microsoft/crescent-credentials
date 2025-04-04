@@ -7,6 +7,15 @@
     <link rel="icon" href="img/site1-favicon.ico" type="image/x-icon">
 </head>
 <body>
+    <div class="flag-top-right">
+        {% if country == "US" %}
+            <img src="img/us-flag.png" style="width: 2em; margin-right: 1em;" alt="US Flag">
+        {% elif country == "CA" %}
+            <img src="img/ca-flag.png" style="width: 2em; margin-right: 1em;" alt="CA Flag">
+        {% endif %}
+        {{ preferred_language }}
+    </div>
+
     <div style="display: flex; align-items: center;">
         <img src="img/site1-logo.png" style="width: 5em; margin-right: 1em;">
         <h1>{{ site1_verifier_name }} Health</h1>

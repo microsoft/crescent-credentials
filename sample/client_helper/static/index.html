@@ -4,12 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Client Helper Test Page</title>
+    <style>
+        /* Hide the selective disclosure claims section by default */
+        #sd-claims-section {
+          display: none;
+          margin-top: 20px;
+          border: 1px solid #ccc;
+          padding: 10px;
+        }
+      </style>
     <script>
         // URL of the Client Helper service
         const clientHelperUrl = 'http://127.0.0.1:8003'
         
-        // Credential UID to be used in the page
-        let cred_uid = null;
+        // page variables
+        let cred_uid = null; // the credential UID
+        let sd_claims = null; // the selective disclosure claims
+
+        // Dynamically create a checkbox for each selective disclosure claim.
+        function populateSDClaims(claims) {
+            const form = document.getElementById('sd-claims-form');
+            form.innerHTML = ""; // Clear any existing entries
+            claims.forEach(function(claim) {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'sd_claims';
+                checkbox.value = claim;
+                checkbox.id = 'claim_' + claim;
+
+                const label = document.createElement('label');
+                label.htmlFor = checkbox.id;
+                label.textContent = claim;
+
+                form.appendChild(checkbox);
+                form.appendChild(label);
+                form.appendChild(document.createElement('br'));
+            });
+        }
+
 
         async function prepareTask() {
             try {
@@ -31,8 +63,12 @@
                     },
                     body: JSON.stringify(credInfo)
                 });
-                cred_uid = await response.text();
-                console.log('Prepare task started. Cred UID:', cred_uid);
+                const response_json = await response.json();
+                [cred_uid, sd_claims] = response_json;
+                console.log('Prepare task started');
+                console.log('Credential UID:', cred_uid);
+                console.log('Selective Disclosure Claims:', sd_claims);
+
                 document.getElementById('status').innerText = 'Preparing...';
                 
                 // Poll the status route every 5 second
@@ -101,8 +137,30 @@
                 const challenge = document.getElementById("challengeInput").value;
 
                 // the disclosure UID associated with the credential
-                const disclosure_UID = document.getElementById("disclosureUidSelect").value;
-                const showResponse = await fetch(`${clientHelperUrl}/show?cred_uid=${cred_uid}&disc_uid=${disclosure_UID}&challenge=${challenge}`);
+                const disclosure_UID = document.getElementById("disclosure-select").value;
+
+                // the selected claims for selective disclosure (if any)
+                let selectedClaims = [];
+                const sdClaimsSection = document.getElementById('sd-claims-section');
+                if (sdClaimsSection.style.display !== "none") {
+                    // Gather all checked claim checkboxes
+                    const checkboxes = document.querySelectorAll('#sd-claims-form input[name="sd_claims"]:checked');
+                    checkboxes.forEach(function(checkbox) {
+                        selectedClaims.push(checkbox.value);
+                    });
+                }
+                
+                // the proof specification (optional, can be empty)
+                let proof_spec = {
+                    'revealed': selectedClaims
+                }
+                console.log('Proof Spec:', proof_spec);
+                
+                // convert the proof specification to a base64url
+                const proof_spec_b64 = btoa(JSON.stringify(proof_spec)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+                console.log('Proof Spec Base64:', proof_spec_b64);
+
+                const showResponse = await fetch(`${clientHelperUrl}/show?cred_uid=${cred_uid}&disc_uid=${disclosure_UID}&challenge=${challenge}&proof_spec=${proof_spec_b64}`);
                 if (!showResponse.ok) { 
                     throw new Error('Failed to fetch Show Proof'); 
                 }
@@ -133,6 +191,7 @@
         <label for="schemaUidInput">Schema UID:</label>
         <select id="schemaUidInput">
             <option value="jwt_corporate_1">jwt_corporate_1</option>
+            <option value="jwt_sd">jwt_sd</option>
             <option value="mdl_1">mdl_1</option>
         </select><br>
         
@@ -167,13 +226,21 @@
         <p>Click "Show Credential" to fetch the proof for the credential.</p>
         <label for="challengeInput">Verifier challenge (from the meta tag "crescent_challenge" value):</label><br>
         <input type="text" id="challengeInput" size="80" value=""><br>
-        <label for="disclosureUidSelect">Disclosure UID:</label>
-        <select id="disclosureUidSelect">
+        <label for="disclosure-select">Disclosure UID:</label>
+        <select id="disclosure-select">
             <option value="crescent://email_domain">crescent://email_domain</option>
+            <option value="crescent://selective_disclosure">crescent://selective_disclosure</option>
             <option value="crescent://over_21">crescent://over_21</option>
             <option value="crescent://over_18">crescent://over_18</option>
             <option value="crescent://over_65">crescent://over_65</option>
         </select><br>
+        <div id="sd-claims-section">
+            <h3>Select claims to disclose</h3>
+            <form id="sd-claims-form">
+              <!-- Checkboxes will be inserted here dynamically -->
+            </form>
+        </div>
+
         <button id="showCredentialButton" onclick="showCredential()" disabled>Show Credential</button> <!-- Button disabled initially -->
         <br>
         <textarea id="showProofTextarea" rows="10" cols="80" readonly></textarea> <!-- Textarea to display Show Proof -->
@@ -181,7 +248,22 @@
         <textarea id="testCommand" rows="10" cols="80" readonly></textarea> <!-- Textarea to display Show Proof -->
     </div>
 
+<script>
+            // Toggle the selective disclosure claims section based on selection.
+            document.getElementById('disclosure-select').addEventListener('change', function() {
+            const selectedValue = this.value;
+            const sdClaimsSection = document.getElementById('sd-claims-section');
+            if (selectedValue === "crescent://selective_disclosure") {
+                sdClaimsSection.style.display = "block";
+                if (sd_claims && sd_claims.length > 0) {
+                populateSDClaims(sd_claims);
+                }
+            } else {
+                sdClaimsSection.style.display = "none";
+            }
+        });
 
+</script>
 
 </body>
 </html>
