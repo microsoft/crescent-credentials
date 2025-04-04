@@ -235,7 +235,7 @@ export class CardElement extends LitElement {
     const discloseVerifierLabel = this.shadowRoot.querySelector<HTMLParagraphElement>('#discloseVerifierLabel')
     assert(discloseVerifierLabel)
     disclosePropertyLabel.innerText = `${disclosureValue}`
-    discloseVerifierLabel.innerText = `to ${verifierUrl.replace(/:\d+.+$/g, '')}?`
+    discloseVerifierLabel.innerText = `to ${verifierUrl.replace(/^.*?:\/\/([^/:?#]+).*$/, '$1')}?`
     this._disclosureParams = { verifierUrl, disclosureValue, disclosureUid, disclosureChallenge, proofSpec }
   }
 

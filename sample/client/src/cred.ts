@@ -248,11 +248,34 @@ export class CredentialWithCard extends Credential {
 
       case 'crescent://selective_disclosure':
         // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
-        const ps = new TextDecoder().decode(base64Decode(proofSpec))
-        return ps
+        const ps = JSON.parse(new TextDecoder().decode(base64Decode(proofSpec))) as { revealed: string[] }
+
+        return ps.revealed.map((claim: string) => {
+          const value = (this.data.token.fields[claim] ?? '') as string
+          const friendlyName = freindlyNames[claim] ?? claim
+          return `${friendlyName}: ${value}`
+        }).join('; ')
 
       default:
         return null
     }
   }
+}
+
+const freindlyNames: Record<string, string> = {
+  'Claim name': 'Friendly name',
+  'family_name': 'family name',
+  'given_name': 'given name',
+  'email': 'email',
+  'email_domain': 'email domain',
+  'name': 'name',
+  'tenant_ctry': 'country',
+  'tenant_region_scope': 'region',
+  'iss': 'issuer',
+  'aud': 'audience',
+  'xms_tpl': 'preferred language',
+  'birth_date': 'date of birth',
+  'issuing_country': 'issuing country',
+  'issuing_authority': 'issuing authority',
+  'document_number': 'license number'
 }
