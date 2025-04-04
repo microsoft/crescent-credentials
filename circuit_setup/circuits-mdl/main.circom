@@ -167,7 +167,7 @@ template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
     // Now we've confirmed that dob_preimage is authenticated: parse out the YYYY-MM-DD 
     // and confirm it equals dob_value
 
-    // Copy dob_preimage into a local array 'a' // FIXME: why not use dob_preimage directly?
+    // Copy dob_preimage into a local array 'a'
     signal a[dob_preimage_len] <== dob_preimage;
     // last 10 characters are 'YYYY-MM-DD', 32 bytes of SHA padding, so year 
     // starts at position 85 = 127 - 32 - 10
