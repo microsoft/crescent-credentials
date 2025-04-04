@@ -83,7 +83,10 @@ if [ ${CREDTYPE} == 'jwt' ] && ([ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${IN
     if [[ `cat ${INPUTS_DIR}/config.json` =~ $ALG_REGEX ]]; then
         ALG="${BASH_REMATCH[1]}"
         echo "Creating sample keys and token for algorithm $ALG"
-    fi # TODO: what if alg is not found?
+    else
+        echo "Error: algorithm not found in config.json"
+        exit 1
+    fi
     python3 scripts/jwk_gen.py ${ALG} ${INPUTS_DIR}/issuer.prv ${INPUTS_DIR}/issuer.pub
     if [ $DEVICE_BOUND ]; then
         echo "Creating device public key"
@@ -99,7 +102,10 @@ elif [ ${CREDTYPE} == 'mdl' ] && ([ ! -f ${INPUTS_DIR}/device_private_key.pem ] 
     if [[ `cat ${INPUTS_DIR}/config.json` =~ $ALG_REGEX ]]; then
         ALG="${BASH_REMATCH[1]}"
         echo "Creating sample device/issuer keys and mdl for algorithm $ALG"
-    fi # TODO: what if alg is not found?
+    else
+        echo "Error: algorithm not found in config.json"
+        exit 1
+    fi
     cd ${ROOT_DIR}/scripts
     ./gen_mdl_device_key.sh
     ./gen_x509_cert_chain.sh
