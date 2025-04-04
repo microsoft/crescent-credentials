@@ -13,7 +13,7 @@ fi
 echo "Building crescent wasm package"
 pushd $CRESCENT_DIR > /dev/null
 cargo install wasm-pack
-RUSTFLAGS="-A unused-imports -A unused-assignments -A unused-variables" \
+RUSTFLAGS='-A unused-imports -A unused-assignments -A unused-variables --cfg getrandom_backend="wasm_js"' \
 wasm-pack build --target web --no-default-features --features wasm
 
 ## Alternative way to build wasm package with temp install of wasm-pack but slower as it builds each time
