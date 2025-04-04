@@ -133,9 +133,8 @@ template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
     signal input dob_id;            // the number of the birth_date claim 
     signal input dob_preimage[dob_preimage_len];    // Version of dob_value that is encoded with random salt. 
                                                     // It's OK to hardcode the length since birth_date is fixed-length
-    signal input dob_encoded_l;     // Theposition in the cred where the hashed dob occurs
+    signal input dob_encoded_l;     // The position in the cred where the hashed dob occurs
     signal input dob_encoded_r;
-
     
     component sha_bytes = Sha256Bytes(dob_preimage_len);
     sha_bytes.in_padded <== dob_preimage;
@@ -148,13 +147,12 @@ template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
     hash_bytes.in <== sha_bytes.out;
 
     signal encoded_dob_digest[35];
-    encoded_dob_digest[0] <== dob_id;
-    encoded_dob_digest[1] <== 88;   // == 58h
-    encoded_dob_digest[2] <== 32;   // == 20h
+    encoded_dob_digest[0] <== dob_id; // FIXME: dob_id > 23 will be encoded in 2 bytes
+    encoded_dob_digest[1] <== 88;   // == 0x58
+    encoded_dob_digest[2] <== 32;   // == 0x20
     for(var i = 0; i < 32; i++ ) {
         encoded_dob_digest[i + 3] <== hash_bytes.out[i];
     }
-
     component dob_indicator = IntervalIndicator(max_msg_bytes);
     dob_indicator.l <== dob_encoded_l;
     dob_indicator.r <== dob_encoded_r;
@@ -169,6 +167,7 @@ template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
     // Now we've confirmed that dob_preimage is authenticated: parse out the YYYY-MM-DD 
     // and confirm it equals dob_value
 
+    // Copy dob_preimage into a local array 'a'
     signal a[dob_preimage_len] <== dob_preimage;
     // last 10 characters are 'YYYY-MM-DD', 32 bytes of SHA padding, so year 
     // starts at position 85 = 127 - 32 - 10
@@ -185,7 +184,7 @@ template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
 
     log("ds.out =", ds.out);
     ds.out === dob_value;
-
 }
 
-component main { public [pubkey_x, pubkey_y, valid_until_value, dob_value] } = Main(1152, 1152, 31, 43, 6);
+// Note: make sure the first two parameters are the same as the max_cred_len in inputs/mdl1/config.json
+component main { public [pubkey_x, pubkey_y, valid_until_value, dob_value] } = Main(1792, 1792, 31, 43, 6);

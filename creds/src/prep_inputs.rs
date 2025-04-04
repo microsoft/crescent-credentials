@@ -504,7 +504,7 @@ fn sha256_padding(prepad_m: &[u32]) -> Vec<u32> {
 }
 
 fn base64_decoded_size(encoded_len : u64) -> u64 {
-    ((encoded_len+3)/4)*3
+    encoded_len.div_ceil(4) * 3
 }
 
 fn to_utf8_integers(input_bytes: &str) -> Vec<u32> {
