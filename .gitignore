@@ -22,7 +22,7 @@ circuit_setup/inputs/*/token.jwt
 circuit_setup/inputs/*/device.prv
 circuit_setup/inputs/*/device.pub
 circuit_setup/inputs/*/device_private_key.pem
-circuit_setup/inputs/*/device_private_key.pem
+circuit_setup/inputs/*/device_public_key.pem
 circuit_setup/inputs/*/issuer.priv
 circuit_setup/inputs/*/issuer.pub
 circuit_setup/inputs/*/issuer_certs.pem

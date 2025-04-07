@@ -73,6 +73,12 @@ jobs:
           cd creds
           ../clippy_command.sh
 
+      - name: Run clippy for mdl-tools
+        run: |
+          cd circuit_setup/mdl-tools
+          ../../clippy_command.sh
+
+
       - name: Run cargo test for /creds
         run: |
           cd creds
