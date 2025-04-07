@@ -1,9 +1,9 @@
 //! Heap Size helpers for use with [datasize].
 
-use rug::Integer;
+use num_bigint::BigInt;
 
 /// Measure memory footprint of an integer
-pub fn estimate_heap_size_integer(i: &Integer) -> usize {
+pub fn estimate_heap_size_integer(i: &BigInt) -> usize {
     // a guess
-    i.capacity() / 8
+    (i.bits() as usize + 7) / 8
 }
