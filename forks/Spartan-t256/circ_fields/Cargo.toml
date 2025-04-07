@@ -24,7 +24,7 @@ ark-std = { version = "0.4.0", default-features = false }
 ark-secp256r1 = {default-features = false, git = "https://github.com/arkworks-rs/curves" }
 ark-ff-macros =  { version = "0.4.2", default-features = false }
 ark-serialize = { version = "0.4.2", default-features = false }
-num-bigint = { version = "0.4", features = ["serde", "rand"]   }
+num-bigint = { version = "0.4.6", features = ["serde", "rand"]   }
 num-bigint-02 = { package = "num-bigint", version = "0.2" }
 num-integer = "0.1"
 num-primes = { version = "0.3" }
