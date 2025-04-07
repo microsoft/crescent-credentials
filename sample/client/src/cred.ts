@@ -220,11 +220,11 @@ export class CredentialWithCard extends Credential {
     if (this.status !== 'PREPARED') {
       return
     }
-    const disclosureProperty = this.getDisclosureProperty(disclosureUid, proofSpec)
-    if (disclosureProperty === null) {
+    const disclosureProperties = this.getDisclosureProperties(disclosureUid, proofSpec)
+    if (disclosureProperties.length === 0) {
       return
     }
-    this.element.discloseRequest(url, disclosureProperty, disclosureUid, challenge, proofSpec)
+    this.element.discloseRequest(url, disclosureProperties, disclosureUid, challenge, proofSpec)
     this.status = 'DISCLOSABLE'
   }
 
@@ -234,47 +234,51 @@ export class CredentialWithCard extends Credential {
     window.close()
   }
 
-  private getDisclosureProperty (uid: string, proofSpec: string): string | null {
+  private getDisclosureProperties (uid: string, proofSpec: string): string[] {
     switch (uid) {
       case 'crescent://email_domain':
         // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
         const emailValue = this.data.token.fields.email as string | undefined
-        return emailValue === undefined ? null : emailValue.replace(/^.*@/, '')
+        return emailValue === undefined ? [] : [emailValue.replace(/^.*@/, '')]
 
       case 'crescent://over_18':
         // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
         const dob = this.data.token.fields.birth_date as string | undefined
-        return dob === undefined ? null : 'age is over 18'
+        return dob === undefined ? [] : ['age is over 18']
 
       case 'crescent://selective_disclosure':
         // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
         const ps = JSON.parse(new TextDecoder().decode(base64Decode(proofSpec))) as { revealed: string[] }
 
+        if (ps.revealed.some((claim: string) => this.data.token.fields[claim] === undefined)) {
+          return []
+        }
+
         return ps.revealed.map((claim: string) => {
           const value = (this.data.token.fields[claim] ?? '') as string
           const friendlyName = friendlyNames[claim] ?? claim
           return `${friendlyName}: ${value}`
-        }).join('; ')
+        })
 
       default:
-        return null
+        return []
     }
   }
 }
 
 const friendlyNames: Record<string, string> = {
-  'family_name': 'family name',
-  'given_name': 'given name',
-  'email': 'email',
-  'email_domain': 'email domain',
-  'name': 'name',
-  'tenant_ctry': 'country',
-  'tenant_region_scope': 'region',
-  'iss': 'issuer',
-  'aud': 'audience',
-  'xms_tpl': 'preferred language',
-  'birth_date': 'date of birth',
-  'issuing_country': 'issuing country',
-  'issuing_authority': 'issuing authority',
-  'document_number': 'license number'
+  family_name: 'family name',
+  given_name: 'given name',
+  email: 'email',
+  email_domain: 'email domain',
+  name: 'name',
+  tenant_ctry: 'country',
+  tenant_region_scope: 'region',
+  iss: 'issuer',
+  aud: 'audience',
+  xms_tpl: 'preferred language',
+  birth_date: 'date of birth',
+  issuing_country: 'issuing country',
+  issuing_authority: 'issuing authority',
+  document_number: 'license number'
 }

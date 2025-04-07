@@ -268,6 +268,23 @@ getElementById<HTMLInputElement>('text-import-domain').addEventListener('input',
   validDomain ? buttonImportFile.classList.remove('config-button-disabled') : buttonImportFile.classList.add('config-button-disabled')
 })
 
+getElementById<HTMLInputElement>('dropdown-import-schema').addEventListener('change', function (event) {
+  const schema = (event.target as HTMLSelectElement).value
+  const textDomain = getElementById<HTMLInputElement>('text-import-domain')
+  if (schema === 'mdl_1') {
+    const buttonImportFile = getElementById<HTMLInputElement>('button-import-card')
+    buttonImportFile.classList.remove('config-button-disabled')
+    buttonImportFile.disabled = false
+    textDomain.disabled = true
+    textDomain.value = '<none>'
+    importSettings.domain = 'MDL'
+  }
+  else {
+    textDomain.disabled = false
+    textDomain.value = ''
+  }
+})
+
 listener.handle(MSG_BACKGROUND_POPUP_IS_OPEN, (): true => {
   return true
 }, true)

@@ -41,6 +41,6 @@ for i in "${!SOURCE_DIRS[@]}"; do
 done
 
 # Copy the issuer public key for the mDL demo only
-cp "${SOURCE_DIRS[1]}/issuer.pub" "${TARGET_DIRS[1]}/"
+cp "${SOURCE_DIRS[2]}/issuer.pub" "${TARGET_DIRS[2]}/"
 
 echo "All copy operations complete."
