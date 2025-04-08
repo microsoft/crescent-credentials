@@ -255,7 +255,10 @@ export class CredentialWithCard extends Credential {
         }
 
         return ps.revealed.map((claim: string) => {
-          const value = (this.data.token.fields[claim] ?? '') as string
+          let value = (this.data.token.fields[claim] ?? '') as string
+          if (typeof formatters[claim] === 'function') {
+            value = formatters[claim](value)
+          }
           const friendlyName = friendlyNames[claim] ?? claim
           return `${friendlyName}: ${value}`
         })
@@ -269,7 +272,7 @@ export class CredentialWithCard extends Credential {
 const friendlyNames: Record<string, string> = {
   family_name: 'family name',
   given_name: 'given name',
-  email: 'email',
+  email: 'email domain',
   email_domain: 'email domain',
   name: 'name',
   tenant_ctry: 'country',
@@ -281,4 +284,10 @@ const friendlyNames: Record<string, string> = {
   issuing_country: 'issuing country',
   issuing_authority: 'issuing authority',
   document_number: 'license number'
+}
+
+const formatters: Record<string, (value: string) => string> = {
+  email: (value: string) => {
+    return value.replace(/^.*@/, '')
+  }
 }

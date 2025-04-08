@@ -48,6 +48,7 @@ async function handleDisclose (id: string, destinationUrl: string, disclosureUid
     assert(showProof)
   }
   else {
+    // TODO: remove this when fixed in issuer
     const result = await fetchShowProof(cred.id, disclosureUid, challenge, (proofSpec === 'e30') ? 'eyJyZXZlYWxlZCI6W119' : proofSpec)
     if (!result.ok) {
       console.error('Failed to fetch show data:', result.error)
