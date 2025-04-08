@@ -73,7 +73,7 @@ fn mdoc_builder(claims: String, device_priv_key: String) -> Builder {
     let isomdl_claims = parsed.get(ISO_MDL_NAMESPACE)
         .ok_or_else(|| format!("Missing key: {}", ISO_MDL_NAMESPACE))
         .unwrap();
-    let isomdl_data = OrgIso1801351::from_json(&isomdl_claims)
+    let isomdl_data = OrgIso1801351::from_json(isomdl_claims)
         .unwrap()
         .to_ns_map();
     
@@ -133,7 +133,7 @@ fn mdoc_builder(claims: String, device_priv_key: String) -> Builder {
 fn generate_mdl(claims: String, device_pub_key: String, private_key_pem: String, x5chain_pem: String) -> Vec<u8> {
     let mdoc_builder = mdoc_builder(claims, device_pub_key);
 
-    let pem_blocks = pem::parse_many(&x5chain_pem.as_bytes()).unwrap();
+    let pem_blocks = pem::parse_many(x5chain_pem.as_bytes()).unwrap();
     let mut builder = X5Chain::builder();
     for block in pem_blocks {
         // If the builder accepts DER, pass block.contents; otherwise, you could
@@ -152,7 +152,7 @@ fn generate_mdl(claims: String, device_pub_key: String, private_key_pem: String,
         .expect("failed to issue mdoc");
 
     // serialize the mdoc to a CBOR byte array
-    return cbor::to_vec(&mdoc).unwrap();
+    cbor::to_vec(&mdoc).unwrap()
 }
 
 fn main() {

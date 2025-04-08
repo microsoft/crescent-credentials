@@ -37,7 +37,6 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use num_bigint::BigUint;
 use num_traits::{Num, Zero, One, ToPrimitive};
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
-use hex;
 use std::str;
 use std::collections::BTreeMap;
 
@@ -102,7 +101,7 @@ fn digest_to_limbs(digest_hex: &str) -> [u128; 2] {
 }
 
 fn base64_decoded_size(encoded_len: usize) -> usize {
-    ((encoded_len + 3) / 4) * 3
+    encoded_len.div_ceil(4) * 3
 }
 
 fn ymd_to_timestamp(ymd: &str, is_bytes: bool, has_time: bool) -> Option<u64> {
@@ -126,7 +125,7 @@ fn ymd_to_timestamp(ymd: &str, is_bytes: bool, has_time: bool) -> Option<u64> {
     let naive_dt = NaiveDateTime::parse_from_str(&ymd_str, format_string).ok()?;
 
     // Reset time-of-day to midnight.
-    let midnight = naive_dt.date().and_hms(0, 0, 0);
+    let midnight = naive_dt.date().and_hms_opt(0, 0, 0).unwrap();
 
     // Build the correct FixedOffset.
     let offset_secs = ISSUER_TIMEZONE_OFFSET_HOURS * 3600;
@@ -247,7 +246,7 @@ pub(crate) fn find_value_digest_info(
                 if recomputed_value_digest != signed_value_digest.as_ref()  {
                     println!("Digest mismatch");
                     println!("Recomputed: {}", hex::encode(&recomputed_value_digest));
-                    println!("Signed    : {}", hex::encode(&signed_value_digest));
+                    println!("Signed    : {}", hex::encode(signed_value_digest));
                     panic!("Digest mismatch");
                 } else {
                     println!("Digest: {}", hex::encode(&recomputed_value_digest));
@@ -266,7 +265,7 @@ pub(crate) fn find_value_digest_info(
 }
 
 // TODO: see the check_config() function in the python script; more stuff to implement
-fn check_config(config: &serde_json::Value) -> () {
+fn check_config(config: &serde_json::Value) {
     // check the credtype
     let credtype = config["credtype"].as_str().unwrap();
     if credtype != "mdl" {
@@ -281,8 +280,8 @@ fn check_config(config: &serde_json::Value) -> () {
 
     // make sure max_cred_len exists
     let max_cred_len = config["max_cred_len"].as_u64().unwrap();
-    if max_cred_len <= 0 {
-        panic!("Invalid max_cred_len: {}", max_cred_len);
+    if max_cred_len == 0 {
+        panic!("Invalid max_cred_len, needs to be > 0: {}", max_cred_len);
     }
 }
 
@@ -396,9 +395,9 @@ fn main() {
     hasher.update(&tbs_data_ints);
     let sha256_hash = hasher.finalize();
 
-    let digest_hex_str = hex::encode(&sha256_hash);
+    let digest_hex_str = hex::encode(sha256_hash);
     let _digest_bits = hex_string_to_binary_array(&digest_hex_str, 256); // FIXME: from python script, but unused
-    let _digest_b64 = URL_SAFE_NO_PAD.encode(&sha256_hash); // FIXME: from python script, but unused
+    let _digest_b64 = URL_SAFE_NO_PAD.encode(sha256_hash); // FIXME: from python script, but unused
     let _digest_limbs = digest_to_limbs(&digest_hex_str); // FIXME: from python script, but unused
     
     let valid_until_prefix = "6a76616c6964556e74696cc074"; // 6a: text(10), 7661...696c: "validUntil", c0: date, 74: text(20)
@@ -423,7 +422,7 @@ fn main() {
     let dob_value = ymd_to_daystamp(dob_info.value.into_tag().unwrap().1.into_text().unwrap().as_str()).unwrap();
     prover_inputs.insert("dob_value".to_string(), serde_json::json!(dob_value));
     prover_inputs.insert("dob_id".to_string(), serde_json::json!(dob_info.id));
-    let dob_preimage = sha256_padding(&dob_info.preimage.as_ref());
+    let dob_preimage = sha256_padding(dob_info.preimage.as_ref());
     if dob_preimage.len() != 128 {
         panic!("Invalid dob_preimage length: {}; expected 128 (hardcoded in circom circuit)", dob_preimage.len());
     }
