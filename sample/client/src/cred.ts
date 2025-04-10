@@ -7,7 +7,7 @@ import { fields as mdocFields } from './mdoc'
 import { fields as jwtFields } from './jwt'
 import schemas, { type Schema } from './schema'
 import type { CardElement } from './components/card'
-import { assert, guid } from './utils'
+import { assert, base64Decode, guid } from './utils'
 import { sendMessage } from './listen'
 import { addData, getData, removeData } from './indexeddb.js'
 import * as clientHelper from './clientHelper'
@@ -30,6 +30,7 @@ export interface CredentialRecord {
   showData: ShowData | null
   status: Card_status
   credUid: string
+  sdClaims: string[]
   progress: number
 }
 
@@ -99,6 +100,7 @@ export class Credential {
       },
       status: 'PENDING',
       credUid: guid(),
+      sdClaims: [],
       // eslint-disable-next-line @typescript-eslint/no-magic-numbers
       progress: 0,
       showData: null
@@ -214,38 +216,78 @@ export class CredentialWithCard extends Credential {
     this._onStatusChangeCallback?.(status)
   }
 
-  public discloserRequest (url: string, disclosureUid: string, challenge: string): void {
+  public discloserRequest (url: string, disclosureUid: string, challenge: string, proofSpec: string): void {
     if (this.status !== 'PREPARED') {
       return
     }
-    const disclosureProperty = this.getDisclosureProperty(disclosureUid)
-    if (disclosureProperty === null) {
+    const disclosureProperties = this.getDisclosureProperties(disclosureUid, proofSpec)
+    if (disclosureProperties.length === 0) {
       return
     }
-    this.element.discloseRequest(url, disclosureProperty, disclosureUid, challenge)
+    this.element.discloseRequest(url, disclosureProperties, disclosureUid, challenge, proofSpec)
     this.status = 'DISCLOSABLE'
   }
 
-  public disclose (url: string, disclosureUid: string, challenge: string): void {
-    void verifier.disclose(this, url, disclosureUid, challenge)
+  public disclose (url: string, disclosureUid: string, challenge: string, proofSpec: string): void {
+    void verifier.disclose(this, url, disclosureUid, challenge, proofSpec)
     this.status = 'PREPARED'
     window.close()
   }
 
-  private getDisclosureProperty (uid: string): string | null {
+  private getDisclosureProperties (uid: string, proofSpec: string): string[] {
     switch (uid) {
       case 'crescent://email_domain':
         // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
         const emailValue = this.data.token.fields.email as string | undefined
-        return emailValue === undefined ? null : emailValue.replace(/^.*@/, '')
+        return emailValue === undefined ? [] : [emailValue.replace(/^.*@/, '')]
 
       case 'crescent://over_18':
         // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
         const dob = this.data.token.fields.birth_date as string | undefined
-        return dob === undefined ? null : 'age is over 18'
+        return dob === undefined ? [] : ['age is over 18']
+
+      case 'crescent://selective_disclosure':
+        // eslint-disable-next-line no-case-declarations, @typescript-eslint/no-unnecessary-condition
+        const ps = JSON.parse(new TextDecoder().decode(base64Decode(proofSpec))) as { revealed: string[] }
+
+        if (ps.revealed.some((claim: string) => this.data.token.fields[claim] === undefined)) {
+          return []
+        }
+
+        return ps.revealed.map((claim: string) => {
+          let value = (this.data.token.fields[claim] ?? '') as string
+          if (typeof formatters[claim] === 'function') {
+            value = formatters[claim](value)
+          }
+          const friendlyName = friendlyNames[claim] ?? claim
+          return `${friendlyName}: ${value}`
+        })
 
       default:
-        return null
+        return []
     }
+  }
+}
+
+const friendlyNames: Record<string, string> = {
+  family_name: 'family name',
+  given_name: 'given name',
+  email: 'email domain',
+  email_domain: 'email domain',
+  name: 'name',
+  tenant_ctry: 'country',
+  tenant_region_scope: 'region',
+  iss: 'issuer',
+  aud: 'audience',
+  xms_tpl: 'preferred language',
+  birth_date: 'date of birth',
+  issuing_country: 'issuing country',
+  issuing_authority: 'issuing authority',
+  document_number: 'license number'
+}
+
+const formatters: Record<string, (value: string) => string> = {
+  email: (value: string) => {
+    return value.replace(/^.*@/, '')
   }
 }

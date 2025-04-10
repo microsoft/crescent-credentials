@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta crescent_verify_url="{{ site2_verify_url  | safe }}">
-    <meta crescent_disclosure_uid="crescent://over_18">
+    <meta crescent_disclosure_uid="{{ site2_disclosure_uid | safe }}">
+    <meta crescent_proof_spec="{{ site2_proof_spec_b64url }}">
     <meta crescent_challenge="{{ session_id }}">
     <title>{{ site2_verifier_name }} Sign Up</title>
     <link rel="stylesheet" href="css/site2_style.css">
@@ -29,7 +30,7 @@
     <img src="img/icon128.png" style="width: 3em; margin-right: 1em;"> 
     <p><strong>You need to be 18 or older to create an account on our site.</strong> 
     Please present a proof of age to continue. 
-    We will only learn that you  are old enough, the rest of your driver's license stays private! </p>
+    We will only learn that you are old enough, the rest of your driver's license stays private! </p>
     </div>
     <div style="height: 2em;"></div>
 

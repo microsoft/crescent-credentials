@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the source and target directories as arrays
-SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/mdl1")
-TARGET_DIRS=("./data/issuers/jwt_corporate_1/shared" "./data/issuers/mdl_1/shared")
+SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/rs256-sd" "../../creds/test-vectors/mdl1")
+TARGET_DIRS=("./data/issuers/jwt_corporate_1/shared" "./data/issuers/jwt_sd/shared" "./data/issuers/mdl_1/shared")
 # Directory to clean up before copying new files
 CLEANUP_DIR="./data/issuers"
 
@@ -41,6 +41,6 @@ for i in "${!SOURCE_DIRS[@]}"; do
 done
 
 # Copy the issuer public key for the mDL demo only
-cp "${SOURCE_DIRS[1]}/issuer.pub" "${TARGET_DIRS[1]}/"
+cp "${SOURCE_DIRS[2]}/issuer.pub" "${TARGET_DIRS[2]}/"
 
 echo "All copy operations complete."

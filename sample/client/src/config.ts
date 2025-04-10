@@ -5,7 +5,7 @@
 
 import 'dotenv/config'
 
-const schemaList = process.env.SCHEMAS ?? 'jwt_corporate_1,mdl_1'
+const schemaList = process.env.SCHEMAS ?? 'jwt_corporate_1,jwt_sd,mdl_1'
 
 const config = {
   clientHelperUrl: process.env.CLIENT_HELPER_URL ?? 'http://127.0.0.1:8003',
@@ -13,7 +13,8 @@ const config = {
   pollInterval: parseInt(process.env.PREPARE_POLL_INTERVAL ?? '5000'),
   pollStatusRate: parseFloat(process.env.PREPARE_STATUS_RATE ?? '0.07'),
   cardColor: process.env.CARD_COLOR ?? '#4E95D9',
-  autoOpen: (process.env.AUTO_OPEN ?? '').trim().toLowerCase() === 'true'
+  autoOpen: (process.env.AUTO_OPEN ?? '').trim().toLowerCase() === 'true',
+  wasmShowProof: (process.env.WASM_SHOW_PROOF ?? '').trim().toLowerCase() === 'true'
 }
 
 export function setClientHelperUrl (url: string): void {

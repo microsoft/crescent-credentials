@@ -20,6 +20,19 @@ interface MESSAGE_PAYLOAD {
   data: unknown[]
 }
 
+declare module 'crescent' {
+  // eslint-disable-next-line @typescript-eslint/max-params, @typescript-eslint/naming-convention
+  export function create_show_proof_wasm (
+    clientStateB64: string,
+    rangePkB64: string,
+    ioLocationsStr: string,
+    disclosureUid: string,
+    challenge: string
+  ): string
+
+  export default function init (): Promise<void>
+}
+
 interface JWT_TOKEN { header: Record<string, unknown>, payload: Record<string, unknown>, signature: string }
 
 interface MDOC { status: number, version: string, documents: mdocDocument[] }

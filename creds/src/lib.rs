@@ -105,7 +105,7 @@ impl<E: Pairing> VerifierParams<E> {
 // Proof specification describing what is to be proven during a Show proof.  Currently supporting selective disclosure
 // of attributes as field elements or hashed values.  Will likely be extended in the future to support other predicates.
 // The range proof that "exp" is in the future is always done.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ProofSpec {
     pub revealed: Vec<String>,
     pub presentation_message: Option<Vec<u8>>,

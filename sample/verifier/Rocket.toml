@@ -1,10 +1,19 @@
 [default]
 port = 8004
 
-# JWT verifier
+# Site 1 - JWT verifier
 site1_verifier_name = "Fabrikam"
 site1_verifier_domain = "fabrikam.com"
+# over-18 demo
+# site1_disclosure_uid = "crescent://email_domain"
+# site1_proof_spec = '{"revealed": ["email"]}'
+# - or - 
+# selective-disclosure demo
+site1_disclosure_uid = "crescent://selective_disclosure"
+site1_proof_spec = '{"revealed": ["email", "tenant_ctry"]}'
 
-# mDL verifier
+# Site 2 - mDL verifier
 site2_verifier_name = "Soc.ial"
 site2_verifier_domain = "soc.ial"
+site2_disclosure_uid = "crescent://over_18"
+site2_proof_spec = '{}'
