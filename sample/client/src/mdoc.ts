@@ -7,21 +7,11 @@
 
 import { decode as cborDecode } from './cbor.js'
 
-interface mdocDocument {
+export interface mdocDocument {
   docType: string
-  deviceSigned: {
-    deviceAuth: {
-      deviceMac: unknown[]
-    }
-    nameSpaces: {
-      tag: number
-      value: Uint8Array
-    }
-  }
-  issuerSigned: {
-    issuerAuth: Uint8Array[]
-    nameSpaces: Record<string, Array<nameSpace | nameSpaceTag>>
-  }
+  namespaces: Record<string, Array<nameSpace | nameSpaceTag>>
+  mso: Record<string, unknown>
+  issuerAuth: unknown[]
 }
 
 interface nameSpaceTag {
@@ -60,16 +50,13 @@ function hexToUint8Array (hexString: string): Uint8Array {
   return new Uint8Array(hexPairs.map(byte => parseInt(byte, 16)))
 }
 
-export function decode (hex: string): RESULT<MDOC, Error> {
+export function decode (hex: string): RESULT<mdocDocument, Error> {
   const bytes = hexToUint8Array(hex)
-  const decoded = cborDecode<MDOC>(bytes)
+  const decoded = cborDecode<mdocDocument>(bytes);
 
-  decoded.documents.forEach((doc: mdocDocument) => {
-    (doc.issuerSigned.nameSpaces['org.iso.18013.5.1'] as nameSpaceTag[]).forEach((ns: nameSpaceTag, i) => {
-      const decodedTag = cborDecode<nameSpace>(ns.value)
-      // decodeElementValue(decodedTag)
-      doc.issuerSigned.nameSpaces['org.iso.18013.5.1'][i] = decodedTag
-    })
+  (decoded.namespaces['org.iso.18013.5.1'] as nameSpaceTag[]).forEach((ns: nameSpaceTag, i) => {
+    const decodedTag = cborDecode<nameSpace>(ns.value)
+    decoded.namespaces['org.iso.18013.5.1'][i] = decodedTag
   })
 
   return { ok: true, value: decoded }
@@ -85,11 +72,10 @@ function _decodeElementValue (ns: nameSpace): void {
   }
 }
 
-export function fields (mdoc: MDOC): Record<string, unknown> {
-  const document = mdoc.documents[0]
+export function fields (mdoc: mdocDocument): Record<string, unknown> {
   const fields: Record<string, unknown> = {}
-  document.issuerSigned.nameSpaces['org.iso.18013.5.1'].forEach((ns: nameSpace) => {
-    fields[(ns).elementIdentifier] = decodeKnownTags((ns).elementValue)
+  Object.values(mdoc.namespaces).flat().forEach((ns: nameSpace | nameSpaceTag) => {
+    fields[(ns as nameSpace).elementIdentifier] = decodeKnownTags((ns as nameSpace).elementValue)
   })
   return fields
 }

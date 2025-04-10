@@ -4,10 +4,10 @@
  */
 
 import { decode as decodeJwt } from './jwt.js'
-import { decode as decodeMdoc } from './mdoc.js'
+import { decode as decodeMdoc, type mdocDocument } from './mdoc.js'
 
 export interface Schema {
-  decode: (encoded: string) => RESULT<JWT_TOKEN, Error> | RESULT<MDOC, Error>
+  decode: (encoded: string) => RESULT<JWT_TOKEN, Error> | RESULT<mdocDocument, Error>
   type: 'JWT' | 'MDOC'
   name: 'mdl_1' | 'jwt_corporate_1' | 'jwt_sd'
 }
