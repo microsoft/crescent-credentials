@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Define the source and target directories as arrays
 CRESCENT_DIR=("../../creds")

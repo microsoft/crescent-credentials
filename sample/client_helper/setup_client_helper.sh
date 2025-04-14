@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Define the source and target directories as arrays
 SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/rs256-sd" "../../creds/test-vectors/mdl1")

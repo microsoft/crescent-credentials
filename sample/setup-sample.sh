@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # usage: setup-sample.sh
 
