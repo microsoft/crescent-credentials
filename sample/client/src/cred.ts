@@ -3,7 +3,7 @@
  *  Licensed under the MIT license.
  */
 
-import { fields as mdocFields } from './mdoc'
+import { type mdocDocument, fields as mdocFields } from './mdoc'
 import { fields as jwtFields } from './jwt'
 import schemas, { type Schema } from './schema'
 import type { CardElement } from './components/card'
@@ -20,7 +20,7 @@ export interface CredentialRecord {
     type: 'JWT' | 'MDOC'
     schema: string
     raw: string
-    value: JWT_TOKEN | MDOC
+    value: JWT_TOKEN | mdocDocument
     fields: Record<string, unknown>
   }
   issuer: {
@@ -92,7 +92,7 @@ export class Credential {
         schema: schema.name,
         raw: rawJwtOrMdoc,
         value: decoded.value,
-        fields: schema.type === 'JWT' ? jwtFields(decoded.value as JWT_TOKEN) : mdocFields(decoded.value as MDOC)
+        fields: schema.type === 'JWT' ? jwtFields(decoded.value as JWT_TOKEN) : mdocFields(decoded.value as mdocDocument)
       },
       issuer: {
         url: credentialOrDomain.startsWith('http') ? credentialOrDomain : `http://${credentialOrDomain}`,

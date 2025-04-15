@@ -2,7 +2,7 @@
 set -e
 
 # Define the source and target directories as arrays
-CRESCENT_DIR=("../../creds")
+CRESCENT_DIR="../../creds"
 
 # Make sure we're in the right directory
 CURRENT_DIR=${PWD##*/}
@@ -14,19 +14,20 @@ fi
 echo "Building crescent wasm package"
 pushd $CRESCENT_DIR > /dev/null
 cargo install wasm-pack
+
+# Build crescent wasm package 
 RUSTFLAGS="-A unused-imports -A unused-assignments -A unused-variables" \
-wasm-pack build --target web --no-default-features --features wasm
+wasm-pack build --target web --no-default-features --features wasm || \
+echo -e "\n\033[33m[WARNING] wasm-pack build failed. Proceeding without it.\033[0m\n"
 
-if [ $? -ne 0 ]; then
-    echo "[WARNING] wasm-pack build failed. Proceeding without it."
-fi
-
-## Alternative way to build wasm package with temp install of wasm-pack but slower as it builds each time
-# TMP_DIR="$(mktemp -d)"
-# cargo install --root "$TMP_DIR" wasm-pack
-# "$TMP_DIR/bin/wasm-pack" build --target web --no-default-features --features wasm
-# rm -rf "$TMP_DIR"
+popd > /dev/null
 
 echo "Install NPM dependencies"
-popd > /dev/null
 npm install
+
+if [ -f "$CRESCENT_DIR/pkg/package.json" ]; then
+    echo "Installing NPM dependencies for crescent"
+    npm install -D ../../creds/pkg/    
+else
+    echo -e "\n\033[33m[WARNING]No package.json found in ../../creds/pkg. Skipping NPM install.\033[0m\n"
+fi

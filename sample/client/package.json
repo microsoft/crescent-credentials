@@ -24,7 +24,6 @@
     "@rollup/plugin-virtual": "^3.0.2",
     "@stylistic/eslint-plugin": "^2.8.0",
     "@types/chrome": "0.0.272",
-    "crescent": "file:../../creds/pkg",
     "cross-env": "^7.0.3",
     "dotenv": "^16.4.5",
     "eslint": "8.57.1",
