@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'creds/**'
+      - 'ecdsa-pop/**'
       - 'forks/**'
       - 'circuit_setup/**'
       - 'samples/**'
@@ -14,6 +15,7 @@ on:
       - main
     paths:
       - 'creds/**'
+      - 'ecdsa-pop/**'
       - 'forks/**'
       - 'circuit_setup/**'
       - 'samples/**'
