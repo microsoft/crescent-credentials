@@ -2,3 +2,4 @@
 issuer_name = "Contoso"
 issuer_domain = "contoso.com"
 port = 8001
+device_key_binding = true

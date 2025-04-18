@@ -2,7 +2,8 @@
 set -e
 
 # Define the source and target directories as arrays
-SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/rs256-sd" "../../creds/test-vectors/mdl1")
+# Note: the rs256-db (device binding) set also supports selective disclosure, so we use that set for both features
+SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/rs256-db" "../../creds/test-vectors/mdl1")
 TARGET_DIRS=("./data/creds/jwt_corporate_1/shared" "./data/creds/jwt_sd/shared" "./data/creds/mdl_1/shared")
 # Directory to clean up before copying new files
 CLEANUP_DIR="./data/creds"
@@ -35,6 +36,8 @@ for i in "${!SOURCE_DIRS[@]}"; do
     cp "${SOURCE_DIR}/main.wasm" "${TARGET_DIR}/"
     cp "${SOURCE_DIR}/main_c.r1cs" "${TARGET_DIR}/"
     cp "${SOURCE_DIR}/io_locations.sym" "${TARGET_DIR}/"
+    [ -f "${SOURCE_DIR}/device.prv" ] && cp "${SOURCE_DIR}/device.prv" "${TARGET_DIR}/"
+    [ -f "${SOURCE_DIR}/device.pub" ] && cp "${SOURCE_DIR}/device.pub" "${TARGET_DIR}/"
     cp "${SOURCE_DIR}/cache/prover_params.bin" "${TARGET_DIR}/cache/"
     cp "${SOURCE_DIR}/cache/groth16_pvk.bin" "${TARGET_DIR}/cache/"
     cp "${SOURCE_DIR}/cache/range_pk.bin" "${TARGET_DIR}/cache/"

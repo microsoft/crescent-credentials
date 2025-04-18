@@ -19,9 +19,12 @@ use std::path::PathBuf;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use std::fs;
+use p256::ecdsa::VerifyingKey;
+use p256::pkcs8::DecodePublicKey;
 
 // issuer config values
 const PRIVATE_KEY_PATH : &str = "keys/issuer.prv"; // private key path
+const DEVICE_PUB_KEY_PATH: &str = "keys/device.pub"; // device public key path
 const JWKS_PATH: &str = ".well-known/jwks.json"; // JWKS path
 
 // struct for the personal claims related to the user
@@ -44,6 +47,10 @@ struct UserClaims {
     tenant_region_scope: String,
     verified_primary_email: Vec<String>,
     verified_secondary_email: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    device_key_0: Option<u128>, // optional device-binding key, part 0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    device_key_1: Option<u128>, // optional device-binding key, part 1
 }
 
 // struct for the full JWT claims, which includes both user-specific and dynamic fields
@@ -94,6 +101,7 @@ struct IssuerConfig {
     issuer_name: String,
     issuer_domain: String,
     issuer_kid: String,
+    _device_key_binding: bool,
 }
 
 // redirect from `/` to `/login`
@@ -239,9 +247,31 @@ async fn serve_jwks() -> Option<NamedFile> {
     NamedFile::open(PathBuf::from(JWKS_PATH)).await.ok()
 }
 
+fn parse_device_public_key(device_pub_key: &VerifyingKey) -> (u128, u128) {
+    let encoded_point = device_pub_key.to_encoded_point(false); // uncompressed
+    let x_bytes = encoded_point.x().expect("Missing x-coordinate");
+    assert_eq!(x_bytes.len(), 32); // ensure it's 256-bit
+
+    let pk_x_int = x_bytes;
+    let device_key_0 = u128::from_be_bytes(pk_x_int[16..32].try_into().unwrap());
+    let device_key_1 = u128::from_be_bytes(pk_x_int[0..16].try_into().unwrap());
+
+    (device_key_0, device_key_1)
+}
+
 // create a list of users with their personal claims
-fn create_demo_users(issuer_config: &IssuerConfig) -> Vec<User> {
+fn create_demo_users(issuer_config: &IssuerConfig, device_pub_key: Option<VerifyingKey>) -> Vec<User> {
     let user_domain = issuer_config.issuer_domain.as_str();
+
+    let mut device_key_0 = None;
+    let mut device_key_1 = None;
+    if let Some(device_pub_key) = device_pub_key {
+        let (key0, key1) = parse_device_public_key(&device_pub_key);
+        device_key_0 = Some(key0);
+        device_key_1 = Some(key1);
+    }
+    println!("Device key 0: {:?}", device_key_0);
+    println!("Device key 1: {:?}", device_key_1);
 
     vec![
         User {
@@ -265,6 +295,8 @@ fn create_demo_users(issuer_config: &IssuerConfig) -> Vec<User> {
                 tenant_region_scope: "NA".to_string(), // North America
                 verified_primary_email: vec![format!("alice@{}", user_domain)],
                 verified_secondary_email: vec![format!("alice2@{}", user_domain)],
+                device_key_0: device_key_0,
+                device_key_1: device_key_1,
             },
         },
         User {
@@ -288,6 +320,8 @@ fn create_demo_users(issuer_config: &IssuerConfig) -> Vec<User> {
                 tenant_region_scope: "NA".to_string(), // North America
                 verified_primary_email: vec![format!("bob@{}", user_domain)],
                 verified_secondary_email: vec![format!("bob2@{}", user_domain)],
+                device_key_0: device_key_0,
+                device_key_1: device_key_1,
             },
         },
     ]
@@ -300,7 +334,7 @@ async fn favicon() -> Option<NamedFile> {
 
 #[launch]
 fn rocket() -> _ {
-    // load the private key at server startup
+    // load the issuer private key at server startup
     let private_key_data = fs::read(PRIVATE_KEY_PATH)
         .expect("Failed to read private key");
     let encoding_key = EncodingKey::from_rsa_pem(&private_key_data)
@@ -323,15 +357,31 @@ fn rocket() -> _ {
      let figment = rocket::Config::figment();
      let issuer_name: String = figment.extract_inner("issuer_name").unwrap_or_else(|_| "Example Issuer".to_string());
      let issuer_domain: String = figment.extract_inner("issuer_domain").unwrap_or_else(|_| "example.com".to_string());
- 
+     let device_key_binding: bool = figment.extract_inner("device_key_binding").unwrap_or(false);
+     
      let issuer_config = IssuerConfig {
          issuer_name,
          issuer_domain,
          issuer_kid,
+         _device_key_binding: device_key_binding,
      };
  
+     let mut device_pub_key = None;
+     if device_key_binding {
+        // read the device public key
+        // note: currently, all users share the same device public key, as prepared by the 
+        // Crescent provisioning tool. In a real system, each user would have their own key pair
+        let device_pub_key_pem = fs::read_to_string(DEVICE_PUB_KEY_PATH)
+            .expect("Failed to read device public key");
+        device_pub_key = Some(
+            VerifyingKey::from_public_key_pem(&device_pub_key_pem)
+                .expect("Failed to parse PEM device public key"),
+        );
+        println!("Loaded device public key: {:?}", device_pub_key);
+     }
+
      // Create demo users based on the issuer config
-     let users = create_demo_users(&issuer_config);
+     let users = create_demo_users(&issuer_config, device_pub_key);
 
     // launch the Rocket server and manage the private key and user state
     rocket::build()
