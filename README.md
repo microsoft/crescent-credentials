@@ -83,7 +83,9 @@ The `rs256-sd` example demonstrates how to disclose a subset of the attributes i
 which means that the proof will disclose those attributes to the verifier.  The subset of the attributes that may be revealed in this way is limited to those in `circuit_setup/inputs/rs256-sd/config.json` that have the `reveal` or `reveal_digest` boolean set to `true`. 
 The `reveal_digest` option is used for values that may be larger than 31 bytes; they will get hashed first.  Setting this flag changes how the circuit setup phase handles those attributes, allowing them to be optionally revealed during `show`.
 
-As example ways to experiment with selective disclosure, try removing `aud` from the list of revealed attributes, or adding `given_name` to the list of revealed attributes in the proof specification file. 
+As example ways to experiment with selective disclosure, try removing `aud` from the list of revealed attributes, or adding `given_name` to the list of revealed attributes in the proof specification file.
+
+Note that the `rs256-db` parameter set also supports selective disclosure; this is the set used in the sample to offer both selective disclosure and key binding (see next section).
 
 ### Device-Bound Credentials
 The example `rs256-db` demonstrates a JWT credential that is *device bound*.  This means that the JWT encodes the public key of an ECDSA signing key, where the private key is stored by a device (such as a hardware security module), and the device exposes only a signing API. 
