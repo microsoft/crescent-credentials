@@ -50,11 +50,21 @@ else
     CIRCOM_SRC_DIR="${ROOT_DIR}/circuits"
 fi
 
-# Replace symlink with junction if on Windows
+# Replace linux symlink with junction if on Windows
+# There is a scenario where the symlink is broken on Windows, but then copied to the Ubuntu Docker container.
+# In this case, we need to remove the broken symlink and create a new one.
 if [ -f "${CIRCOM_SRC_DIR}/circomlib" ]; then
+    echo "Detected broken symlink at ${CIRCOM_SRC_DIR}/circomlib"
     rm -f "${CIRCOM_SRC_DIR}/circomlib"
-    cmd //c "mklink /J ${CIRCOM_SRC_DIR##*/}\circomlib circuits\circomlib"
+    if [[ "$OS" == "Windows_NT" || "$(uname -o 2>/dev/null)" == "Msys" ]]; then
+        echo "Creating Windows junction..."
+        cmd //c "mklink /J ${CIRCOM_SRC_DIR//\//\\}\\circomlib circuits\\circomlib"
+    else
+        echo "Creating Linux symlink..."
+        ln -s "${ROOT_DIR}/circuits/circomlib" "${CIRCOM_SRC_DIR}/circomlib"
 fi
+fi
+
 
 # Determine if the credential should be device bound
 DEVICE_BOUND_REGEX="\"device_bound\": ([a-z]+)"

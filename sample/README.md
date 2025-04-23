@@ -17,6 +17,20 @@ Two scripts help with managing the sample projects:
 
 Each component must be setup and modified individually; see their respective README for details. Once setup, follow the instructions from <a href="sample.html">this page</a> to go through the sample demo steps.
 
+## Docker
+
+The sample can be built and run in a docker container without having to install Rust and its dependencies.
+The image build copies the project source code from this directory, so any changes made to the source code will be reflected in the image.
+
+```bash
+# from the root of the project build the image
+docker build -f sample/Dockerfile -t crescent-sample .
+
+# start the image in a container
+# the browser extension files will be available in the `sample/docker-extension` folder
+docker run -v "$(pwd -W)\docker-extension:/crescent-credentials/sample/client/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
+```
+
 # Sample Overview
 
 The sample application illustrates the setup of a Crescent system, and the proof generation and verification from a standard JWT or mDL, mimicking a real-life scenario. Note that security aspects have been overly simplified (e.g., using HTTP over localhost instead of HTTPS, simple username/password user authentication, etc.).

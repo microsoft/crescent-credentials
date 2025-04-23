@@ -31,3 +31,4 @@ circuit_setup/inputs/*/mdl.cbor
 
 setup/generated_files/
 circuit_setup/circuits-mdl/circomlib
+docker-extension
