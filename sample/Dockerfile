@@ -5,7 +5,7 @@
 #  besides Docker. The browser extension can be installed from the container to your local browser and will 
 #  connect to the services running in the container.
 #
-#  The browser extension files and sample mdoc are available in /sample/docker-extension in the project
+#  The browser extension files and sample mdl are available in /sample/docker-extension in the project
 #  folder after running instantiating the container with 'docker run'.
 #
 #
@@ -21,7 +21,7 @@
 #  Run the Docker container:
 #
 #    A new folder called 'crescent-extension' will be created in the directory where you run the command.
-#    This folder will contain the browser extension files and the sample mdoc.
+#    This folder will contain the browser extension files and the sample mdl.
 #
 #    # Windows (Cmd)
 #    docker run -v "%cd%\crescent-extension:/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
