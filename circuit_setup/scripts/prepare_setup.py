@@ -21,7 +21,7 @@ def main_circom_header(config):
     if config['alg'] == 'RS256':
         template_filename = "circuits/main_header_rs256.circom.template"
     elif config['alg'] == 'ES256K':
-        template_filename = "circuits/main_header_es256k.circom.template"
+        template_filename = "circuits/main_header_es256k.circom.template" # FIXME: can't find this file
     else :
         print("Error: Unsupported algorithm")
         sys.exit(-1)
