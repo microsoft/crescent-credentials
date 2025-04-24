@@ -1,4 +1,40 @@
-FROM ubuntu:22.04
+# 
+#
+#  This Dockerfile is used to build a Docker image for the Crescent credentials project and sample.
+#  You can build and run the sample in the container without installing any dependencies on your local machine
+#  besides Docker. The browser extension can be installed from the container to your local browser and will 
+#  connect to the services running in the container.
+#
+#  The browser extension files and sample mdoc are available in /sample/docker-extension in the project
+#  folder after running instantiating the container with 'docker run'.
+#
+#
+#  Build the Docker image (this can take 30 minutes or more and use 35+ GB of disk space):
+#
+#    # Make sure you are in the root folder of the project even though the Dockerfile is in the sample folder
+#    cd crescent-credentials
+#
+#    # Build the Docker image
+#    docker build -f sample/Dockerfile -t crescent-sample .
+#
+#
+#  Run the Docker container:
+#
+#    A new folder called 'crescent-extension' will be created in the directory where you run the command.
+#    This folder will contain the browser extension files and the sample mdoc.
+#
+#    # Windows (Cmd)
+#    docker run -v "%cd%\crescent-extension:/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
+#
+#    # Windows (Git Bash)
+#    docker run -v "$(pwd -W)\crescent-extension:/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
+#
+#    # Linux
+#    docker run -v "$(pwd)/crescent-extension:/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
+#
+# 
+
+FROM rust:slim
 
 SHELL ["/bin/bash", "-c"]
 
@@ -6,23 +42,28 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV ROCKET_ADDRESS=0.0.0.0
 
 RUN apt-get update && apt-get upgrade -y && apt-get clean
-RUN apt-get install git curl software-properties-common build-essential python3-pip cmake clang libclang-dev llvm-dev m4 bsdextrautils dos2unix -y
-# RUN { add-apt-repository ppa:git-core/ppa -y; apt update; apt install git -y; git --version; }
+RUN apt-get install python3.11-venv python3-pip curl git dos2unix m4 cmake libclang-dev bsdextrautils -y
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs && node -v && npm -v
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y
-ENV PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-RUN pip install --upgrade pip setuptools wheel setuptools-scm
+
+# pip requires a virtual environment to not pollute the system python installation
+RUN python3 -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+RUN pip install --upgrade pip
 RUN pip install python_jwt git+https://github.com/peppelinux/pyMDOC-CBOR.git
 
+# Install circom
 RUN git clone https://github.com/iden3/circom.git && cd circom && git checkout v2.1.6 && cargo build --release && cargo install --path circom;
+
+# Copy local Crescent source code to the container
 COPY . /crescent-credentials
+
+# Fix line endings for all shell scripts as we may be copying from Windows
 RUN find /crescent-credentials -type f -name "*.sh" -exec dos2unix {} +
 
 WORKDIR /crescent-credentials
 RUN git submodule update --init --recursive;
 
 WORKDIR /crescent-credentials/circuit_setup/scripts
-
 RUN ./run_setup.sh rs256
 RUN ./run_setup.sh rs256-sd
 RUN ./run_setup.sh rs256-db
@@ -33,31 +74,32 @@ RUN cargo run --bin crescent --release --features print-trace zksetup --name rs2
 RUN cargo run --bin crescent --release --features print-trace prove --name rs256
 RUN cargo run --bin crescent --release --features print-trace show --name rs256
 RUN cargo run --bin crescent --release --features print-trace verify --name rs256
-
 RUN cargo run --bin crescent --release --features print-trace zksetup --name rs256-sd
 RUN cargo run --bin crescent --release --features print-trace prove --name rs256-sd
 RUN cargo run --bin crescent --release --features print-trace show --name rs256-sd
 RUN cargo run --bin crescent --release --features print-trace verify --name rs256-sd
-
 RUN cargo run --bin crescent --release --features print-trace zksetup --name rs256-db
 RUN cargo run --bin crescent --release --features print-trace prove --name rs256-db
 RUN cargo run --bin crescent --release --features print-trace show --name rs256-db
 RUN cargo run --bin crescent --release --features print-trace verify --name rs256-db
-
 RUN cargo run --bin crescent --release --features print-trace zksetup --name mdl1
 RUN cargo run --bin crescent --release --features print-trace prove --name mdl1
 RUN cargo run --bin crescent --release --features print-trace show --name mdl1
 RUN cargo run --bin crescent --release --features print-trace verify --name mdl1
 
+WORKDIR /crescent-credentials/ecdsa-pop
+RUN cargo build --release
+
 WORKDIR /crescent-credentials/sample
 RUN ./setup-sample.sh
+
+# Create run script to start all services and copy extension files to the mount folder
 RUN echo '#!/bin/bash' > start-all.sh && \
-    # echo 'cd setup_service && cargo run --release &' >> start-all.sh && \
     echo 'cd client_helper && cargo run --release &' >> start-all.sh && \
     echo 'cd issuer && cargo run --release &' >> start-all.sh && \
     echo 'cd verifier && cargo run --release &' >> start-all.sh && \
-    echo 'cp -r /crescent-credentials/sample/client/dist/* /crescent-credentials/sample/client/extension/' >> start-all.sh && \
-    echo 'cp -r /crescent-credentials/sample/client/mdl.cbor.hex /crescent-credentials/sample/client/extension/' >> start-all.sh && \
+    echo 'cp -r /crescent-credentials/sample/client/dist/* /extension/' >> start-all.sh && \
+    echo 'cp -r /crescent-credentials/sample/client/mdl.cbor.hex /extension/' >> start-all.sh && \
     echo 'wait -n' >> start-all.sh && \
     chmod +x start-all.sh
 
@@ -65,9 +107,3 @@ EXPOSE 8001 8003 8004
 
 CMD ["./start-all.sh"]
 
-# Run with the following commands:
-#   cd crescent-credentials
-#   docker build -f sample/Dockerfile -t crescent-sample .
-#   docker run -v "$(pwd -W)\docker-extension:/crescent-credentials/sample/client/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
-
-# docker run -v "D:\Repos-Temp\crescent-credentials-docker\sample\client\dist:/crescent-credentials/sample/client/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample

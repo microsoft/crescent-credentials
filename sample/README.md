@@ -19,17 +19,32 @@ Each component must be setup and modified individually; see their respective REA
 
 ## Docker
 
-The sample can be built and run in a docker container without having to install Rust and its dependencies.
-The image build copies the project source code from this directory, so any changes made to the source code will be reflected in the image.
+The sample can be built and run in a docker container without having to install Rust or the project dependencies.
+The docker build copies the project source code from this directory, so any changes made to the source code will be reflected in the image.
 
 ```bash
-# from the root of the project build the image
+# From the root of the project, build the image
 docker build -f sample/Dockerfile -t crescent-sample .
 
-# start the image in a container
-# the browser extension files will be available in the `sample/docker-extension` folder
-docker run -v "$(pwd -W)\docker-extension:/crescent-credentials/sample/client/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
+# Start a container from the image
+# The browser extension files will be available in the `crescent-extension` folder created in the current directory
+
+# Linux
+docker run -v "$(pwd)/crescent-extension:/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
+
+# Windows (Cmd)
+docker run -v "%cd%\crescent-extension:/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
+
+# Windows (Git Bash)
+docker run -v "$(pwd -W)\crescent-extension:/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
 ```
+
+When the container is started, the following services will be available:
+* Issuer: http://localhost:8001
+* Client Helper: http://localhost:8004
+* Verifier: http://localhost:8002
+
+Install the browser extension from the `crescent-extension` folder created in the current directory. See the [client README](./client/README.md#installation) for instructions on how to install the extension.
 
 # Sample Overview
 
