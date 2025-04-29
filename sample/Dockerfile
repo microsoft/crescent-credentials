@@ -1,4 +1,4 @@
-# 
+#
 #
 #  This Dockerfile is used to build a Docker image for the Crescent credentials project and sample.
 #  You can build and run the sample in the container without installing any dependencies on your local machine
@@ -32,7 +32,7 @@
 #    # Linux
 #    docker run -v "$(pwd)/crescent-extension:/extension" -p 8001:8001 -p 8003:8003 -p 8004:8004 crescent-sample
 #
-# 
+#
 
 FROM rust:slim
 
