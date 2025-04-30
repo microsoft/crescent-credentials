@@ -121,7 +121,9 @@ fi
 echo "- Generating ${NAME}_main.circom..."
 
 # Generate the circom main file.  
-if [ ${CREDTYPE} != 'mdl' ]; then
+if [ ${CREDTYPE} == 'mdl' ]; then
+    python3 scripts/prepare_mdl_setup.py ${INPUTS_DIR}/config.json ${CIRCOM_DIR}/main.circom
+else
     python3 scripts/prepare_setup.py ${INPUTS_DIR}/config.json ${CIRCOM_DIR}/main.circom
 fi
 
