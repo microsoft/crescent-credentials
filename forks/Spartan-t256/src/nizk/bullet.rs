@@ -3,6 +3,8 @@
 #![allow(non_snake_case)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
+use crate::nizk::ipa_bases::IPABases;
+
 use super::super::errors::ProofVerifyError;
 use super::super::group::{CompressedGroup, GroupElement, VartimeMultiscalarMul};
 use super::super::math::Math;
@@ -11,6 +13,7 @@ use super::super::transcript::ProofTranscript;
 use core::iter;
 use merlin::Transcript;
 use serde::{Deserialize, Serialize};
+use ff::Field;
 
 use super::super::group::CompressedGroupExt; // added
 
@@ -51,7 +54,7 @@ impl BulletReductionProof {
     // Create slices G, H, a, b backed by their respective
     // vectors.  This lets us reslice as we compress the lengths
     // of the vectors in the main loop below.
-    let mut G = &mut G_vec.to_owned()[..];
+    let G = &mut G_vec.to_owned()[..];
     let mut a = &mut a_vec.to_owned()[..];
     let mut b = &mut b_vec.to_owned()[..];
 
@@ -71,31 +74,38 @@ impl BulletReductionProof {
     let mut blinds_iter = blinds_vec.iter();
     let mut blind_fin = *blind;
 
+    let mut G_bases = IPABases::new(n);
+    for i in 0..n {
+      G_bases.defer_init(&[Scalar::one()], &[G[i]]);
+    }    
+
     while n != 1 {
       n /= 2;
       let (a_L, a_R) = a.split_at_mut(n);
       let (b_L, b_R) = b.split_at_mut(n);
-      let (G_L, G_R) = G.split_at_mut(n);
+      let (mut G_bases_L, G_bases_R) = G_bases.split_at(n);
 
       let c_L = inner_product(a_L, b_R);
       let c_R = inner_product(a_R, b_L);
 
       let (blind_L, blind_R) = blinds_iter.next().unwrap();
 
+      let (scalars, bases) = G_bases_R.get(&a_L);
       let L = GroupElement::vartime_multiscalar_mul(
-        a_L
+        scalars
           .iter()
           .chain(iter::once(&c_L))
           .chain(iter::once(blind_L)),
-        G_R.iter().chain(iter::once(Q)).chain(iter::once(H)),
+        bases.iter().chain(iter::once(Q)).chain(iter::once(H)),
       );
 
+      let (scalars, bases) = G_bases_L.get(&a_R);
       let R = GroupElement::vartime_multiscalar_mul(
-        a_R
+        scalars
           .iter()
           .chain(iter::once(&c_R))
           .chain(iter::once(blind_R)),
-        G_L.iter().chain(iter::once(Q)).chain(iter::once(H)),
+        bases.iter().chain(iter::once(Q)).chain(iter::once(H)),
       );
 
       transcript.append_point(b"L", &L.compress());
@@ -107,28 +117,33 @@ impl BulletReductionProof {
       for i in 0..n {
         a_L[i] = a_L[i] * u + u_inv * a_R[i];
         b_L[i] = b_L[i] * u_inv + u * b_R[i];
-        G_L[i] = GroupElement::vartime_multiscalar_mul(&[u_inv, u], &[G_L[i], G_R[i]]);
+        //G_L[i] = GroupElement::vartime_multiscalar_mul(&[u_inv, u], &[G_L[i], G_R[i]]);
+        G_bases_L.defer(i, &G_bases_R, &[u_inv, u]);
       }
 
       blind_fin = blind_fin + blind_L * u * u + blind_R * u_inv * u_inv;
 
       L_vec.push(L.compress());
       R_vec.push(R.compress());
+      
 
       a = a_L;
       b = b_L;
-      G = G_L;
+      G_bases = G_bases_L;
     }
 
-    let Gamma_hat =
-      GroupElement::vartime_multiscalar_mul(&[a[0], a[0] * b[0], blind_fin], &[G[0], *Q, *H]);
+    let (scalars, bases) = G_bases.get(&[Scalar::one()]);
+    let G0 = GroupElement::vartime_multiscalar_mul(scalars, bases);
 
+    let Gamma_hat =
+      GroupElement::vartime_multiscalar_mul(&[a[0], a[0] * b[0], blind_fin], &[G0, *Q, *H]);
+    
     (
       BulletReductionProof { L_vec, R_vec },
       Gamma_hat,
       a[0],
       b[0],
-      G[0],
+      G0,
       blind_fin,
     )
   }
@@ -161,7 +176,7 @@ impl BulletReductionProof {
 
     // 2. Compute 1/(u_k...u_1) and 1/u_k, ..., 1/u_1
     let mut challenges_inv = challenges.clone();
-    let allinv = Scalar::batch_invert(&mut challenges_inv);
+    let allinv = crate::scalar::batch_invert(&mut challenges_inv);
 
     // 3. Compute u_i^2 and (1/u_i)^2
     for i in 0..lg_n {
