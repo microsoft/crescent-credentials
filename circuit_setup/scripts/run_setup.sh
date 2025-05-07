@@ -156,7 +156,7 @@ awk -v max="$NUM_PUBLIC_IOS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, "."
 
 if [ ${CREDTYPE} == 'mdl' ]; then 
     echo "=== Generating mDL ===" # delete me
-    # Create the prover inputs (do it here, rather than in Rust like we do for JWTs; since the CBOR/mDL parsing code is in python) TODO: in future we should re-write it in rust
+    # Create the prover inputs (TODO: now that this has been ported to rust, do it in the library like for the JWT case)
     PROVER_INPUTS_FILE=${OUTPUTS_DIR}/prover_inputs.json
     MDL_FILE=${INPUTS_DIR}/mdl.cbor
     CONFIG_FILE=${INPUTS_DIR}/config.json
