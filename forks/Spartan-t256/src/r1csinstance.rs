@@ -12,7 +12,8 @@ use super::sparse_mlpoly::{
 
 use super::timer::Timer;
 use merlin::Transcript;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
+use ff::Field;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]

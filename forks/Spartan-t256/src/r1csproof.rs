@@ -495,7 +495,8 @@ impl R1CSProof {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use rand::rngs::OsRng;
+  use rand_core::OsRng;
+  use ff::Field;
 
   fn produce_tiny_r1cs() -> (R1CSInstance, Vec<Scalar>, Vec<Scalar>) {
     // three constraints over five variables Z1, Z2, Z3, Z4, and Z5

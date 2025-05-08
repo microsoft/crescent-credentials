@@ -1,6 +1,7 @@
 use super::group::{CompressedGroup, AsBytesDev};
 use super::scalar::Scalar;
 use merlin::Transcript;
+use ff::FromUniformBytes;
 
 pub trait ProofTranscript {
   fn append_protocol_name(&mut self, protocol_name: &'static [u8]);
@@ -27,7 +28,7 @@ impl ProofTranscript for Transcript {
   fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
     let mut buf = [0u8; 64];
     self.challenge_bytes(label, &mut buf);
-    Scalar::from_bytes_wide(&buf)
+    Scalar::from_uniform_bytes(&buf)
   }
 
   fn challenge_vector(&mut self, label: &'static [u8], len: usize) -> Vec<Scalar> {

@@ -1868,3 +1868,21 @@ https://github.com/lurk-lab/neptune/blob/main/LICENSE-MIT
 ### Additional Attributions
 None
 
+---
+
+### Component
+halo2curves
+https://github.com/privacy-scaling-explorations/halo2curves
+Path: forks/halo2curves
+Note: forked to support the T256 elliptic curve
+
+### Open Source License/Copyright Notice
+MIT 
+https://github.com/privacy-scaling-explorations/halo2curves/blob/b6fa078aa36d04d7eb654a1e2f823e3fdf971041/LICENSE-MIT
+
+Apache
+https://github.com/privacy-scaling-explorations/halo2curves/blob/b6fa078aa36d04d7eb654a1e2f823e3fdf971041/LICENSE-APACHE
+
+### Additional Attributions
+None
+

@@ -36,7 +36,7 @@ ethers-core = { version = "=2.0.7", default-features = false, optional = true }
 
 # error handling
 thiserror = "1.0.39"
-color-eyre = "=0.6.2"
+color-eyre = {version = "0.6.4", features =[]}
 criterion = "=0.3.6"
 
 cfg-if = "=1.0.0"

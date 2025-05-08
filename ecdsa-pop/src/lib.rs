@@ -171,7 +171,7 @@ struct ECDSACircuitProverInputs {
 
 impl ECDSACircuitProverInputs {
   pub fn new(s: &BigUint, q0: &BigUint, q1: &BigUint, z: &BigUint) -> Self {
-    Self { s: big_to_ff(&s), q0: big_to_ff(&q0), q1: big_to_ff(&q1), z: big_to_ff(&z) }
+    Self { s: big_to_ff(s), q0: big_to_ff(q0), q1: big_to_ff(q1), z: big_to_ff(z) }
   }
 }
 
@@ -308,9 +308,9 @@ impl ECDSAProofCircuit {
   pub fn compute_hQ(params: &ECDSAParams, q0: &BigUint, q1: &BigUint, z: &BigUint) -> Vec<u8> {
     let NUM_ABSORBS = 3;
     let mut poseidon: Poseidon<P256Fp> = Poseidon::new(params.constants.clone(), NUM_ABSORBS);
-    poseidon.absorb(big_to_ff(&q0));
-    poseidon.absorb(big_to_ff(&q1));
-    poseidon.absorb(big_to_ff(&z));
+    poseidon.absorb(big_to_ff(q0));
+    poseidon.absorb(big_to_ff(q1));
+    poseidon.absorb(big_to_ff(z));
 
     let hQ = poseidon.squeeze_field_element();    // H(q0, q1, z)
 
@@ -337,9 +337,9 @@ impl ECDSAProofCircuit {
   {
     // Check that m = q0 + q1*e1 + z*e2 (mod q)
     // using emulated arithmetic
-    let q0 : EmulatedFieldElement<Scalar, Bn254FrEmulatedParams> = allocated_num_to_emulated_fe(&mut cs.namespace(||"convert q0"), &q0)?;
-    let q1 : EmulatedFieldElement<Scalar, Bn254FrEmulatedParams> = allocated_num_to_emulated_fe(&mut cs.namespace(||"convert q1"), &q1)?;
-    let z : EmulatedFieldElement<Scalar, Bn254FrEmulatedParams> = allocated_num_to_emulated_fe(&mut cs.namespace(||"convert z"), &z)?;
+    let q0 : EmulatedFieldElement<Scalar, Bn254FrEmulatedParams> = allocated_num_to_emulated_fe(&mut cs.namespace(||"convert q0"), q0)?;
+    let q1 : EmulatedFieldElement<Scalar, Bn254FrEmulatedParams> = allocated_num_to_emulated_fe(&mut cs.namespace(||"convert q1"), q1)?;
+    let z : EmulatedFieldElement<Scalar, Bn254FrEmulatedParams> = allocated_num_to_emulated_fe(&mut cs.namespace(||"convert z"), z)?;
 
     let tmp = e1.mul(&mut cs.namespace(||"e1*q1"), &q1)?;
     let tmp2 = e2.mul(&mut cs.namespace(||"e2*z"), &z)?;
@@ -349,7 +349,7 @@ impl ECDSAProofCircuit {
     EmulatedFieldElement::<Scalar, Bn254FrEmulatedParams>::assert_is_equal(
         &mut cs.namespace(|| "check equality"),
         &m_calc,
-        &m,
+        m,
     )?;
     
     Ok(())
@@ -457,7 +457,7 @@ impl ECDSAProof {
 
     assert!(params.curve == NamedCurve::Secp256r1); // We only support one curve right now
     let public_inputs = ECDSACircuitPublicInputs::_default();
-    let circuit_verifier = ECDSAProofCircuit::new(&params,  None, &public_inputs);
+    let circuit_verifier = ECDSAProofCircuit::new(params,  None, &public_inputs);
     let t = start_timer!(|| "Getting R1CS Shape");
     let mut cs = ShapeCS::<Scalar>::new();
     let _ = circuit_verifier.synthesize(&mut cs.namespace(||"synthesize verifier"));
@@ -472,6 +472,7 @@ impl ECDSAProof {
   }
 
   /// Create a proof of an ECDSA signature
+  #[allow(clippy::too_many_arguments)]
   pub fn prove(params : &ECDSAParams, 
     qx: &BigUint, qy: &BigUint,                   // Signer's public key
     r: &BigUint, s: &BigUint, digest: &[u8],      // ECDSA signature on digest
@@ -486,12 +487,12 @@ impl ECDSAProof {
 
     let (q0, q1) = ECDSAProof::split_public_key_x(qx);
 
-    let e1 = BigUint::from_bytes_le(&e1);
-    let e2 = BigUint::from_bytes_le(&e2);
+    let e1 = BigUint::from_bytes_le(e1);
+    let e2 = BigUint::from_bytes_le(e2);
     let public_inputs = ECDSACircuitPublicInputs::new(&T, &U, hQ, m.clone(), e1, e2);
     let prover_inputs = ECDSACircuitProverInputs::new(s, &q0, &q1, z);
     
-    let circuit_verifier = ECDSAProofCircuit::new(&params,  None, &public_inputs);
+    let circuit_verifier = ECDSAProofCircuit::new(params,  None, &public_inputs);
     let t = start_timer!(|| "Getting R1CS Shape");
     let mut cs = ShapeCS::<Scalar>::new();
     let _ = circuit_verifier.synthesize(&mut cs.namespace(||"synthesize verifier"));
@@ -499,7 +500,7 @@ impl ECDSAProof {
     end_timer!(t);
 
     let t = start_timer!(|| "Calculate witness");
-    let circuit_prover = ECDSAProofCircuit::new(&params,  Some(prover_inputs), &public_inputs);
+    let circuit_prover = ECDSAProofCircuit::new(params,  Some(prover_inputs), &public_inputs);
     let mut cs: SatisfyingAssignment<Scalar> = SatisfyingAssignment::new();
     let _ = circuit_prover.clone().synthesize(&mut cs.namespace(||"calculate witness"));
     let (inst, witness, inputs) = cs.r1cs_instance_and_witness(&shape);
@@ -521,7 +522,7 @@ impl ECDSAProof {
       let t = start_timer!(|| "Checking satisfiability (debugging only)");
       let is_sat = inst.is_sat(&witness, &inputs);
       assert!(is_sat.is_ok());
-      assert_eq!(is_sat.unwrap(), true);
+      assert!(is_sat.unwrap());
       end_timer!(t);
     }
 
@@ -550,6 +551,7 @@ impl ECDSAProof {
   }
 
   /// Verify the proof
+  #[allow(clippy::too_many_arguments)]
   pub fn verify(params : &ECDSAParams, Rx: &BigUint, Ry: &BigUint, digest : &[u8], hQ: &[u8], m: &BigUint, e1: &[u8], e2: &[u8], proof : &[u8]) -> bool {
 
     assert!(params.curve == NamedCurve::Secp256r1); // We only support one curve right now
@@ -557,11 +559,11 @@ impl ECDSAProof {
     let R = Point{x: Rx.clone(), y: Ry.clone()};
     let (T, U) = ECDSACircuitPublicInputs::compute_TU(&R, &hex::encode(digest), &params.curve);
     
-    let e1 = BigUint::from_bytes_le(&e1);
-    let e2 = BigUint::from_bytes_le(&e2);
+    let e1 = BigUint::from_bytes_le(e1);
+    let e2 = BigUint::from_bytes_le(e2);
     let public_inputs = ECDSACircuitPublicInputs::new(&T, &U, hQ, m.clone(), e1, e2);
     
-    let circuit_verifier = ECDSAProofCircuit::new(&params,  None, &public_inputs);
+    let circuit_verifier = ECDSAProofCircuit::new(params,  None, &public_inputs);
     let t = start_timer!(|| "Getting R1CS Shape");
     let mut cs = ShapeCS::<Scalar>::new();
     let _ = circuit_verifier.synthesize(&mut cs.namespace(||"synthesize verifier"));
@@ -581,7 +583,7 @@ impl ECDSAProof {
 
     let t = start_timer!(|| "Decompress proof");
     let mut decoder = ZlibDecoder::new(Vec::new());
-    match decoder.write_all(&proof) {
+    match decoder.write_all(proof) {
       Ok(_) => {},
       Err(_) => return_false!("failed writing proof to ZlibDecoder")
     };
@@ -658,8 +660,8 @@ mod tests {
     GGA::new(x, y)
   }
   fn uint_to_point(x : &BigUint, y: &BigUint) -> GGA {
-    let x = uint_to_ark::<Fp>(&x);
-    let y = uint_to_ark::<Fp>(&y);
+    let x = uint_to_ark::<Fp>(x);
+    let y = uint_to_ark::<Fp>(y);
     GGA::new(x, y)
   }
 
@@ -684,17 +686,18 @@ mod tests {
   }
 
   fn regular_ECDSA_ver(digest : &str, s: &BigUint, R_x : &BigUint, Q : &Point<BigUint>) -> bool{
-    let z = hex_to_ark::<Fr>(&digest);
-    let s = uint_to_ark::<Fr>(&s);
+    let z = hex_to_ark::<Fr>(digest);
+    let s = uint_to_ark::<Fr>(s);
     let u1 = z/s;
-    let r = uint_to_ark::<Fr>(&R_x);
+    let r = uint_to_ark::<Fr>(R_x);
     let u2 = r/s;
     let G = hex_to_point( "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296",
     "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5");
     let Q = uint_to_point(&Q.x, &Q.y);
     let Rprime = G * u1 + Q * u2;
     let Rprime = Rprime.into_affine();
-    return Rprime.x == uint_to_ark::<Fp>(&R_x);
+
+    Rprime.x == uint_to_ark::<Fp>(R_x)
   }
 
   // cargo test --release --features print-trace test_ecdsa_proof -- --nocapture
@@ -744,7 +747,7 @@ mod tests {
     let mut rng = thread_rng();
     // Public key Q will be provided as two Pedersen commitments to the high and low
     // bytes of Q.x
-    let (q0, q1) = ECDSAProof::split_public_key_x(&Qx);
+    let (q0, q1) = ECDSAProof::split_public_key_x(Qx);
    
     // Setup some commitment bases G and H (just placeholders; the real values defined in Crescent)
     let G = G1Affine::generator();
@@ -788,7 +791,7 @@ mod tests {
     let (q0, q1, hQ, m, e1, e2, z) = compute_mock_adapter_values(&Q.x);
 
     let params = ECDSAParams::new(NamedCurve::Secp256r1, NamedCurve::Bn254);    
-    let public_inputs = ECDSACircuitPublicInputs::new(&T, &U, &hQ, m, e1, e2);
+    let public_inputs = ECDSACircuitPublicInputs::new(T, U, &hQ, m, e1, e2);
     let prover_inputs = ECDSACircuitProverInputs::new(s, &q0, &q1, &z);
     let circuit_verifier = ECDSAProofCircuit::new(&params,  None, &public_inputs);
     let circuit_prover = ECDSAProofCircuit::new(&params,  Some(prover_inputs), &public_inputs);
@@ -823,7 +826,7 @@ mod tests {
     let t = start_timer!(|| "Checking satisfiability (debugging only)");
     let is_sat = inst.is_sat(&witness, &inputs);
     assert!(is_sat.is_ok());
-    assert_eq!(is_sat.unwrap(), true);
+    assert!(is_sat.unwrap());
     end_timer!(t);
 
     let t = start_timer!(|| "Producing NIZK public generators");
@@ -887,7 +890,7 @@ mod tests {
     let valid = ECDSAProof::verify(&params, &Rx, &Ry, &digest, &hQ, &m, &e1, &e2, &proof);
     end_timer!(t);
 
-    assert_eq!(valid, true);
+    assert!(valid);
   }
 
 

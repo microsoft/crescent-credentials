@@ -447,7 +447,7 @@ pub fn biguint_to_scalar<Scalar:PrimeField>(x : &BigUint) -> Scalar {
 
 pub fn mod_inverse(a: &BigUint, p: &BigUint) -> BigUint {
   let two = BigUint::from(2u8);
-  a.modpow(&(p - two), &p)
+  a.modpow(&(p - two), p)
 }
 
 

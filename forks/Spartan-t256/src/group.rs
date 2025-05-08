@@ -1,25 +1,24 @@
 use super::errors::ProofVerifyError;
-use super::scalar::{Scalar, ScalarBytesFromScalar};
+use super::scalar::Scalar;
 use core::borrow::Borrow;
 use core::ops::{Mul, MulAssign, Add, Sub};
-use circ_fields::t256::{Affine, Projective};
-use ark_serialize::CanonicalDeserialize;
-use ark_serialize::CanonicalSerialize;
-use ark_ec::{Group, CurveGroup};
+use halo2curves::serde::Repr;
+use halo2curves::t256::{T256Affine as Affine, T256 as Projective};
+use halo2curves::group::{Curve, GroupEncoding};
 use serde_bytes::ByteArray;
-
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use crate::scalar::ScalarBytesFromScalar;
 
 
-#[derive(Copy, Clone,Debug,PartialEq)] // , Serialize, Deserialize
-pub struct GroupElement(circ_fields::t256::Projective); // curve25519_dalek::ristretto::RistrettoPoint;
-pub type GroupElementOri = circ_fields::t256::Projective;
-pub type CompressedGroup = ByteArray<33>;// [u8; 33]; // curve25519_dalek::ristretto::CompressedRistretto;
+#[derive(Copy, Clone,Debug,PartialEq)]
+pub struct GroupElement(pub Projective); 
+pub type GroupElementOri = Projective;
+pub type CompressedGroup = ByteArray<33>;
 
 lazy_static! {
   /// Compressed form of the generator
-  pub static ref GROUP_BASEPOINT_COMPRESSED: CompressedGroup = CompressedGroup::new(circ_fields::t256::curves::BASEPOINT_COMPRESSED);
+  pub static ref GROUP_BASEPOINT_COMPRESSED: CompressedGroup = CompressedGroup::new(Affine::generator().to_bytes().into());
 }
 
 // Define an extension trait that offers the as_bytes functionality
@@ -29,7 +28,6 @@ pub trait AsBytesDev {
 
 impl AsBytesDev for CompressedGroup {
   fn as_bytes(&self) -> &[u8] {
-      // &self.into_array()
       &self[..]
   }
 }
@@ -45,10 +43,7 @@ impl GroupElement {
     GroupElement(Projective::from(point))
   }
   pub fn compress(&self) -> CompressedGroup {
-    let mut compressed_bytes = Vec::new();
-    // let mut compressed_bytes = [0u8; 33];
-    self.0.serialize_compressed(&mut compressed_bytes).unwrap();
-    CompressedGroup::new(compressed_bytes.try_into().unwrap()) //.into_array())
+    CompressedGroup::new(self.0.to_bytes().into())
   }
 }
 
@@ -57,9 +52,7 @@ impl Serialize for GroupElement {
   where
       S: Serializer,
   {
-      let mut bytes = Vec::new();
-      self.0.serialize_compressed(&mut bytes).unwrap();
-      bytes.serialize(serializer)
+      self.0.to_bytes().as_ref().serialize(serializer)
   }
 }
 
@@ -69,54 +62,31 @@ impl<'de> Deserialize<'de> for GroupElement { // ** to do
       D: Deserializer<'de>,
   {
       let bytes = Vec::<u8>::deserialize(deserializer)?;
-      let point = Projective::deserialize_compressed(&bytes[..])
-          .map_err(|e| serde::de::Error::custom(format!("Deserialization error: {:?}", e)))?;
-      Ok(GroupElement(point))
+      let point = Projective::from_bytes(&Repr::from(bytes.as_slice())).into_option().map(GroupElement).ok_or_else(||serde::de::Error::custom("Deserialization error 1"))?;
+      Ok(point)
   }
 }
 
 pub trait CompressedGroupExt {
   type Group;
   fn unpack(&self) -> Result<Self::Group, ProofVerifyError>;
-  // fn decompress(&self) -> Self::Group;
   fn decompress(&self) -> Option<Self::Group>;
 }
 
 impl CompressedGroupExt for CompressedGroup {
-  // type Group = circ_fields::t256::Projective; // curve25519_dalek::ristretto::RistrettoPoint;
-  type Group = GroupElement; // curve25519_dalek::ristretto::RistrettoPoint;
+  type Group = GroupElement;
   fn unpack(&self) -> Result<Self::Group, ProofVerifyError> {
-    let result = Projective::deserialize_compressed(&self[..]);
-    // let result = Self::Group::deserialize_compressed(&self[..]);
-    if result.is_ok() {
-      Ok(GroupElement(result.unwrap()))
-    } else {
-      Err(ProofVerifyError::DecompressionError(self[1..].try_into().unwrap()))     
-      // let last_32_bytes = &self[1..];
-      // let last_32_bytes_array: [u8; 32] = last_32_bytes.try_into()
-      //                                     .expect("slice with incorrect length");
-      // Err(ProofVerifyError::DecompressionError(last_32_bytes.into_array()))                                    
-    }
-    // Self::Group::deserialize_compressed(&self[..]).ok_or_else(|| ProofVerifyError::DecompressionError(last_32_bytes_array))
-    // self
-    //   .decompress()
-    //   .ok_or_else(|| ProofVerifyError::DecompressionError(self.to_bytes()))
+    Projective::from_bytes(&Repr::from(self.into_array())).into_option().map(GroupElement).ok_or_else(||ProofVerifyError::DecompressionError([2;32]))    
   }
 
   #[inline]
   fn decompress(&self) -> Option<Self::Group> {
-    // Projective::deserialize_compressed(&self[..])
-    //     .map_or_else(|_| None, |result| Some(GroupElement(result)))
-    // Projective::deserialize_compressed(&self[..])
-    //       .ok().map(|r| GroupElement(r))
-    let result = Projective::deserialize_compressed(&self[..]);
-    // result.ok().map(|r| Self::Group(r))
-    result.ok().map(|r| GroupElement(r))
+    let result = Projective::from_bytes(&Repr::from(self.into_array()));
+    result.into_option().map(|r| GroupElement(r))
   }
 }
 
-
-impl<'b> MulAssign<&'b Scalar> for GroupElement { // to do: modify Scalar to that it can fit original MulAssign
+impl<'b> MulAssign<&'b Scalar> for GroupElement {
   fn mul_assign(&mut self, scalar: &'b Scalar) {
     let point = (self as &GroupElement).into();
     let result = point * Scalar::decompress_scalar(scalar);
@@ -127,7 +97,7 @@ impl<'b> MulAssign<&'b Scalar> for GroupElement { // to do: modify Scalar to tha
 impl<'a, 'b> Mul<&'b Scalar> for &'a GroupElement {
   type Output = GroupElement;
   fn mul(self, scalar: &'b Scalar) -> GroupElement { 
-    GroupElement(self.into() * Scalar::decompress_scalar(scalar)) // right is of type ScalarBytes
+    GroupElement(self.into() * Scalar::decompress_scalar(scalar))
   }
 }
 
@@ -265,11 +235,7 @@ pub trait VartimeMultiscalarMul {
 
 impl VartimeMultiscalarMul for GroupElement {
   type Scalar = super::scalar::Scalar;
-  // TODO Borrow the arguments so we don't have to clone them, as it was in the original implementation
-  // fn vartime_multiscalar_mul(scalars: Vec<Scalar>, points: Vec<GroupElement>) -> Self {
 
-  // }
-  // #[inline] // ** to test improve 1ms
   fn vartime_multiscalar_mul<I, J>(scalars: I, points: J) -> Self // to do: use msm instead
   where
     I: IntoIterator,
@@ -278,31 +244,23 @@ impl VartimeMultiscalarMul for GroupElement {
     J::Item: Borrow<Self>,
     Self: Clone,
   {
-    use ark_ec::VariableBaseMSM;
-    use ark_ff::biginteger::BigInteger256;
-    let points_affine: Vec<Affine> = points
-                                      .into_iter()
-                                      .map(|p| p.borrow().into().into_affine())
-                                      .collect::<Vec<Affine>>(); 
-    let result = GroupElementOri::msm_bigint(
-                    &points_affine,
-                    // &points
-                    // .into_iter()
-                    // .map(|p| p.borrow().into().into_affine())
-                    // .collect::<Vec<Affine>>(),
-                    &scalars
-                      .into_iter()
-                      .map(|s| s.borrow().to_bigint())
-                      .collect::<Vec<BigInteger256>>(),
-                  );
-              
-    // let result = GroupElementOri::msm(
-    //                 &points_affine,
-    //                 &scalars
-    //                   .into_iter()
-    //                   .map(|s| Scalar::decompress_scalar(s.borrow()))
-    //                   .collect::<Vec<ScalarBytes>>(),
-    //               ).unwrap();
+    use halo2curves::msm::msm_best;
+    use halo2curves::group::prime::PrimeCurveAffine;
+
+    let points_projective: Vec<Projective> = points
+    .into_iter()
+    .map(|p| p.borrow().0)
+    .collect();    
+    let mut points_affine = vec![Affine::identity(); points_projective.len()];
+    Projective::batch_normalize(&points_projective, &mut points_affine);
+
+    let scalars_bigint: Vec<_> = scalars
+      .into_iter()
+      .map(|s| Scalar::decompress_scalar(s.borrow()))
+      .collect();
+
+    let result = msm_best::<Affine>(&scalars_bigint, &points_affine);
+
     GroupElement(result)
   }
 }
@@ -310,7 +268,7 @@ impl VartimeMultiscalarMul for GroupElement {
 #[cfg(test)]
 mod tests {
   use super::*;
-  // use ark_ff::fields::PrimeField;
+
   #[test]
   fn msm() { // https://github.com/personaelabs/spartan-ecdsa/blob/main/packages/Spartan-secq/src/group.rs
     for i in 0..5000 {

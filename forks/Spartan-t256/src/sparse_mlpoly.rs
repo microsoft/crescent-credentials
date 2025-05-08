@@ -1610,10 +1610,12 @@ mod tests {
   use super::*;
   use rand::rngs::OsRng;
   use rand::RngCore;
+  use ff::Field;
   #[test]
   fn check_sparse_polyeval_proof() {
     let mut csprng: OsRng = OsRng;
-
+    let mut osrng = rand_core::OsRng;
+    
     let num_nz_entries: usize = 256;
     let num_rows: usize = 256;
     let num_cols: usize = 256;
@@ -1626,7 +1628,7 @@ mod tests {
       M.push(SparseMatEntry::new(
         (csprng.next_u64() % (num_rows as u64)) as usize,
         (csprng.next_u64() % (num_cols as u64)) as usize,
-        Scalar::random(&mut csprng),
+        Scalar::random(&mut osrng),
       ));
     }
 
@@ -1644,10 +1646,10 @@ mod tests {
 
     // evaluation
     let rx: Vec<Scalar> = (0..num_vars_x)
-      .map(|_i| Scalar::random(&mut csprng))
+      .map(|_i| Scalar::random(&mut osrng))
       .collect::<Vec<Scalar>>();
     let ry: Vec<Scalar> = (0..num_vars_y)
-      .map(|_i| Scalar::random(&mut csprng))
+      .map(|_i| Scalar::random(&mut osrng))
       .collect::<Vec<Scalar>>();
     let eval = SparseMatPolynomial::multi_evaluate(&[&poly_M], &rx, &ry);
     let evals = vec![eval[0], eval[0], eval[0]];

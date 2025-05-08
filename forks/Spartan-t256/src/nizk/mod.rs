@@ -10,7 +10,9 @@ use merlin::Transcript;
 use serde::{Deserialize, Serialize};
 
 mod bullet;
+mod ipa_bases;
 use bullet::BulletReductionProof;
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KnowledgeProof {
@@ -580,7 +582,9 @@ impl DotProductProofLog {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use rand::rngs::OsRng;
+  use rand_core::OsRng;
+  use ff::Field;
+
   #[test]
   fn check_knowledgeproof() {
     let mut csprng: OsRng = OsRng;

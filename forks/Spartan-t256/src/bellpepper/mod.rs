@@ -24,7 +24,8 @@ mod tests {
   use merlin::Transcript;
   use rand::random;
 
-  type F = circ_fields::ff_field::f_t256::Ft;
+  //type F = circ_fields::ff_field::f_t256::Ft;
+  type F = halo2curves::t256::Fq;
 
   fn synthesize_alloc_bit<Fr: PrimeField, CS: ConstraintSystem<Fr>>(
     cs: &mut CS,
@@ -53,7 +54,8 @@ mod tests {
   #[test]
   fn test_alloc_bit()
   {
-    type F = circ_fields::ff_field::f_t256::Ft;
+    //type F = circ_fields::ff_field::f_t256::Ft;
+    type F = halo2curves::t256::Fq;
     // First create the shape
     let mut cs = ShapeCS::<F>::new();
     let _ = synthesize_alloc_bit(&mut cs);
