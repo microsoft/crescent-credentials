@@ -75,6 +75,12 @@ jobs:
           cd creds
           ../clippy_command.sh
 
+      - name: Run clippy for /ecdsa-pop
+        run: |
+          cd ecdsa-pop
+          ../clippy_command.sh
+
+
       - name: Run clippy for mdl-tools
         run: |
           cd circuit_setup/mdl-tools
