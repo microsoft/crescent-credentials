@@ -1,4 +1,4 @@
-# Crescent Sample
+# Crescent Sample 
 
 This folder contains a sample setup service, issuer, client, and verifier making use of the Crescent system. Note that these components are for demonstration only; they should not be used in production environments.
 
