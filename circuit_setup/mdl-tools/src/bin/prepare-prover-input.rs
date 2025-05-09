@@ -20,13 +20,14 @@
 use anyhow::Result;
 use clap::Parser;
 use coset::cbor::Value;
+use coset::iana::Algorithm;
 use coset::Label;
 use isomdl::cbor;
 use isomdl::definitions::helpers::{ByteStr, NonEmptyVec};
 use isomdl::definitions::issuer_signed::IssuerSignedItemBytes;
 use isomdl::definitions::x509::x5chain::X5CHAIN_COSE_HEADER_LABEL;
 use isomdl::definitions::x509::X5Chain;
-use isomdl::definitions::{DigestAlgorithm, DigestId, Mso};
+use isomdl::definitions::{CoseKey, DigestAlgorithm, DigestId, Mso};
 use isomdl::issuance::mdoc::Mdoc;
 use p256::ecdsa::{Signature, VerifyingKey};
 use p256::pkcs8::EncodePublicKey;
@@ -472,6 +473,56 @@ fn main() {
     prover_inputs.insert("pubkey_y".to_string(), serde_json::json!(y_limb));
     prover_inputs.insert("message_padded_bytes".to_string(), msg_len_after_sha2_padding.into());
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
+
+    // If device bound, include the device public key in the prover inputs
+    if config["device_bound"].as_bool().is_some_and(|x| x == true) {
+        let device_key = mso.device_key_info.device_key;
+        assert!(device_key.signature_algorithm() == Some(Algorithm::ES256), "Only device keys with the ES256 algorithm are supported");
+        
+        let mut device_key_x  = match device_key {
+            CoseKey::EC2 { x, .. } => x,
+            _ => panic!("Unsupported curve type, expected EC2 (https://www.rfc-editor.org/rfc/rfc9053.html#name-elliptic-curve-keys)")
+        };
+        println!("device_key.x = {:?}", device_key_x);
+        prover_inputs.insert("device_key_x".to_string(), serde_json::json!(device_key_x));
+        device_key_x.reverse();
+
+        let bytes_to_int = |bytes: &[u8]| -> String {
+            let mut a = BigUint::zero();
+            for i in 0..bytes.len() {
+                a += BigUint::from(bytes[i] as u64) * BigUint::from(256u64).pow(i as u32);
+            }
+            a.to_str_radix(10)
+        };
+        let device_key_0 = bytes_to_int(&device_key_x[0..16]);
+        let device_key_1 = bytes_to_int(&device_key_x[16..32]);
+        println!("device_key_0_value: {:?}", device_key_0);
+        println!("device_key_1_value: {:?}", device_key_1);
+        prover_inputs.insert("device_key_0_value".to_string(), serde_json::json!(device_key_0));
+        prover_inputs.insert("device_key_1_value".to_string(), serde_json::json!(device_key_1));
+
+        let device_key_prefix = "6d6465766963654b6579496e666fa1696465766963654b6579a401022001215820"; 
+        // The prefix is: 
+        //   6d                                                #     text(13)
+        //      6465766963654b6579496e666f                     #       "deviceKeyInfo"
+        //   a1                                                #     map(1)
+        //      69                                             #       text(9)
+        //         6465766963654b6579                          #         "deviceKey"
+        //      a4                                             #       map(4)
+        //         01                                          #         unsigned(1)
+        //         02                                          #         unsigned(2)
+        //         20                                          #         negative(-1)
+        //         01                                          #         unsigned(1)
+        //         21                                          #         negative(-2)
+        //         58 20                                       #         bytes(32)
+
+        let device_key_prefix_l = tbs_data_hex.find(device_key_prefix).unwrap()/2;
+        let device_key_prefix_r = device_key_prefix_l + device_key_prefix.len()/2;
+        prover_inputs.insert("device_key_x_prefix_l".to_string(), serde_json::json!(device_key_prefix_l));
+        prover_inputs.insert("device_key_x_prefix_r".to_string(), serde_json::json!(device_key_prefix_r));        
+
+    }
+
 
     // the python script defines a public_IOs and prover_aux_data dictionaries, but never write them out (FIXME) 
 
