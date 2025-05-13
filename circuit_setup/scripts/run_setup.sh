@@ -58,7 +58,7 @@ if [ -f "${CIRCOM_SRC_DIR}/circomlib" ]; then
     rm -f "${CIRCOM_SRC_DIR}/circomlib"
     if [[ "$OS" == "Windows_NT" || "$(uname -o 2>/dev/null)" == "Msys" ]]; then
         echo "Creating Windows junction..."
-        cmd //c "mklink /J ${CIRCOM_SRC_DIR//\//\\}\\circomlib circuits\\circomlib"
+        cmd //c "mklink /J $(cygpath -wa "$CIRCOM_SRC_DIR"/circomlib) $(cygpath -wa "${ROOT_DIR}/circuits/circomlib")"
     else
         echo "Creating Linux symlink..."
         ln -s "${ROOT_DIR}/circuits/circomlib" "${CIRCOM_SRC_DIR}/circomlib"
