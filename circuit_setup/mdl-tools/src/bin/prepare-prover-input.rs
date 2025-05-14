@@ -21,6 +21,7 @@ use anyhow::Result;
 use clap::Parser;
 use coset::cbor::Value;
 use coset::Label;
+use lazy_static::lazy_static;
 use isomdl::cbor;
 use isomdl::definitions::helpers::{ByteStr, NonEmptyVec};
 use isomdl::definitions::issuer_signed::IssuerSignedItemBytes;
@@ -38,13 +39,24 @@ use num_bigint::BigUint;
 use num_traits::{Num, Zero, One, ToPrimitive};
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use std::str;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap,HashSet};
 
 static MDL_DOCTYPE: &str = "org.iso.18013.5.1.mDL";
 static ISO_MDL_NAMESPACE: &str = "org.iso.18013.5.1";
 static AAMVA_MDL_NAMESPACE: &str = "org.iso.18013.5.1.aamva";
 static SUPPORTED_NAMESPACES: [&str; 2] = [ISO_MDL_NAMESPACE, AAMVA_MDL_NAMESPACE];
 const CIRCOM_ES256_LIMB_BITS: usize = 43;
+
+lazy_static! {
+    static ref CRESCENT_CONFIG_KEYS: HashSet<&'static str> = {
+        let mut set = HashSet::new();
+        set.insert("alg");
+        set.insert("credtype");
+        set.insert("max_cred_len");
+        set.insert("device_bound");
+        set
+    };
+}
 
 // Define the issuer's timezone as PST (UTC-8). Change this if needed (TODO: move to config)
 const ISSUER_TIMEZONE_OFFSET_HOURS: i32 = -8; // US West Coast / PST (UTC-8)
@@ -149,12 +161,15 @@ fn ymd_to_daystamp(ymd: &str) -> Option<i32> {
 
 #[derive(Debug)]
 struct  ValueDigestInfo {
-    value: Value,
+    value: String,
     id: DigestId,
     digest: Vec<u8>,
     preimage: ByteStr,
     encoded_l: usize,
     encoded_r: usize,
+    identifier_l: usize,
+    value_l: usize,
+    value_r: usize,
 }
 
 /// Returns (encoded_l, encoded_r) as computed from tbs_data.
@@ -199,6 +214,59 @@ pub fn compute_encoded_positions(
     Ok((encoded_l, encoded_r))
 }
 
+/// Find the positions of the element identifier and value in the preimage.
+/// Returns (identifier_l, identifier_r, value_l, value_r)
+fn find_element_positions(preimage: &[u8], identifier: &str) -> Option<(usize, usize, usize, usize)> {
+    // Encode the identifier as CBOR text string
+    let identifier_bytes = {
+        let mut v = Vec::new();
+        let len = identifier.len();
+
+        if len < 24 {
+            v.push(0x60 | (len as u8)); // Major type 3 (text string)
+        } else {
+            panic!("Only supports identifier strings shorter than 24 bytes");
+        }
+
+        v.extend_from_slice(identifier.as_bytes());
+        v
+    };
+
+    // Find the start of the elementIdentifier
+    let identifier_l = preimage
+        .windows(identifier_bytes.len())
+        .position(|window| window == identifier_bytes.as_slice())?;
+
+    let identifier_r = identifier_l + identifier_bytes.len();
+
+    // Find the next string after identifier: "elementValue"
+    let element_value_label = {
+        let label = "elementValue";
+        let mut v = Vec::new();
+        v.push(0x60 | (label.len() as u8));
+        v.extend_from_slice(label.as_bytes());
+        v
+    };
+
+    let element_value_pos = preimage
+        .windows(element_value_label.len())
+        .position(|window| window == element_value_label.as_slice())?;
+
+    let value_l = element_value_pos + element_value_label.len();
+    let value_r = preimage.len();
+    println!("identifier_l: {}, identifier_r: {}, value_l: {}, value_r: {}", identifier_l, identifier_r, value_l, value_r);
+    Some((identifier_l, identifier_r, value_l, value_r))
+}
+
+/// Extract the text from a Value, which can be a Tag or Text.
+fn extract_text(value: Value) -> String {
+    match value {
+        Value::Tag(_, boxed) => extract_text(*boxed),
+        Value::Text(s) => s,
+        other => panic!("Expected Text or Tag containing Text, got {:?}", other),
+    }
+}
+
 /// Given an mdoc and a target element name, recompute the value digest,
 /// compare it with the signed digest in the mso, and return detailed info.
 pub(crate) fn find_value_digest_info(
@@ -209,12 +277,15 @@ pub(crate) fn find_value_digest_info(
 ) -> Option<ValueDigestInfo> {
 
     let mut info = ValueDigestInfo {
-        value: Value::Null,
+        value: String::new(),
         id: DigestId::new(0),
         digest: Vec::new(),
         preimage: ByteStr::from(Vec::new()),
         encoded_l: 0,
         encoded_r: 0,
+        identifier_l: 0,
+        value_l: 0,
+        value_r: 0,
     };
 
     // Iterate over each supported namespace.
@@ -228,10 +299,16 @@ pub(crate) fn find_value_digest_info(
                 println!("found claim: {}", claim);
                 println!("item: {:?}", item);
 
-                info.value = item.as_ref().element_value.clone();
+                info.value = extract_text(item.as_ref().element_value.clone());
                 println!("value: {:?}", info.value);
                 info.id = item.as_ref().digest_id;
                 info.preimage = ByteStr::from(isomdl::cbor::to_vec(item).expect("unable to encode IssuerSigned as cbor bytes"));
+                let (identifier_l, _identifier_r, value_l, value_r) = find_element_positions(info.preimage.as_ref(), claim)
+                    .expect("Unable to find the element positions in preimage");
+                info.identifier_l = identifier_l;
+                //info.identifier_r = _identifier_r; FIXME: return this?
+                info.value_l = value_l;
+                info.value_r = value_r;
                 let mut hasher = Sha256::new();
                 hasher.update(&info.preimage);
                 let recomputed_value_digest = hasher.finalize().to_vec();
@@ -265,7 +342,7 @@ pub(crate) fn find_value_digest_info(
 }
 
 // TODO: see the check_config() function in the python script; more stuff to implement
-fn check_config(config: &serde_json::Value) {
+fn check_config(config: &serde_json::Map<String, serde_json::Value>) {
     // check the credtype
     let credtype = config["credtype"].as_str().unwrap();
     if credtype != "mdl" {
@@ -302,13 +379,39 @@ fn bytes_to_circom_limbs(bytes: &[u8], limb_size: usize) -> Vec<u128> {
     limbs
 }
 
+// copied from JWT's proverinput.rs
+fn pack_string_to_int_unquoted(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Error>> {
+    // Must match function "RevealDomainOnly" in match_claim.circom
+
+    //First convert "s" to bytes and pad with zeros
+    let s_bytes = s.bytes();
+    if s_bytes.len() > n_bytes {
+        panic!("String to large to convert to integer of n_bytes = {}", n_bytes);
+    }
+    let mut s_bytes = s_bytes.collect::<Vec<u8>>();
+    for _ in 0 .. n_bytes - s_bytes.len() {
+        s_bytes.push(0x00);
+    }
+    // Convert to an integer with base-256 digits equal to s_bytes
+    let mut n = BigUint::zero();
+    let twofiftysix = BigUint::from(256_u32);// from_u32(256);
+    for i in 0..s_bytes.len() {
+        assert!(i < u32::MAX as usize);
+        n += s_bytes[i] * twofiftysix.pow(i as u32);
+    }
+    
+    Ok(n.to_str_radix(10))
+}
+
+
 fn main() {
     let args = Args::parse();
 
     // read and parse the config file
     let config_file = std::fs::read_to_string(&args.config).unwrap();
-    let config: serde_json::Value = serde_json::from_str(&config_file).unwrap();
-    check_config(&config);
+    let config_value: serde_json::Value = serde_json::from_str(&config_file).unwrap();
+    let config = config_value.as_object().expect("Invalid config file");
+    check_config(config);
 
     let mdl_cbor = std::fs::read(&args.mdl).unwrap();
     let mdoc = cbor::from_slice::<Mdoc>(
@@ -396,9 +499,9 @@ fn main() {
     let sha256_hash = hasher.finalize();
 
     let digest_hex_str = hex::encode(sha256_hash);
-    let _digest_bits = hex_string_to_binary_array(&digest_hex_str, 256); // FIXME: from python script, but unused
-    let _digest_b64 = URL_SAFE_NO_PAD.encode(sha256_hash); // FIXME: from python script, but unused
-    let _digest_limbs = digest_to_limbs(&digest_hex_str); // FIXME: from python script, but unused
+    let _digest_bits = hex_string_to_binary_array(&digest_hex_str, 256); // FIXME: from the old python script, but unused
+    let _digest_b64 = URL_SAFE_NO_PAD.encode(sha256_hash); // FIXME: from the old python script, but unused
+    let _digest_limbs = digest_to_limbs(&digest_hex_str); // FIXME: from the old python script, but unused
     
     let valid_until_prefix = "6a76616c6964556e74696cc074"; // 6a: text(10), 7661...696c: "validUntil", c0: date, 74: text(20)
     let tbs_data_hex = hex::encode(&tbs_data);
@@ -407,10 +510,7 @@ fn main() {
     let valid_until_data = &tbs_data_hex[valid_until_pos..valid_until_pos + 40];
     let valid_until_unix_timestamp = ymd_to_timestamp(valid_until_data, true, true).unwrap();
     println!("valid_until_unix_timestamp: {}", valid_until_unix_timestamp);
-
-    let dob_info = find_value_digest_info(&namespaces, &mso, &tbs_data, "birth_date").unwrap();
-    println!("dob_info: {:?}", dob_info);
-
+    
     // begin output of prover's inputs
     let mut prover_inputs = Map::new();
     prover_inputs.insert("message".to_string(), serde_json::json!(padded_m_extended));
@@ -419,16 +519,54 @@ fn main() {
     prover_inputs.insert("valid_until_prefix_l".to_string(), valid_until_prefix_l.into());
     let valid_until_prefix_r = valid_until_prefix_l + valid_until_prefix.len() / 2;
     prover_inputs.insert("valid_until_prefix_r".to_string(), valid_until_prefix_r.into());
-    let dob_value = ymd_to_daystamp(dob_info.value.into_tag().unwrap().1.into_text().unwrap().as_str()).unwrap();
-    prover_inputs.insert("dob_value".to_string(), serde_json::json!(dob_value));
-    prover_inputs.insert("dob_id".to_string(), serde_json::json!(dob_info.id));
-    let dob_preimage = sha256_padding(dob_info.preimage.as_ref());
-    if dob_preimage.len() != 128 {
-        panic!("Invalid dob_preimage length: {}; expected 128 (hardcoded in circom circuit)", dob_preimage.len());
+    
+    // process claims listed in the config
+    let keys = config.keys();
+    for key in keys {
+        if CRESCENT_CONFIG_KEYS.contains(key.as_str()) {
+            continue;
+        }
+        let claim_name = key.as_str();
+        let entry = config[claim_name].as_object().ok_or(format!("Config file entry for claim {}, does not have object type", claim_name)).unwrap();
+        let claim_type = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", claim_name)).unwrap();
+        let reveal = entry["reveal"].as_bool().unwrap_or(false);
+        let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().ok_or(format!("Config file entry for claim {} does not have a valid u64 'max_claim_byte_len'", claim_name)).map(|v| v as usize).unwrap();
+        println!("\nProcessing {} ({})", claim_name, claim_type);
+
+        if !reveal {
+            panic!("Claim {} is not revealed: not currently supported", claim_name);
+        }
+
+        let claim_info = find_value_digest_info(&namespaces, &mso, &tbs_data, &claim_name).unwrap();
+        println!("claim_info ({}): {:?}", claim_name, claim_info);
+        prover_inputs.insert(format!("{}_id", claim_name).to_string(), serde_json::json!(claim_info.id));
+        let claim_preimage = sha256_padding(claim_info.preimage.as_ref());
+        if claim_preimage.len() != 128 { // FIXME: don't hardcode this value
+            panic!("Invalid {}_preimage length: {}; expected 128 (hardcoded in circom circuit)", claim_name, claim_preimage.len());
+        }
+        prover_inputs.insert(format!("{}_preimage", claim_name).to_string(), serde_json::json!(claim_preimage));
+        prover_inputs.insert(format!("{}_encoded_l", claim_name).to_string(), serde_json::json!(claim_info.encoded_l));
+        prover_inputs.insert(format!("{}_encoded_r", claim_name).to_string(), serde_json::json!(claim_info.encoded_r));
+        prover_inputs.insert(format!("{}_identifier_l", claim_name).to_string(), serde_json::json!(claim_info.identifier_l));
+
+        let claim_value_str = claim_info.value.as_str();
+        match claim_type {
+            "string" => {
+                prover_inputs.insert(format!("{}_value_l", claim_name).to_string(), serde_json::json!(claim_info.value_l + 1)); // FIXME: +1 to skip the length byte (only works for short strings!)
+                prover_inputs.insert(format!("{}_value_r", claim_name).to_string(), serde_json::json!(claim_info.value_r));
+                let claim_value = pack_string_to_int_unquoted(claim_value_str, max_claim_byte_len).unwrap();
+                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value)); // FIXME: move out of the match
+            },
+            "date" => {
+                // we don't need the value_l and value_r for date
+                let claim_value = ymd_to_daystamp(claim_value_str).unwrap();
+                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value)); // FIXME: move out of the match
+            },
+            &_ => {
+                panic!("Unsupported claim type: {}", claim_type);
+            }
+        };
     }
-    prover_inputs.insert("dob_preimage".to_string(), serde_json::json!(dob_preimage));
-    prover_inputs.insert("dob_encoded_l".to_string(), serde_json::json!(dob_info.encoded_l));
-    prover_inputs.insert("dob_encoded_r".to_string(), serde_json::json!(dob_info.encoded_r));
 
     // extract the signature from the issuer_auth
     let signature_bytes = issuer_auth.signature.clone();

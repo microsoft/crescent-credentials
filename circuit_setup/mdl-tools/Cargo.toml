@@ -22,6 +22,7 @@ clap = { version = "4", features = ["derive"] }
 num-bigint = "0.4"
 num-traits = "0.2"
 chrono = "0.4"
+lazy_static = "1.5"
 
 # Pull isomdl directly from our GitHub fork
 isomdl = { git = "https://github.com/christianpaquin/isomdl", branch = "crescent-mods" }

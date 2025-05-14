@@ -146,7 +146,7 @@ def prepare_circom(config, circom_output_file):
 
 ###  begin reveal hashed          
             elif claim_reveal_hashed(config[name]):
-                f.write('''var {}_max_claim_byte_len = {};'''.format(name, config[name]["max_claim_byte_len"]))
+                f.write('''    var {}_max_claim_byte_len = {};'''.format(name, config[name]["max_claim_byte_len"]))
                 
                 is_number = 0
                 if typ == 1:

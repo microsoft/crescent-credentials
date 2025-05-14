@@ -4,6 +4,12 @@
     "max_cred_len": 1792,
 
     "birth_date": {
+        "type": "date",
+        "reveal": true,
+        "max_claim_byte_len": 31
+    },
+
+    "resident_state": {
         "type": "string",
         "reveal": true,
         "max_claim_byte_len": 31

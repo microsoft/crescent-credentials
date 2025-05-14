@@ -5,10 +5,11 @@ include "./circomlib/circuits/comparators.circom";
 include "./circomlib/circuits/gates.circom";
 include "./ecdsa-p256/sha256.circom";
 include "./strings.circom";
+include "./match_claim.circom";
 
-template Main(max_msg_bytes, max_mdl_bytes, field_byte_len, n, k) {
+template Main(max_msg_bytes, field_byte_len, n, k) {
 
-    signal input message[max_msg_bytes]; 
+    signal input message[max_msg_bytes];
     signal input signature_r[k]; 
     signal input signature_s[k];
     signal input pubkey_x[k];
