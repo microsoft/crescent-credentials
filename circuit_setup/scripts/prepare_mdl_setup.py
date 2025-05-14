@@ -3,22 +3,8 @@
 
 #!/usr/bin/env python3
 
-import os, sys, json
+import os, sys, json, cbor2
 from crescent_helper import *
-
-# mDL attributes
-
-# TODO: generate this programmatically
-mDL_attributes = {
-    "birth_date": {
-        "cbor_str": "[106, 98, 105, 114, 116, 104, 95, 100, 97, 116, 101]",
-        "cbor_str_len": 11
-    },
-    "resident_state": {
-        "cbor_str": "[110, 114, 101, 115, 105, 100, 101, 110, 116, 95, 115, 116, 97, 116, 101]",
-        "cbor_str_len": 15
-    }
-}
 
 # ----------------------------------------------------------------------
 def usage():
@@ -30,6 +16,10 @@ def circom_header(cfg):
         print("Unsupported alg:", cfg.get("alg")); sys.exit(-1)
     with open("circuits-mdl/main_header_es256.circom.template") as f:
         return f.read()
+
+def get_cbor_encoded_name_identifier(name: str):
+    encoded_bytes = cbor2.dumps(name)
+    return list(encoded_bytes), len(encoded_bytes)
 
 # ======================================================================
 #  generator
@@ -67,8 +57,7 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
             attr_type = cfg[name].get("type")
             reveal = cfg[name].get("reveal")
             max_claim_byte_len = cfg[name].get("max_claim_byte_len")
-            name_identifier = mDL_attributes[name]["cbor_str"]
-            name_identifier_len = mDL_attributes[name]["cbor_str_len"]
+            name_identifier, name_identifier_len = get_cbor_encoded_name_identifier(name)
             name_preimage_len = 128 # don't hardcode; calculate from max_claim_byte_len?
 
             if (reveal is None) or (reveal == "false"):
