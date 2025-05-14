@@ -306,7 +306,7 @@ pub(crate) fn find_value_digest_info(
                 let (identifier_l, _identifier_r, value_l, value_r) = find_element_positions(info.preimage.as_ref(), claim)
                     .expect("Unable to find the element positions in preimage");
                 info.identifier_l = identifier_l;
-                //info.identifier_r = _identifier_r; FIXME: return this?
+                //info.identifier_r = _identifier_r; FIXME: return this? we currently calculate it based on the identifier value
                 info.value_l = value_l;
                 info.value_r = value_r;
                 let mut hasher = Sha256::new();
@@ -541,7 +541,7 @@ fn main() {
         println!("claim_info ({}): {:?}", claim_name, claim_info);
         prover_inputs.insert(format!("{}_id", claim_name).to_string(), serde_json::json!(claim_info.id));
         let claim_preimage = sha256_padding(claim_info.preimage.as_ref());
-        if claim_preimage.len() != 128 { // FIXME: don't hardcode this value
+        if claim_preimage.len() != 128 { // FIXME: don't hardcode this value. Currently correct for the mDL we generate, but not in general
             panic!("Invalid {}_preimage length: {}; expected 128 (hardcoded in circom circuit)", claim_name, claim_preimage.len());
         }
         prover_inputs.insert(format!("{}_preimage", claim_name).to_string(), serde_json::json!(claim_preimage));
@@ -552,15 +552,18 @@ fn main() {
         let claim_value_str = claim_info.value.as_str();
         match claim_type {
             "string" => {
-                prover_inputs.insert(format!("{}_value_l", claim_name).to_string(), serde_json::json!(claim_info.value_l + 1)); // FIXME: +1 to skip the length byte (only works for short strings!)
+                // for string values, we skip the first CBOR byte (0x60) which indicates the string length, to only compare the claim value
+                // FIXME: not true in general, only for short strings!
+                let value_l = claim_info.value_l + 1;
+                prover_inputs.insert(format!("{}_value_l", claim_name).to_string(), serde_json::json!(value_l));
                 prover_inputs.insert(format!("{}_value_r", claim_name).to_string(), serde_json::json!(claim_info.value_r));
                 let claim_value = pack_string_to_int_unquoted(claim_value_str, max_claim_byte_len).unwrap();
-                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value)); // FIXME: move out of the match
+                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
             },
             "date" => {
                 // we don't need the value_l and value_r for date
                 let claim_value = ymd_to_daystamp(claim_value_str).unwrap();
-                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value)); // FIXME: move out of the match
+                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
             },
             &_ => {
                 panic!("Unsupported claim type: {}", claim_type);

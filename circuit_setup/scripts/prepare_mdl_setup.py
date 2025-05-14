@@ -41,9 +41,7 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
 
     attrs = [k for k in cfg if k not in CRESCENT_CONFIG_KEYS]
 
-    public_inputs = [] # ["pubkey_x", "pubkey_y"] FIXME: add these back
-    # add other public signals below if you want them exported FIXME
-    # public_inputs.append("threshold_days")  # example
+    public_inputs = ["pubkey_x", "pubkey_y"]
 
     with open(out_path, "w") as f:
 
@@ -56,12 +54,12 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
     //   - attribute_value: the value of the attribute; for date types, this in an integer (days since year 0000)
     //   - attribute_id: the id of the attribute (currently limited to 1 byte)
     //   - attribute_preimage: the sha256-padded preimage of the mDL IssuerSignedItem formatted as follows:
-    //    'digestID': 
-    //    'random': random salt
-    //    'elementIdentifier': CBOR encoded string of the attribute name,
-    //    'elementValue': the attribute value
+    //     * 'digestID': 
+    //     * 'random': random salt
+    //     * 'elementIdentifier': CBOR encoded string of the attribute name,
+    //     * 'elementValue': the attribute value
     // Then we check TODO
-    // FIXME: support <attr>_id > 23 (which would be encoded in 2+ bytes)
+    // FIXME: support attribute_id > 23 (which would be encoded in 2+ bytes)
 """)
         for name in attrs:
 
@@ -74,8 +72,8 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
             name_preimage_len = 128 # don't hardcode; calculate from max_claim_byte_len?
 
             if (reveal is None) or (reveal == "false"):
-                # FIXME: is that ok? maybe we need to handle the attribute, but not make it part of the public inputs?
-                print(f"Skipping {name} (not revealed)"); continue
+                print(f"Claim {name} is not revealed; not currently supported")
+                sys.exit(-1)
 
             print(f"Writing circuit code for {name} ({attr_type})")                        
 
@@ -87,11 +85,11 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
     // ------------------------------------------------------------
     //  {name}
     // ------------------------------------------------------------
-    var {name}_preimage_len = {name_preimage_len}; // FIXME: hardcoded for now
+    var {name}_preimage_len = {name_preimage_len};
     signal input {name}_value;
     signal input {name}_id;
-    signal input {name}_preimage[{name}_preimage_len]; // FIXME: not all attributes are 128 bytes long!
-    signal input {name}_identifier_l;     // The position of the {name} indicator in the preimage
+    signal input {name}_preimage[{name}_preimage_len];
+    signal input {name}_identifier_l; // The start position of the {name} identifier in the preimage
 
     signal input {name}_encoded_l; // The start position in the cred where the hashed {name} occurs
     signal input {name}_encoded_r; // The end position FIXME: do we need this? for our 1-byte digestID, it's always going to be l + 35
