@@ -14,6 +14,12 @@ cd circuit_setup/scripts
 ./run_setup.sh mdl1
 
 cd ../../creds
+for d in test-vectors/rs256 test-vectors/rs256-sd test-vectors/rs256-db test-vectors/mdl1; do
+  if [ ! -d "$d" ]; then
+    echo "❌ Error: Missing directory creds/'$d'" >&2
+    exit 1
+  fi
+done
 
 cargo run --bin crescent $RELEASE_FLAG --features print-trace zksetup --name rs256
 cargo run --bin crescent $RELEASE_FLAG --features print-trace prove --name rs256
