@@ -90,8 +90,8 @@ pub fn create_show_proof_wasm(
                     age.expect("Age not valid."),
                 )
             } else {
-                proof_spec.presentation_message = Some(challenge);
-                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec).unwrap()
+                proof_spec.presentation_message = Some(challenge.into());
+                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, None).unwrap()
             };
 
             let show_proof_b64 = write_to_b64url(&show_proof);

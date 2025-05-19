@@ -438,7 +438,7 @@ fn main() {
             issuer_auth
             .verify::<VerifyingKey, Signature>(&issuer_pub_key, None, None);
     if !verification_result.is_success() {
-        panic!("Error: issuer signature verification failed");
+        panic!("Error: issuer signature verification failed: {}", verification_result.into_result().err().unwrap());
     }
 
     // process the signature
