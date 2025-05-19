@@ -6,29 +6,18 @@ Cargo.lock
 creds/test-vectors
 !creds/test-vectors/README
 
+
+circuit_setup/circuits-mdl/circomlib
+circuit_setup/inputs/*/**
+!circuit_setup/inputs/*/*.json
+
 # sample files
 sample/issuer/.well-known/
 sample/issuer/keys/
-sample/client/.vscode/crescent-client-extension.code-workspace
 sample/client/node_modules
 sample/client/mdl.cbor.hex
 sample/client/dist
 sample/client_helper/data
 sample/verifier/data
 
-# sample credentials that are generated
-circuit_setup/inputs/*/issuer.prv
-circuit_setup/inputs/*/issuer.pub
-circuit_setup/inputs/*/token.jwt
-circuit_setup/inputs/*/device.prv
-circuit_setup/inputs/*/device.pub
-circuit_setup/inputs/*/device_private_key.pem
-circuit_setup/inputs/*/device_public_key.pem
-circuit_setup/inputs/*/issuer.priv
-circuit_setup/inputs/*/issuer.pub
-circuit_setup/inputs/*/issuer_certs.pem
-circuit_setup/inputs/*/mdl.cbor
-
-setup/generated_files/
-circuit_setup/circuits-mdl/circomlib
 crescent-extension
