@@ -552,12 +552,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     }
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = utc_now_seconds();
-    let delta = 
-        if show_proof.cur_time < now_seconds {
-            now_seconds - show_proof.cur_time
-        } else {
-            0
-    };
+    let delta = now_seconds.saturating_sub(show_proof.cur_time);
     println!("Proof created {} seconds ago", delta);    
 
     if delta > SHOW_PROOF_VALIDITY_SECONDS {
@@ -663,12 +658,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
     }
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = utc_now_seconds();
-    let delta = 
-        if show_proof.cur_time < now_seconds {
-            now_seconds - show_proof.cur_time
-        } else {
-            0
-    };
+    let delta = now_seconds.saturating_sub(show_proof.cur_time);
     println!("Proof created {} seconds ago", delta);    
 
     if delta > SHOW_PROOF_VALIDITY_SECONDS {
