@@ -6,7 +6,7 @@ use ark_bn254::Bn254 as ECPairing;
 use num_bigint::BigUint;
 use num_traits::FromPrimitive;
 use serde_json::{Map, Value};
-use std::{collections::BTreeMap, io::ErrorKind};
+use std::{collections::BTreeMap};
 
 #[cfg(not(feature = "wasm"))]
 use ark_circom::CircomBuilder;
