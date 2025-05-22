@@ -193,11 +193,17 @@ R1CS_FILE=${OUTPUTS_DIR}/main_c.r1cs
 WIT_GEN_FILE=${OUTPUTS_DIR}/circom/main_js/main.wasm
 SYM_FILE=${OUTPUTS_DIR}/circom/io_locations.sym
 CONFIG_FILE=${INPUTS_DIR}/config.json
-TOKEN_FILE=${INPUTS_DIR}/token.jwt
 ISSUER_KEY_FILE=${INPUTS_DIR}/issuer.pub
 PROOF_SPEC_FILE=${INPUTS_DIR}/proof_spec.json
-DEVICE_PUB_FILE=${INPUTS_DIR}/device.pub
-DEVICE_PRV_FILE=${INPUTS_DIR}/device.prv
+if [ ${CREDTYPE} == 'jwt' ]; then
+    CRED_FILE=${INPUTS_DIR}/token.jwt
+    DEVICE_PUB_FILE=${INPUTS_DIR}/device.pub
+    DEVICE_PRV_FILE=${INPUTS_DIR}/device.prv
+elif [ ${CREDTYPE} == 'mdl' ]; then 
+    CRED_FILE=${INPUTS_DIR}/mdl.cbor
+    DEVICE_PUB_FILE=${INPUTS_DIR}/device_public_key.pem
+    DEVICE_PRV_FILE=${INPUTS_DIR}/device_private_key.pem
+fi
 
 rm -rf ${COPY_DEST}
 mkdir -p ${COPY_DEST}
@@ -206,14 +212,10 @@ cp ${WIT_GEN_FILE} ${COPY_DEST}/
 cp ${SYM_FILE} ${COPY_DEST}/
 cp ${CONFIG_FILE} ${COPY_DEST}/
 cp ${ISSUER_KEY_FILE} ${COPY_DEST}/
-
-if [ ${CREDTYPE} == 'jwt' ]; then
-    cp ${TOKEN_FILE} ${COPY_DEST}/
-    cp ${PROOF_SPEC_FILE} ${COPY_DEST}/ || true     # Optional file
-    cp ${DEVICE_PUB_FILE} ${COPY_DEST}/ || true     # Optional file
-    cp ${DEVICE_PRV_FILE} ${COPY_DEST}/ || true     # Optional file
-fi
-
+cp ${CRED_FILE} ${COPY_DEST}/
+cp ${DEVICE_PUB_FILE} ${COPY_DEST}/ || true     # Optional file # FIXME: optional only for JWT, is that a problem?
+cp ${DEVICE_PRV_FILE} ${COPY_DEST}/ || true     # Optional file
+cp ${PROOF_SPEC_FILE} ${COPY_DEST}/ || true     # Optional file
 if [ ${CREDTYPE} == 'mdl' ]; then 
     cp ${PROVER_INPUTS_FILE} ${COPY_DEST}/
 fi

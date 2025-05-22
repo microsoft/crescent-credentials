@@ -298,7 +298,7 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_s
             let show_proof =
             if &client_state.credtype == "mdl" {
                 let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())?;
-                create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, age)
+                create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations)
             }
             else {
                 proof_spec.presentation_message = Some(challenge.into());

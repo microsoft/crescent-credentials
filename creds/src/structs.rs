@@ -71,7 +71,7 @@ impl IOLocations {
             Some(location) => Ok(*location),
             None => Err(std::io::Error::new(
                 ErrorKind::Other,
-                "Key not found in public_io_locations",
+                format!("Key {} not found in public_io_locations", key),
             )),
         }
     }

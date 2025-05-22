@@ -353,7 +353,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         disclosed_info = Some(info);
     } else {
         let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap(); // disclosure UID validated, so unwrap should be safe
-        let (valid, info) = verify_show_mdl(&vp, &show_proof, Some(challenge.as_bytes()), age);
+        let (valid, info) = verify_show_mdl(&vp, &show_proof, Some(challenge.as_bytes()));
         is_valid = valid;
         disclosed_info = Some(info);
     }

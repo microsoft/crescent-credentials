@@ -18,10 +18,6 @@ use std::{fs, path::PathBuf};
 
 use structopt::StructOpt;
 
-const MDL_AGE_GREATER_THAN : usize = 18;         // mDL show proofs will prove that the holder is older than this value (in years)
-
-
-
 fn main() {
     let root = current_dir().unwrap();
     let opt = Opt::from_args();
@@ -143,17 +139,16 @@ fn show_proof_size(show_proof: &ShowProof<CrescentPairing>) -> usize {
     print!("Show proof size: ");
     let groth16_size = show_proof.show_groth16.compressed_size();
     print!("{} (Groth16 proof) + ", groth16_size);
-    let show_range_size = show_proof.show_range.compressed_size();
+    let show_range_size = show_proof.show_range_exp.compressed_size();
     print!("{} (range proof) ", show_range_size);
 
-    let show_range2_size = 
-    if show_proof.show_range2.is_some() {
-        let tmp = show_proof.show_range2.compressed_size();
-        print!("{} + (range proof2) ", tmp);        
-        tmp
-    } else {
-        0
-    };
+    // accumulate the size of the show_range_attr proofs
+    let mut show_range_attr_size = 0;
+    for (i, show_range_attr) in show_proof.show_range_attr.iter().enumerate() {
+        let tmp = show_range_attr.compressed_size();
+        print!(" + {} (range proof{}) ", tmp, i);
+        show_range_attr_size += tmp;
+    }
 
     let device_proof_size = if show_proof.device_proof.is_some() {
         let tmp = show_proof.device_proof.compressed_size();
@@ -163,7 +158,7 @@ fn show_proof_size(show_proof: &ShowProof<CrescentPairing>) -> usize {
         0
     };
 
-    let total = groth16_size + show_range_size + show_range2_size + device_proof_size;
+    let total = groth16_size + show_range_size + show_range_attr_size + device_proof_size;
     println!(" = {} bytes total", total);
 
     total
@@ -208,12 +203,11 @@ pub fn run_show(
     let io_locations = IOLocations::new(&paths.io_locations);    
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
-    
+
+    let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
     let show_proof = if client_state.credtype == "mdl" {
-        let pm = string_to_byte_vec(presentation_message);
-        create_show_proof_mdl(&mut client_state, &range_pk, pm.as_deref(), &io_locations, MDL_AGE_GREATER_THAN)  
+        create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations).unwrap()
     } else {
-        let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
 
         let device_signature = 
         if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
@@ -241,13 +235,14 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
     let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     let config_str = std::fs::read_to_string(&paths.config).unwrap();
+    let credtype = "mdl"; // FIXME: read from config_str
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str};
-    
-    let (verify_result, data) = if show_proof.show_range2.is_some() {
-        let pm = string_to_byte_vec(presentation_message);
-        verify_show_mdl(&vp, &show_proof, pm.as_deref(), MDL_AGE_GREATER_THAN)
+
+    let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);  
+    println!("show_proof.show_range_attr.len() = {}", show_proof.show_range_attr.len());
+    let (verify_result, data) = if credtype == "mdl" {
+        verify_show_mdl(&vp, &show_proof, &proof_spec)
     } else {
-        let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);  
         verify_show(&vp, &show_proof, &proof_spec)
     };
 
