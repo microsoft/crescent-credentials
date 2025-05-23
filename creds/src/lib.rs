@@ -681,7 +681,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 {
     let proof_spec = create_proof_spec_internal(proof_spec, &vp.config_str);
     if proof_spec.is_err() {
-        println!("Failed to create internal proof spec");
+        println!("Failed to create internal proof spec: {:?}", proof_spec.err().unwrap());
         return (false, "".to_string());
     }
     let proof_spec = proof_spec.unwrap();

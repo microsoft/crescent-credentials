@@ -582,7 +582,6 @@ pub fn parse_config(config_str: &str) -> Result<serde_json::Map<String, Value>, 
 // Create the internal version of the ProofSpec object.  This combines information from the config file and the
 // provided ProofSpec to create a mode detailed object. 
 pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &str) -> Result<ProofSpecInternal, Box<dyn Error>> {
-
     let config = parse_config(config_str)?;
     let mut revealed = vec![];
     let mut hashed = vec![];
