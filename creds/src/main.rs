@@ -235,7 +235,8 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
     let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     let config_str = std::fs::read_to_string(&paths.config).unwrap();
-    let credtype = "mdl"; // FIXME: read from config_str
+    let config_json: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+    let credtype = config_json.get("credtype").and_then(|v| v.as_str()).unwrap_or("mdl");
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str};
 
     let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);  
