@@ -44,10 +44,15 @@ The circuit setup must be completed first, by running
 
 ```bash
 cd circuit_setup/scripts
-./run_setup.sh rs256
-./run_setup.sh mdl1
+./run_setup.sh <param>
 cd ../../creds
 ```
+
+Where `<param>` is one of the supported parameter sets:
+* `rs256`: for a RSA-SHA256 signed JWT credential, hardcoding the disclosure of the user's email domain,
+* `rs256-sd`: for a RSA-SHA256 signed JWT credential, supporting selective disclosure of its attributes,
+* `rs256-db`: for a device-bound RSA-SHA256 signed JWT credential, supporting selective disclosure of its attributes,
+* `mdl1`: for a device-bound ECSDA mDL credential, supporting selective disclosure of its attributes
 
 Circuit setup will copy data (parameters etc.) into `creds/test-vectors/`.
 
@@ -61,20 +66,21 @@ The individual steps are
 and we can run each step as follows
 
 ```bash
-cargo run --bin crescent --release --features print-trace zksetup --name rs256
-cargo run --bin crescent --release --features print-trace prove --name rs256
-cargo run --bin crescent --release --features print-trace show --name rs256 [--presentation-message "..."]
-cargo run --bin crescent --release --features print-trace verify --name rs256 [--presentation-message "..."]
+cargo run --bin crescent --release --features print-trace zksetup --name <param>
+cargo run --bin crescent --release --features print-trace prove --name <param>
+cargo run --bin crescent --release --features print-trace show --name <param> [--presentation-message "..."]
+cargo run --bin crescent --release --features print-trace verify --name <param> [--presentation-message "..."]
 ```
 
-The `--name` parameter, used in circuit setup and with the command-line tool, specifies which credential type is used, the two examples are `rs256`, a JWT signed with RSA256, and `mdl1` a sample mobile driver's license. An optional text presentation message can be passed to the `show` and `prove` steps to bind the presentation to some application data (e.g., a verifier challenge, some data to sign).
+The `--name` parameter must be one of the `<param>` option above. An optional text presentation message can be passed to the `show` and `prove` steps to bind the presentation to some application data (e.g., a verifier challenge, some data to sign, etc.).
 
 Note that the steps have to be run in order, but once the client state is created by `prove`, the `show` and `verify` steps can be run repeatedly.
 
 ### Selective Disclosure
-The demo generates proofs of fixed statements, for the `rs256` example, the domain of the email address is revealed to the verifier, and for `mdl` the statement is that the holder's age is greater than 18.  By default Crescent also proves that the credential is not expired.
+The `rs256` parameter set always discloses the domain of the email address to the verifier. 
 
-The `rs256-sd` example demonstrates how to disclose a subset of the attributes in a credential.  The file `creds/test-vectors/rs256-sd/proof_spec.json` contains 
+The `rs256-sd`, `rs256-db`, and `mdl1` parameter sets demonstrate how to disclose a subset of the attributes in a credential. For example, 
+the file `creds/test-vectors/rs256-sd/proof_spec.json` contains 
 ```
 {
     "revealed" : ["family_name", "tenant_ctry", "auth_time", "aud"]
@@ -83,15 +89,24 @@ The `rs256-sd` example demonstrates how to disclose a subset of the attributes i
 which means that the proof will disclose those attributes to the verifier.  The subset of the attributes that may be revealed in this way is limited to those in `circuit_setup/inputs/rs256-sd/config.json` that have the `reveal` or `reveal_digest` boolean set to `true`. 
 The `reveal_digest` option is used for values that may be larger than 31 bytes; they will get hashed first.  Setting this flag changes how the circuit setup phase handles those attributes, allowing them to be optionally revealed during `show`.
 
-As example ways to experiment with selective disclosure, try removing `aud` from the list of revealed attributes, or adding `given_name` to the list of revealed attributes in the proof specification file.
+To experiment with selective disclosure, try removing `aud` from the list of revealed attributes, or adding `given_name` to the list of revealed attributes in the proof specification file.
 
-Note that the `rs256-db` parameter set also supports selective disclosure; this is the set used in the sample to offer both selective disclosure and key binding (see next section).
+### Range proofs
+
+Crescent proves for all parameter set that the credential is not expired by creating a range proof that the expiration date (the `exp` claim for JWTs, the `valid_until` one for mDL) is later than the current time.
+
+The `mdl1` parameter set also supports proving that an attribute is `X years old`. For example, the file `` contains:
+```
+{
+    "range_over_year": {"birth_date": 18}
+}
+```
+which means that the proof will create a range prove to show that the encoded `birth_date` is such that the user is at least 18 of age.
 
 ### Device-Bound Credentials
-The example `rs256-db` demonstrates a JWT credential that is *device bound*.  This means that the JWT encodes the public key of an ECDSA signing key, where the private key is stored by a device (such as a hardware security module), and the device exposes only a signing API. 
-When the credential is used, the verifier expects the holder to demonstrate possession of the device key, by signing a challenge.  During circuit setup, the file `circuit_setup/inputs/rs256-db/config.json` has the line `"device_bound": true`, which indicates the sample credential should be generated with a device key.  In the demo, a fresh ECDSA key pair is generated in software, no special hardware is required.
-
-For show proofs, The file `creds/test-vectors/rs256-db/proof_spec.json` contains 
+The `rs256-db` and `mdl1` parameter sets demonstrate a credential that is *device bound*.  This means that the JWT or mDL encodes the public key of an ECDSA signing key, where the private key is stored by a device (such as a hardware security module), and the device exposes only a signing API. 
+When the credential is used, the verifier expects the holder to demonstrate possession of the device key, by signing a challenge.  During circuit setup, the file `circuit_setup/inputs/rs256-db/config.json`, for example, has the line `"device_bound": true`, which indicates the sample credential should be generated with a device key.  In the demo, a fresh ECDSA key pair is generated in software, no special hardware is required.
+For show proofs, the file `creds/test-vectors/rs256-db/proof_spec.json`, for example, contains 
 ```
 {
     "revealed" : ["family_name", "tenant_ctry", "auth_time", "aud"],

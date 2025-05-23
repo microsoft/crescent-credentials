@@ -87,7 +87,6 @@ pub fn create_show_proof_wasm(
                     &range_pk,
                     Some(challenge.as_bytes()),
                     &io_locations,
-                    age.expect("Age not valid."),
                 )
             } else {
                 proof_spec.presentation_message = Some(challenge.into());

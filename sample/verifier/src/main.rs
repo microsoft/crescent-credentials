@@ -345,15 +345,21 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
 
     let is_valid;
     let disclosed_info;
+    let config_proof_spec = match cred_type {
+        "jwt" => verifier_config.site1_proof_spec.clone(),
+        "mdl" => verifier_config.site2_proof_spec.clone(),
+        _ => error_template!("Unsupported credential type", verifier_config),
+    };
+    let mut ps : ProofSpec = serde_json::from_str(&config_proof_spec).unwrap();    
+    ps.presentation_message = Some(challenge.into());       
     if cred_type == "jwt" {
-        let mut ps : ProofSpec = serde_json::from_str(&verifier_config.site1_proof_spec).unwrap();    
-        ps.presentation_message = Some(challenge.into());       
         let (valid, info) = verify_show(&vp, &show_proof, &ps);
         is_valid = valid;
         disclosed_info = Some(info);
     } else {
-        let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap(); // disclosure UID validated, so unwrap should be safe
-        let (valid, info) = verify_show_mdl(&vp, &show_proof, Some(challenge.as_bytes()), age);
+        let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap() as u64; // disclosure UID validated, so unwrap should be safe
+        ps.range_over_year = Some(std::collections::BTreeMap::from([("birth_date".to_string(), age)]));
+        let (valid, info) = verify_show_mdl(&vp, &show_proof, &ps);
         is_valid = valid;
         disclosed_info = Some(info);
     }

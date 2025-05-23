@@ -43,7 +43,7 @@ fn ymd_to_ordinal(year: usize, month: usize, day: usize) -> usize {
 
 
 
-pub fn days_to_be_age(age : usize) -> usize {
+pub fn days_to_be_age(age: u64) -> usize {
 
     let local: DateTime<Local> = Local::now();
     let today = local.date_naive();
@@ -55,7 +55,7 @@ pub fn days_to_be_age(age : usize) -> usize {
     if month == 2 && day == 29 {
         day = 28;
     }
-    let past_stamp = ymd_to_ordinal(year - age, month, day);
+    let past_stamp = ymd_to_ordinal(year - age as usize, month, day);
 
     assert!(today_stamp > past_stamp);
     println!("To be {} years old, you must be {} days old", age, today_stamp - past_stamp);

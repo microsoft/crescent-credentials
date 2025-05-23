@@ -267,8 +267,6 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
 async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_spec: String, state: &State<SharedState>) -> Result<String, String> {
     println!("*** /show called with credential UID {}, disc_uid {}, challenge {}, and proof_spec {}", cred_uid, disc_uid, challenge, proof_spec);
     let tasks = state.inner().0.lock().await;
-    // Parse the challenge as a byte array for the presentation message
-    let pm = challenge.as_bytes();
 
     match tasks.get(&cred_uid) {
         Some(Some(show_data)) => {
@@ -292,16 +290,16 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_s
             println!("Parsed proof spec from b64: {:?}", proof_spec_string);
             let mut proof_spec: ProofSpec = serde_json::from_str(&proof_spec_string)
                 .map_err(|_| "Failed to parse proof spec".to_string())?;
-            println!("Parsed proof spec: {:?}", proof_spec);
 
             // Create the show proof
+            proof_spec.presentation_message = Some(challenge.into());
             let show_proof =
             if &client_state.credtype == "mdl" {
-                let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())?;
-                create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, age)
+                let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())? as u64;
+                proof_spec.range_over_year = Some(std::collections::BTreeMap::from([("birth_date".to_string(), age)]));
+                create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations).map_err(|e| format!("Failed to create show proof. {:?}", e))?
             }
             else {
-                proof_spec.presentation_message = Some(challenge.into());
                 create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, None).map_err(|e| format!("Failed to create show proof. {:?}", e))?
             };
             

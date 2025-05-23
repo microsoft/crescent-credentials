@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta crescent_verify_url="{{ site2_verify_url  | safe }}">
+    <meta crescent_verify_url="{{ site2_verify_url | safe }}">
     <meta crescent_disclosure_uid="{{ site2_disclosure_uid | safe }}">
     <meta crescent_proof_spec="{{ site2_proof_spec_b64url }}">
     <meta crescent_challenge="{{ session_id }}">

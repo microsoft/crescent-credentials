@@ -69,7 +69,10 @@ impl IOLocations {
     pub fn get_io_location(&self, key: &str) -> Result<usize, std::io::Error> {
         match self.public_io_locations.get(key) {
             Some(location) => Ok(*location),
-            None => Err(std::io::Error::other("Key not found in public_io_locations")),
+            None => Err(std::io::Error::new(
+                ErrorKind::Other,
+                format!("Key {} not found in public_io_locations", key),
+            )),
         }
     }
 

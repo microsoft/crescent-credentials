@@ -5,12 +5,11 @@ include "./circomlib/circuits/comparators.circom";
 include "./circomlib/circuits/gates.circom";
 include "./ecdsa-p256/sha256.circom";
 include "./strings.circom";
-//include "./match_claim.circom";
-//include "./predicates.circom";
+include "./match_claim.circom";
 
-template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
+template Main(max_msg_bytes, field_byte_len, n, k) {
 
-    signal input message[max_msg_bytes]; 
+    signal input message[max_msg_bytes];
     signal input signature_r[k]; 
     signal input signature_s[k];
     signal input pubkey_x[k];
@@ -126,65 +125,3 @@ template Main(max_msg_bytes, max_json_bytes, field_byte_len, n, k) {
     log("ts.output = ", ts.out);
     
     ts.out === valid_until_value;    // Constrain the input to the value extracted from the cred
-    
-    // #################### Prove birth_date ####################
-    var dob_preimage_len = 128;
-    signal input dob_value;         // integer, days since year 0000
-    signal input dob_id;            // the number of the birth_date claim 
-    signal input dob_preimage[dob_preimage_len];    // Version of dob_value that is encoded with random salt. 
-                                                    // It's OK to hardcode the length since birth_date is fixed-length
-    signal input dob_encoded_l;     // The position in the cred where the hashed dob occurs
-    signal input dob_encoded_r;
-    
-    component sha_bytes = Sha256Bytes(dob_preimage_len);
-    sha_bytes.in_padded <== dob_preimage;
-    sha_bytes.in_len_padded_bytes <== 128;
-
-    // Convert digest to bytes, ensure it's present in the cred, encoded with dob_id as:
-    //   "{:02x}{}{}".format(as_byte(dob_id), "5820", as_bytes(digest))
-
-    component hash_bytes = DigestToBytes();
-    hash_bytes.in <== sha_bytes.out;
-
-    signal encoded_dob_digest[35];
-    encoded_dob_digest[0] <== dob_id; // FIXME: dob_id > 23 will be encoded in 2 bytes
-    encoded_dob_digest[1] <== 88;   // == 0x58
-    encoded_dob_digest[2] <== 32;   // == 0x20
-    for(var i = 0; i < 32; i++ ) {
-        encoded_dob_digest[i + 3] <== hash_bytes.out[i];
-    }
-    component dob_indicator = IntervalIndicator(max_msg_bytes);
-    dob_indicator.l <== dob_encoded_l;
-    dob_indicator.r <== dob_encoded_r;
-
-    component match_dob = MatchSubstring(max_msg_bytes, 35, 31);
-    match_dob.msg <== message;
-    match_dob.substr <== encoded_dob_digest;
-    match_dob.range_indicator <== dob_indicator.indicator;
-    match_dob.l <== dob_indicator.l;
-    match_dob.r <== dob_indicator.r;
-
-    // Now we've confirmed that dob_preimage is authenticated: parse out the YYYY-MM-DD 
-    // and confirm it equals dob_value
-
-    // Copy dob_preimage into a local array 'a'
-    signal a[dob_preimage_len] <== dob_preimage;
-    // last 10 characters are 'YYYY-MM-DD', 32 bytes of SHA padding, so year 
-    // starts at position 85 = 127 - 32 - 10
-    signal dob_year <== (a[85]-48)*1000 + (a[86]-48)*100 + (a[87]-48)*10 + (a[88]-48);
-    signal dob_month <== (a[90]-48)*10 + (a[91]-48); 
-    signal dob_day <== (a[93]-48)*10 + (a[94]-48);
-    log("birth_date: ", dob_year,"-",dob_month,"-",dob_day);
-
-    // Convert y-m-d to "daystamp" (number of days since year 0)
-    component ds = Daystamp();
-    ds.year <== dob_year;
-    ds.month <== dob_month;
-    ds.day <== dob_day;
-
-    log("ds.out =", ds.out);
-    ds.out === dob_value;
-}
-
-// Note: make sure the first two parameters are the same as the max_cred_len in inputs/mdl1/config.json
-component main { public [pubkey_x, pubkey_y, valid_until_value, dob_value] } = Main(1792, 1792, 31, 43, 6);

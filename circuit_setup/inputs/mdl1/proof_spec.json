@@ -1,0 +1,5 @@
+{
+    "revealed" : ["resident_state"],
+    "range_over_year": {"birth_date": 18},
+    "presentation_message" : [1, 2, 3, 4]
+}

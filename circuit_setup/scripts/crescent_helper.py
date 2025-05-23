@@ -15,6 +15,8 @@ MAX_FIELD_BASE10_LEN = 77
 CIRCOM_RS256_LIMB_BITS = 121
 CIRCOM_ES256K_LIMB_BITS = 64 
 CIRCOM_ES256_LIMB_BITS = 43     # Required by the ecdsa-p256 circuit we use
+CIRCOM_P256_LIMB_BITS = 43   # the limb size you already use for ES‑256
+CIRCOM_P256_N_LIMBS    = 6   # number of limbs in the Main() template
 CRESCENT_CONFIG_KEYS = ['alg', 'credtype', 'reveal_all_claims', 'defer_sig_ver', 'max_cred_len', 'device_bound']     # fields in config.json that are for crescent configuration and do not refer to claims in the token
 CRESCENT_SUPPORTED_ALGS = ['RS256', 'ES256', 'ES256K']     # Signature algorithms used to sign JWT/mDL
 
