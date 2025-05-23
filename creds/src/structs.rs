@@ -6,7 +6,7 @@ use ark_bn254::Bn254 as ECPairing;
 use num_bigint::BigUint;
 use num_traits::FromPrimitive;
 use serde_json::{Map, Value};
-use std::{collections::BTreeMap, io::ErrorKind};
+use std::{collections::BTreeMap};
 
 #[cfg(not(feature = "wasm"))]
 use ark_circom::CircomBuilder;
@@ -156,10 +156,7 @@ impl GenericInputsJSON {
                 Ok(bigint_from_str(s))
             }
             _ => {
-                Err(std::io::Error::new(
-                    ErrorKind::Other,
-                    "Key not found or is not a string",
-                ))
+                Err(std::io::Error::other("Key not found or is not a string"))
             }
         }
     }
@@ -175,10 +172,7 @@ impl GenericInputsJSON {
                 Ok(vec)
             }
             _ => {
-                Err(std::io::Error::new(
-                    ErrorKind::Other,
-                    "Key not found or is not an array",
-                ))
+                Err(std::io::Error::other("Key not found or is not an array"))
             }
         }
     }

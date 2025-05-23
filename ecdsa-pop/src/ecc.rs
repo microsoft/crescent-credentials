@@ -44,7 +44,7 @@ where
       Ok(coords.map_or(Scalar::ZERO, |c| c.1))
     })?;
     let is_infinity = AllocatedNum::alloc(cs.namespace(|| "is_infinity"), || {
-      Ok(if coords.map_or(true, |c| c.2) {
+      Ok(if coords.is_none_or(|c| c.2) {
         Scalar::ONE
       } else {
         Scalar::ZERO

@@ -1,13 +1,11 @@
-use super::group::{GroupElement, VartimeMultiscalarMul};//, GROUP_BASEPOINT_COMPRESSED};
+use super::group::{GroupElement, VartimeMultiscalarMul};
 use super::scalar::Scalar;
 use digest::XofReader;
 use digest::{ExtendableOutput, Input};
+use halo2curves::t256::T256;
+use halo2curves::CurveExt;
 use sha3::Shake256;
-
-use circ_fields::t256::hash_to_curve::create_curvebased_hasher;
-use circ_fields::t256::curves::BASEPOINT_COMPRESSED;
-use ark_ec::hashing::HashToCurve;
-// use circ_fields::t256::Projective;
+use crate::group::{GROUP_BASEPOINT_COMPRESSED, AsBytesDev};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]  
@@ -21,17 +19,18 @@ impl MultiCommitGens {
   pub fn new(n: usize, label: &[u8]) -> Self {
     let mut shake = Shake256::default();
     shake.input(label);
-    // shake.input(GROUP_BASEPOINT_COMPRESSED);
-    shake.input(BASEPOINT_COMPRESSED);
+    shake.input(GROUP_BASEPOINT_COMPRESSED.as_bytes());
 
     let mut reader = shake.xof_result();
     let mut gens: Vec<GroupElement> = Vec::new();
     let mut uniform_bytes = [0u8; 64];
-    let hasher = create_curvebased_hasher(&[]);
+
+    let hasher = T256::hash_to_curve("domain_prefix");
+    
     for _ in 0..n + 1 {
       reader.read(&mut uniform_bytes);
-      let result_affine = hasher.hash(&uniform_bytes).unwrap();
-      gens.push(GroupElement::from_affine(result_affine));
+      let point = hasher(&uniform_bytes);
+      gens.push(GroupElement(point));
     }
 
     MultiCommitGens {

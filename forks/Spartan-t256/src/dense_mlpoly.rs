@@ -407,7 +407,8 @@ impl PolyEvalProof {
 mod tests {
   use super::super::scalar::ScalarFromPrimitives;
   use super::*;
-  use rand::rngs::OsRng;
+  use rand_core::OsRng;
+  use ff::Field;
 
   fn evaluate_with_LR(Z: &[Scalar], r: &[Scalar]) -> Scalar {
     let eq = EqPolynomial::new(r.to_vec());
