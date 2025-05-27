@@ -7,6 +7,7 @@ use num_bigint::BigUint;
 use num_traits::FromPrimitive;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap};
+use std::io::ErrorKind;
 
 #[cfg(not(feature = "wasm"))]
 use ark_circom::CircomBuilder;
