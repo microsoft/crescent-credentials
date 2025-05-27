@@ -7,7 +7,6 @@ use num_bigint::BigUint;
 use num_traits::FromPrimitive;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap};
-use std::io::ErrorKind;
 
 #[cfg(not(feature = "wasm"))]
 use ark_circom::CircomBuilder;
@@ -70,8 +69,7 @@ impl IOLocations {
     pub fn get_io_location(&self, key: &str) -> Result<usize, std::io::Error> {
         match self.public_io_locations.get(key) {
             Some(location) => Ok(*location),
-            None => Err(std::io::Error::new(
-                ErrorKind::Other,
+            None => Err(std::io::Error::other(
                 format!("Key {} not found in public_io_locations", key),
             )),
         }
