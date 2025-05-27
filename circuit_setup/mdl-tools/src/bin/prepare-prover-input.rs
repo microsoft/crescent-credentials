@@ -537,7 +537,7 @@ fn main() {
             panic!("Claim {} is not revealed: not currently supported", claim_name);
         }
 
-        let claim_info = find_value_digest_info(&namespaces, &mso, &tbs_data, &claim_name).unwrap();
+        let claim_info = find_value_digest_info(&namespaces, &mso, &tbs_data, claim_name).unwrap();
         println!("claim_info ({}): {:?}", claim_name, claim_info);
         prover_inputs.insert(format!("{}_id", claim_name).to_string(), serde_json::json!(claim_info.id));
         let claim_preimage = sha256_padding(claim_info.preimage.as_ref());
