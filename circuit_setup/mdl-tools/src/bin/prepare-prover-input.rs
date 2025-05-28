@@ -34,9 +34,8 @@ use p256::pkcs8::EncodePublicKey;
 use p256::NistP256;
 use serde_json::Map;
 use sha2::{Digest, Sha256};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use num_bigint::BigUint;
-use num_traits::{Num, Zero, One, ToPrimitive};
+use num_traits::{Zero, One, ToPrimitive};
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use std::str;
 use std::collections::{BTreeMap,HashSet};
@@ -93,23 +92,6 @@ fn sha256_padding(prepad_m: &[u8]) -> Vec<u8> {
     padded_m.extend_from_slice(&msg_length_bits.to_be_bytes());
 
     padded_m
-}
-
-fn hex_string_to_binary_array(hex_str: &str, bits: usize) -> Vec<u8> {
-    let num = BigUint::from_str_radix(hex_str, 16)
-    .expect("Invalid hex string");
-    let binary_string = format!("{:0>bits$b}", num, bits = bits);    
-    binary_string
-        .chars()
-        .map(|b| b.to_digit(2).unwrap() as u8)
-        .collect()
-}
-
-fn digest_to_limbs(digest_hex: &str) -> [u128; 2] {
-    let digest_bytes = hex::decode(digest_hex).expect("Invalid hex string");
-    let n = u128::from_be_bytes(digest_bytes[0..16].try_into().unwrap());
-    let b = u128::from_be_bytes(digest_bytes[16..32].try_into().unwrap());
-    [n, b]
 }
 
 fn base64_decoded_size(encoded_len: usize) -> usize {
@@ -494,12 +476,6 @@ fn main() {
     padded_m_extended.extend_from_slice(&padded_m);
     padded_m_extended.resize(config_max_cred_len, 0);
 
-    let mut hasher = Sha256::new();
-    hasher.update(&tbs_data_ints);
-    let sha256_hash = hasher.finalize();
-
-    let digest_hex_str = hex::encode(sha256_hash);
-    
     let valid_until_prefix = "6a76616c6964556e74696cc074"; // 6a: text(10), 7661...696c: "validUntil", c0: date, 74: text(20)
     let tbs_data_hex = hex::encode(&tbs_data);
     let valid_until_prefix_pos = tbs_data_hex.find(valid_until_prefix).unwrap();
