@@ -190,9 +190,9 @@ pub fn compute_encoded_positions(
     // Build the "cbored_digest" string.
     // - Format: "{:02x}5820{}", where {:02x} is the digest id in 2-digit hex,
     //   "5820" is a literal string, and the digest is hex-encoded.
-    // FIXME: bending over backward to convert the digest_id into a value accepted by format()
-    //         Digest is defined as "pub struct DigestId(i32)" and provide no public accessor
-    //         to the i32.
+    // NOTE: bending over backward to convert the digest_id into a value accepted by format()
+    //       Digest is defined as "pub struct DigestId(i32)" and provide no public accessor
+    //       to the i32.
     let id_i32: i32 = serde_json::from_str(&serde_json::to_string(&digest_id).unwrap()).unwrap();
     let cbored_digest = format!("{:02x}5820{}", id_i32, hex::encode(digest));
     
@@ -306,7 +306,7 @@ pub(crate) fn find_value_digest_info(
                 let (identifier_l, _identifier_r, value_l, value_r) = find_element_positions(info.preimage.as_ref(), claim)
                     .expect("Unable to find the element positions in preimage");
                 info.identifier_l = identifier_l;
-                //info.identifier_r = _identifier_r; FIXME: return this? we currently calculate it based on the identifier value
+                // Note: should we return info.identifier_r = _identifier_r? We currently calculate it based on the known length identifier value
                 info.value_l = value_l;
                 info.value_r = value_r;
                 let mut hasher = Sha256::new();
@@ -499,9 +499,6 @@ fn main() {
     let sha256_hash = hasher.finalize();
 
     let digest_hex_str = hex::encode(sha256_hash);
-    let _digest_bits = hex_string_to_binary_array(&digest_hex_str, 256); // FIXME: from the old python script, but unused
-    let _digest_b64 = URL_SAFE_NO_PAD.encode(sha256_hash); // FIXME: from the old python script, but unused
-    let _digest_limbs = digest_to_limbs(&digest_hex_str); // FIXME: from the old python script, but unused
     
     let valid_until_prefix = "6a76616c6964556e74696cc074"; // 6a: text(10), 7661...696c: "validUntil", c0: date, 74: text(20)
     let tbs_data_hex = hex::encode(&tbs_data);
@@ -565,6 +562,7 @@ fn main() {
                 let claim_value = ymd_to_daystamp(claim_value_str).unwrap();
                 prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
             },
+            // TODO: add support for other claim types
             &_ => {
                 panic!("Unsupported claim type: {}", claim_type);
             }
@@ -613,8 +611,6 @@ fn main() {
     prover_inputs.insert("pubkey_y".to_string(), serde_json::json!(y_limb));
     prover_inputs.insert("message_padded_bytes".to_string(), msg_len_after_sha2_padding.into());
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
-
-    // the python script defines a public_IOs and prover_aux_data dictionaries, but never write them out (FIXME) 
 
     // save prover_inputs to a file
     let prover_inputs_json = serde_json::to_string_pretty(&prover_inputs).unwrap();

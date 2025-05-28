@@ -93,7 +93,6 @@ fn mdoc_builder(claims: String, device_priv_key: String) -> Builder {
     }
 
     // TODO: should read these values from a config file
-    // FIXME: how do these compare to the ones in the claims.json file?
     let now = OffsetDateTime::now_utc();
     let validity_info = ValidityInfo {
         signed: now,

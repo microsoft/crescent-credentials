@@ -48,8 +48,6 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
     //     * 'random': random salt
     //     * 'elementIdentifier': CBOR encoded string of the attribute name,
     //     * 'elementValue': the attribute value
-    // Then we check TODO
-    // FIXME: support attribute_id > 23 (which would be encoded in 2+ bytes)
 """)
         for name in attrs:
 

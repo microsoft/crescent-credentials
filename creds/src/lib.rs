@@ -446,10 +446,6 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
         revealed_preimages.insert(attr.clone(), json!(aux[attr].clone().to_string()));
     }
 
-    if proof_spec.device_bound {
-        // FIXME: implement
-    }
-
     // Serialize the proof spec as the context
     let context_str = serde_json::to_string(&proof_spec).unwrap();
     let show_groth16 = client_state.show_groth16(Some(context_str.as_bytes()), &io_types);    
@@ -727,7 +723,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         return (false, "".to_string());
     }
     let mut inputs = vec![];
-//    inputs.extend(revealed_hashed); FIXME: implement
+    // inputs.extend(revealed_hashed); TODO: uncomment when hashed attributes are implemented
     inputs.extend(public_key_inputs.unwrap());
     inputs.extend(show_proof.revealed_inputs.clone());
     

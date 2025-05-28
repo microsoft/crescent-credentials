@@ -223,9 +223,9 @@ cp ${SYM_FILE} ${COPY_DEST}/
 cp ${CONFIG_FILE} ${COPY_DEST}/
 cp ${ISSUER_KEY_FILE} ${COPY_DEST}/
 cp ${CRED_FILE} ${COPY_DEST}/
-cp ${DEVICE_PUB_FILE} ${COPY_DEST}/ || true     # Optional file # FIXME: optional only for JWT, is that a problem?
-cp ${DEVICE_PRV_FILE} ${COPY_DEST}/ || true     # Optional file
-cp ${PROOF_SPEC_FILE} ${COPY_DEST}/ || true     # Optional file
+cp ${DEVICE_PUB_FILE} ${COPY_DEST}/ || true     # Optional file for JWTs
+cp ${DEVICE_PRV_FILE} ${COPY_DEST}/ || true     # Optional file for JWTs
+cp ${PROOF_SPEC_FILE} ${COPY_DEST}/
 if [ ${CREDTYPE} == 'mdl' ]; then 
     cp ${PROVER_INPUTS_FILE} ${COPY_DEST}/
 fi
