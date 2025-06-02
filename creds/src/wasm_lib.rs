@@ -87,6 +87,7 @@ pub fn create_show_proof_wasm(
                     &range_pk,
                     Some(challenge.as_bytes()),
                     &io_locations,
+                    None, // FIXME: add device signature
                 )
             } else {
                 proof_spec.presentation_message = Some(challenge.into());

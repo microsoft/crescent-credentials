@@ -103,7 +103,9 @@ pub fn run_prover(
     let client_state = 
     if config.contains_key("credtype") && config.get("credtype").unwrap() == "mdl" {
         let prover_inputs = GenericInputsJSON::new(&paths.mdl_prover_inputs);
-        create_client_state(&paths, &prover_inputs, None, "mdl").unwrap()
+        let prover_aux_string = fs::read_to_string(&paths.mdl_prover_aux).unwrap();
+        println!("prover_aux_string: {}", prover_aux_string);
+        create_client_state(&paths, &prover_inputs, Some(&prover_aux_string), "mdl").unwrap()
     }
     else {
         let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
@@ -198,25 +200,24 @@ pub fn run_show(
     base_path: PathBuf,
     presentation_message: Option<String>
 ) {
-    let proof_timer = std::time::Instant::now();    
+    let proof_timer = std::time::Instant::now();
     let paths = CachePaths::new(base_path);
-    let io_locations = IOLocations::new(&paths.io_locations);    
+    let io_locations = IOLocations::new(&paths.io_locations);
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
 
     let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
-    let show_proof = if client_state.credtype == "mdl" {
-        create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations).unwrap()
+    let device_signature = 
+    if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
+        let device = TestDevice::new_from_file(&paths.device_prv_pem);
+        Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
     } else {
+        None
+    };
 
-        let device_signature = 
-        if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
-            let device = TestDevice::new_from_file(&paths.device_prv_pem);
-            Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
-        } else {
-            None
-        };
-
+    let show_proof = if client_state.credtype == "mdl" {
+        create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations, device_signature).unwrap()
+    } else {
         create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature).unwrap()
     };
     println!("Proving time: {:?}", proof_timer.elapsed());

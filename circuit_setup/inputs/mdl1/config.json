@@ -1,6 +1,7 @@
 {
     "credtype": "mdl",
     "alg": "ES256",
+    "device_bound": true,
     "max_cred_len": 1792,
 
     "birth_date": {

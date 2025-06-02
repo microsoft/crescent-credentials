@@ -105,9 +105,9 @@ if [ ${CREDTYPE} == 'jwt' ] && ([ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${IN
     else
         python3 scripts/jwt_sign.py ${INPUTS_DIR}/claims.json ${INPUTS_DIR}/issuer.prv  ${INPUTS_DIR}/token.jwt
     fi
-elif [ ${CREDTYPE} == 'mdl' ] && ([ ! -f ${INPUTS_DIR}/device_private_key.pem ] || [ ! -f ${INPUTS_DIR}/issuer.priv ] || [ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${INPUTS_DIR}/issuer_certs.pem ] || [ ! -f ${INPUTS_DIR}/mdl.cbor ]); then
+elif [ ${CREDTYPE} == 'mdl' ] && ([ ! -f ${INPUTS_DIR}/device.prv ] || [ ! -f ${INPUTS_DIR}/issuer.prv ] || [ ! -f ${INPUTS_DIR}/issuer.pub ] || [ ! -f ${INPUTS_DIR}/issuer_certs.pem ] || [ ! -f ${INPUTS_DIR}/mdl.cbor ]); then
     echo "Creating sample issuer keys and mDL"
-    rm ${INPUTS_DIR}/device_private_key.pem ${INPUTS_DIR}/issuer.priv ${INPUTS_DIR}/issuer.pub ${INPUTS_DIR}/issuer_certs.pem ${INPUTS_DIR}/mdl.org ${OUTPUTS_DIR}/issuer.pub 2>/dev/null && true         
+    rm ${INPUTS_DIR}/device.prv ${INPUTS_DIR}/issuer.prv ${INPUTS_DIR}/issuer.pub ${INPUTS_DIR}/issuer_certs.pem ${INPUTS_DIR}/mdl.org ${OUTPUTS_DIR}/issuer.pub 2>/dev/null && true         
 
     if [[ `cat ${INPUTS_DIR}/config.json` =~ $ALG_REGEX ]]; then
         ALG="${BASH_REMATCH[1]}"
@@ -159,7 +159,15 @@ echo "=== circom output end ===" >> ${LOG_FILE}
 # there is a line of the form "public inputs: NUM_PUBLIC_INPUTS". parse out NUM_PUBLIC_INPUTS into a variable
 NUM_PUBLIC_INPUTS=$(grep -m 1 "public inputs:" "$LOG_FILE" | awk '{print $3}')
 NUM_PUBLIC_OUTPUTS=$(grep -m 1 "public outputs:" "$LOG_FILE" | awk '{print $3}')
+# for mDL, we need to add the device public key to the number of public inputs
+if [ ${CREDTYPE} == 'mdl' ] and ${DEVICE_BOUND} == 1; then
+    echo "Device bound mDL detected, adding device public key to public inputs"
+    NUM_PUBLIC_INPUTS=$((NUM_PUBLIC_INPUTS + 2))
+fi
 NUM_PUBLIC_IOS=$(($NUM_PUBLIC_INPUTS + $NUM_PUBLIC_OUTPUTS))
+echo "Number of public inputs: $NUM_PUBLIC_INPUTS"
+echo "Number of public outputs: $NUM_PUBLIC_OUTPUTS"
+echo "Total number of public I/Os: $NUM_PUBLIC_IOS"   
 
 # clean up the main.sym file as follows. Each entry is of the form #s, #w, #c, name as described in https://docs.circom.io/circom-language/formats/sym/
 awk -v max="$NUM_PUBLIC_IOS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, "."); printf "%s,%s\n", parts[2], $2}' "${CIRCOM_DIR}/main.sym" > "${CIRCOM_DIR}/io_locations.sym"
@@ -168,11 +176,12 @@ if [ ${CREDTYPE} == 'mdl' ]; then
     echo "=== Generating mDL ===" # delete me
     # Create the prover inputs (TODO: now that this has been ported to rust, do it in the library like for the JWT case)
     PROVER_INPUTS_FILE=${OUTPUTS_DIR}/prover_inputs.json
+    PROVER_AUX_FILE=${OUTPUTS_DIR}/prover_aux.json
     MDL_FILE=${INPUTS_DIR}/mdl.cbor
     CONFIG_FILE=${INPUTS_DIR}/config.json
     CLAIMS_FILE=${INPUTS_DIR}/claims.json
-    DEVICE_PRIV_KEY_FILE=${INPUTS_DIR}/device_private_key.pem
-    ISSUER_PRIV_KEY_FILE=${INPUTS_DIR}/issuer.priv
+    DEVICE_PRIV_KEY_FILE=${INPUTS_DIR}/device.prv
+    ISSUER_PRIV_KEY_FILE=${INPUTS_DIR}/issuer.prv
     ISSUER_CERTS_FILE=${INPUTS_DIR}/issuer_certs.pem
     ISSUER_KEY_FILE=${OUTPUTS_DIR}/issuer.pub
     
@@ -187,7 +196,7 @@ if [ ${CREDTYPE} == 'mdl' ]; then
     fi
     
     # generate the prover inputs
-    cargo run --release --bin prepare-prover-input -- --config ${CONFIG_FILE} --mdl ${MDL_FILE} --prover_inputs ${PROVER_INPUTS_FILE} 2>> ${LOG_FILE}
+    cargo run --release --bin prepare-prover-input -- --config ${CONFIG_FILE} --mdl ${MDL_FILE} --prover_inputs ${PROVER_INPUTS_FILE} --prover_aux ${PROVER_AUX_FILE} 2>> ${LOG_FILE}
     if [ $? -ne 0 ]; then
         echo "Error running prepare_prover_input"
         exit 1
@@ -205,14 +214,12 @@ SYM_FILE=${OUTPUTS_DIR}/circom/io_locations.sym
 CONFIG_FILE=${INPUTS_DIR}/config.json
 ISSUER_KEY_FILE=${INPUTS_DIR}/issuer.pub
 PROOF_SPEC_FILE=${INPUTS_DIR}/proof_spec.json
+DEVICE_PUB_FILE=${INPUTS_DIR}/device.pub
+DEVICE_PRV_FILE=${INPUTS_DIR}/device.prv
 if [ ${CREDTYPE} == 'jwt' ]; then
     CRED_FILE=${INPUTS_DIR}/token.jwt
-    DEVICE_PUB_FILE=${INPUTS_DIR}/device.pub
-    DEVICE_PRV_FILE=${INPUTS_DIR}/device.prv
 elif [ ${CREDTYPE} == 'mdl' ]; then 
     CRED_FILE=${INPUTS_DIR}/mdl.cbor
-    DEVICE_PUB_FILE=${INPUTS_DIR}/device_public_key.pem
-    DEVICE_PRV_FILE=${INPUTS_DIR}/device_private_key.pem
 fi
 
 rm -rf ${COPY_DEST}
@@ -228,6 +235,7 @@ cp ${DEVICE_PRV_FILE} ${COPY_DEST}/ || true     # Optional file for JWTs
 cp ${PROOF_SPEC_FILE} ${COPY_DEST}/
 if [ ${CREDTYPE} == 'mdl' ]; then 
     cp ${PROVER_INPUTS_FILE} ${COPY_DEST}/
+    cp ${PROVER_AUX_FILE} ${COPY_DEST}/
 fi
 
 cd scripts

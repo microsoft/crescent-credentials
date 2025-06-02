@@ -216,9 +216,9 @@ def check_config(config):
             print_debug("Error: the 'defer_sig_ver' option is only valid with the ES256K algorithm")
             return False
         
-    # If the token is device bound, assume it has the claims "device_key_0" and "device_key_1", and ensure
-    # they will be revealed
-    if config['device_bound']:
+    # If a JWT is device bound, assume it has the claims "device_key_0" and "device_key_1", and ensure
+    # they will be revealed (mDL handles this differently)
+    if config['device_bound'] and config['credtype'] == 'jwt':
         config['device_key_0'] = {
             "type": "number",
             "reveal": True,

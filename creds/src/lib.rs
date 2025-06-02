@@ -153,7 +153,8 @@ pub struct CachePaths {
    pub prover_params: String,   
    pub client_state: String, 
    pub show_proof: String,
-   pub mdl_prover_inputs: String, 
+   pub mdl_prover_inputs: String,
+   pub mdl_prover_aux: String,
    pub proof_spec: String,
    pub device_pub_pem: String,
    pub device_prv_pem: String
@@ -198,6 +199,7 @@ impl CachePaths {
             client_state: format!("{}client_state.bin", &cache_path),
             show_proof: format!("{}show_proof.bin", &cache_path),
             mdl_prover_inputs: format!("{}prover_inputs.json", &base_path_str),
+            mdl_prover_aux: format!("{}prover_aux.json", &base_path_str),
             proof_spec: format!("{}proof_spec.json", &base_path_str),
             device_pub_pem: format!("{}device.pub", &base_path_str),
             device_prv_pem: format!("{}device.prv", &base_path_str),
@@ -296,7 +298,6 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
         prover_params.config_str.clone()
     );
     client_state.credtype = credtype.to_string();
-
     Ok(client_state)
 }
 
@@ -396,8 +397,8 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     Ok(ShowProof{ show_groth16, show_range_exp, show_range_attr, revealed_inputs, revealed_preimages, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof})
 }
 
-// TODO: with SD and DB, that starts looking a lot like the JWT function; merge!
-pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, proof_spec: &ProofSpec, io_locations: &IOLocations) -> Result<ShowProof<ECPairing>, Box<dyn Error>>
+// TODO: refactor this function and create_show_proof into one
+pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, proof_spec: &ProofSpec, io_locations: &IOLocations, device_signature: Option<Vec<u8>>) -> Result<ShowProof<ECPairing>, Box<dyn Error>>
 {
     // Create Groth16 rerandomized proof for showing
 
@@ -446,6 +447,14 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
         revealed_preimages.insert(attr.clone(), json!(aux[attr].clone().to_string()));
     }
 
+    // If the credential is device bound, the public key attributes must be committed
+    if proof_spec.device_bound {
+        let device_key_0_pos = io_locations.get_io_location("device_key_0_value").unwrap();
+        let device_key_1_pos = io_locations.get_io_location("device_key_1_value").unwrap();
+        io_types[device_key_0_pos - 1] = PublicIOType::Committed;
+        io_types[device_key_1_pos - 1] = PublicIOType::Committed;
+    }
+
     // Serialize the proof spec as the context
     let context_str = serde_json::to_string(&proof_spec).unwrap();
     let show_groth16 = client_state.show_groth16(Some(context_str.as_bytes()), &io_types);    
@@ -458,9 +467,23 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     com_valid_until_value.m -= cur_time;
     com_valid_until_value.c -= com_valid_until_value.bases[0] * cur_time;
     let show_range_exp = client_state.show_range(&com_valid_until_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
+    let device_proof = 
+    if proof_spec.device_bound {
+        assert!(client_state.committed_input_openings.len() >= 3);
+        let com0 = client_state.committed_input_openings[1].clone();
+        let com1 = client_state.committed_input_openings[2].clone();
+        let sig = ECDSASig::new_from_bytes(&proof_spec.presentation_message.unwrap(), &device_signature.unwrap());
+        let aux = serde_json::from_str::<Value>(client_state.aux.as_ref().unwrap()).unwrap();
+        let aux = aux.as_object().unwrap();
+        let x = BigUint::from_str_radix(aux["device_pub_x"].as_str().unwrap(), 10).unwrap();
+        let y = BigUint::from_str_radix(aux["device_pub_y"].as_str().unwrap(), 10).unwrap();
+        Some(DeviceProof::prove(&com0, &com1, &sig, &x, &y))
+    } else {
+        None
+    };
 
     let mut show_range_attr= vec![];
-    let mut commitment_index = 1; // skip the first one (validUntil)
+    let mut commitment_index = 3; // skip the first 3 commitments (validUntil, device_key_0, device_key_1)
     // for each range-proofed attribute, create a fresh range proof that the attribute is at least "age" years old // TODO: generalize to non-age attributes
     for (_, age) in &proof_spec.range_over_year {
         let days_in_age = Fr::from(days_to_be_age(*age) as u64);
@@ -475,7 +498,7 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     }
 
     // Assemble proof and return
-    Ok(ShowProof{ show_groth16, show_range_exp, show_range_attr, revealed_inputs, revealed_preimages: None, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof: None})
+    Ok(ShowProof{ show_groth16, show_range_exp, show_range_attr, revealed_inputs, revealed_preimages: None, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof})
 }
 
 fn sort_by_io_location(attrs: &[String], io_locations: &IOLocations) -> Vec<String> {
@@ -713,7 +736,10 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 
     // If the credential is device bound, the device public key attributes must be committed
     if proof_spec.device_bound {
-        // TODO
+        let device_key_0_pos = io_locations.get_io_location("device_key_0_value").unwrap();
+        let device_key_1_pos = io_locations.get_io_location("device_key_1_value").unwrap();
+        io_types[device_key_0_pos - 1] = PublicIOType::Committed;
+        io_types[device_key_1_pos - 1] = PublicIOType::Committed;
     }
 
     // Create an inputs vector with the inputs from the prover, and the issuer's public key
@@ -761,7 +787,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
     }      
 
     for (i, show_range_attr) in show_proof.show_range_attr.iter().enumerate() {
-        let commitment_index = i + 1; // skip the first one (validUntil)
+        let commitment_index = i + 3; // skip the first 3 (validUntil, device_key_0, device_key_1)
         let attr_name = &proof_spec.range_over_year[i].0;
         let attr_label = format!("{}_value", &attr_name);
         let age = proof_spec.range_over_year[i].1;
@@ -788,11 +814,21 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
             println!("show_range_attr.verify failed");
             return (false, "".to_string());
         }
-        println!("range proof for {} over {} succeeded", attr_name, age);
+        println!("range proof for {} such that age is over {} succeeded", attr_name, age);
     }
 
     if proof_spec.device_bound {
-        // TODO
+        let device_key_0_pos = io_locations.get_io_location("device_key_0_value").unwrap();
+        let device_key_1_pos = io_locations.get_io_location("device_key_1_value").unwrap();        
+        let com0 = show_proof.show_groth16.commited_inputs[1];
+        let com1 = show_proof.show_groth16.commited_inputs[2];
+        let bases0 = vec![vp.pvk.vk.gamma_abc_g1[device_key_0_pos], vp.pvk.vk.delta_g1];
+        let bases1 = vec![vp.pvk.vk.gamma_abc_g1[device_key_1_pos], vp.pvk.vk.delta_g1];
+        let ret = DeviceProof::verify(show_proof.device_proof.as_ref().unwrap(), &com0.into(), &com1.into(), &bases0, &bases1);
+        if !ret {
+            println!("DeviceProof.verify failed");
+            return (false, "".to_string());            
+        }
     }
 
     println!("Verification time: {:?}", verify_timer.elapsed());  
@@ -827,6 +863,11 @@ mod tests {
 
     #[test]
     #[serial]
+    pub fn end_to_end_test_rs256() {
+        run_test("rs256", "jwt");
+    }
+    #[test]
+    #[serial]
     pub fn end_to_end_test_rs256_sd() {
         run_test("rs256-sd", "jwt");
     }
@@ -846,7 +887,7 @@ mod tests {
         let base_path = PathBuf::from(format!("test-vectors/{}", name));
         let paths = CachePaths::new(base_path.clone());
 
-        println!("Runing end-to-end-test for {}, credential type {}", name, cred_type);
+        println!("Running end-to-end-test for {}, credential type {}", name, cred_type);
         println!("Requires that `../setup/run_setup.sh {}` has already been run", name);
         println!("These tests are slow; best run with the `--release` flag"); 
 
@@ -860,7 +901,7 @@ mod tests {
     
         let (prover_inputs, prover_aux) = 
         if cred_type == "mdl" {
-            (GenericInputsJSON::new(&paths.mdl_prover_inputs), None)
+            (GenericInputsJSON::new(&paths.mdl_prover_inputs), Some(GenericInputsJSON::new(&paths.mdl_prover_aux)))
         }
         else {
             let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
@@ -884,17 +925,16 @@ mod tests {
         let ps_raw = fs::read_to_string(&paths.proof_spec).expect("Proof spec file exists, but failed while reading it");
         let mut proof_spec : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
         proof_spec.presentation_message = Some(pm.as_bytes().to_vec());
-        let proof = if cred_type == "mdl" {
-            create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations)
+        let device_signature = 
+        if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
+            let device = TestDevice::new_from_file(&paths.device_prv_pem);
+            Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
         } else {
-            let device_signature = 
-            if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
-                let device = TestDevice::new_from_file(&paths.device_prv_pem);
-                Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
-            } else {
-                None
-            };
-
+            None
+        };
+        let proof = if cred_type == "mdl" {
+            create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations, device_signature)
+        } else {
             create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature)
         };
         assert!(proof.is_ok());

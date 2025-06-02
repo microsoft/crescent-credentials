@@ -125,3 +125,67 @@ template Main(max_msg_bytes, field_byte_len, n, k) {
     log("ts.output = ", ts.out);
     
     ts.out === valid_until_value;    // Constrain the input to the value extracted from the cred
+
+    // ############ Extract the device key from the credential
+    // Strategy: 
+    //      - prover provides the x-coordinate as circuit input (32-bytes)
+    //      - The circuit ensures that the x-coord follows a public prefix
+    //      - the position of the prefix will be hidden (this prevents a malicious from issuer padding other data)
+    //      - the circuit will split the 32 bytes into two 16-byte pieces, encode as field elements, then output both pieces
+    //Prefix: 6d6465766963654b6579496e666fa1696465766963654b6579a401022001215820
+    signal device_key_x_prefix[33] <== [109, 100, 101, 118, 105, 99, 101, 75, 101, 121, 73, 110, 102, 111, 161, 105, 100, 101, 118, 105, 99, 101, 75, 101, 121, 164, 1, 2, 32, 1, 33, 88, 32];
+    signal input device_key_x[32]; 
+
+    // Match the prefix||key in the credential to prove device_key_x is correct
+    signal input device_key_x_prefix_l;
+    signal input device_key_x_prefix_r;
+
+    // Create a new array to hold the concatenated result
+    signal device_key_x_with_prefix[65]; // 33 bytes prefix + 32 bytes key
+    for (var i = 0; i < 33; i++) {
+        device_key_x_with_prefix[i] <== device_key_x_prefix[i];
+    }
+    for (var i = 0; i < 32; i++) {
+        device_key_x_with_prefix[33 + i] <== device_key_x[i];
+    }
+
+    log("Matching device_key_with_prefix");
+    component device_key_x_with_prefix_indicator = IntervalIndicator(max_msg_bytes);
+    device_key_x_with_prefix_indicator.l <== device_key_x_prefix_l;
+    device_key_x_with_prefix_indicator.r <== device_key_x_prefix_r + 32;  
+
+    component match_device_key_x_with_prefix = MatchSubstring(max_msg_bytes, 65, 31);
+    match_device_key_x_with_prefix.msg <== message;
+    match_device_key_x_with_prefix.substr <== device_key_x_with_prefix;
+    match_device_key_x_with_prefix.range_indicator <== device_key_x_with_prefix_indicator.indicator;
+    match_device_key_x_with_prefix.l <== device_key_x_prefix_l;
+    match_device_key_x_with_prefix.r <== device_key_x_prefix_r + 32;
+
+    // Now that device_key_x is authenticated, we can split it into the two output values
+    log("Splitting key into two parts");
+    signal device_key_x_rev[32];        // Reverse; big endian to little
+    for(var i = 0; i < 32; i++) {
+        device_key_x_rev[i] <== device_key_x[31-i];
+    }
+
+    // Note: in the prover inputs file device_key_0_value and device_key_1_value must be quoted, 
+    // otherwise there is an overflow issue causing the input value to be mangled.
+    signal input device_key_0_value;    
+    signal device_key_0[16];
+    device_key_0[0] <== device_key_x_rev[0];
+    var pow256 = 256;
+    for(var i = 1; i < 16; i++) {
+        device_key_0[i] <== device_key_0[i-1] + device_key_x_rev[i] * pow256;
+        pow256 = pow256*256;
+    }
+    device_key_0[15] === device_key_0_value;
+
+    signal input device_key_1_value;
+    signal device_key_1[16];
+    device_key_1[0] <== device_key_x_rev[16];
+    pow256 = 256;
+    for(var i = 1; i < 16; i++) {
+        device_key_1[i] <== device_key_1[i-1] + device_key_x_rev[16 + i] * pow256;
+        pow256 = pow256*256;
+    }
+    device_key_1[15] === device_key_1_value;

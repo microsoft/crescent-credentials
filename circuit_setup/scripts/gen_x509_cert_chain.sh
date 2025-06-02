@@ -41,8 +41,8 @@ openssl req -new -newkey ec:ecparamp256  -keyout issuer.key -out issuer.csr -nod
 openssl x509 -req -in issuer.csr -out issuer.crt -CA CA.crt -CAkey CA.key -CAcreateserial -days 365 -extfile "$scriptsdir/openssl_ca.cnf" -extensions v3_signer -sha384
 
 # copy the issuer key to the output directory
-cp issuer.key "$outdir/issuer.priv"
-echo "Generated issuer private key: $outdir/issuer.priv"
+cp issuer.key "$outdir/issuer.prv"
+echo "Generated issuer private key: $outdir/issuer.prv"
 
 # extract the public key from the issuer cert
 openssl x509 -in issuer.crt -pubkey -noout > "$outdir/issuer.pub"
