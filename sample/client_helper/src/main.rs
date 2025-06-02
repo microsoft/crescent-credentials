@@ -54,7 +54,8 @@ struct SharedState(Arc<Mutex<HashMap<String, Option<ShowData>>>>);
 struct ShowData {
     client_state_b64: String,
     range_pk_b64: String,
-    io_locations_str: String
+    io_locations_str: String,
+    device_priv_key_path: String
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -120,7 +121,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<
     // verify if the schema_uid is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&cred_info.schema_uid.as_str()) {
         println!("Unsupported schema UID: {}", cred_info.schema_uid);
-        return Json(("error".to_string(), None)); // FIXME: not the right way to handler errors
+        return Json(("error".to_string(), None)); // FIXME: not the right way to handle errors
     }
     let cred_type = cred_type_from_schema(&cred_info.schema_uid).unwrap();
 
@@ -171,6 +172,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<
         println!("Parsed claims: {:?}", sd_claims);    
     }
 
+    // prepare the show data in a separate task using the per-credential folder
     rocket::tokio::spawn(async move {
         let task_result: Result<(), String> = async {
             let start_time = std::time::SystemTime::now();
@@ -178,7 +180,6 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<
                 // fetch the issuer's JWK
                 fetch_and_save_jwk(&issuer_url, &cred_folder).await?;
 
-                // prepare the show data in a separate task using the per-credential folder
                 println!("got schema_uid = {}", &cred_info.schema_uid);
                 println!("got issuer_url = {}", &cred_info.issuer_url);
             }
@@ -216,8 +217,10 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<
 
             let client_state_b64 = write_to_b64url(&client_state);
             println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
-            let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str };
-
+            
+            // save the path to the device private key if the credential is device-bound
+            let device_priv_key_path = paths.device_prv_pem.clone();
+            let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str, device_priv_key_path };
             println!("Task complete, storing ShowData (size: {:?} bytes, took {:?})",
                 show_data.client_state_b64.len() + show_data.io_locations_str.len() + show_data.range_pk_b64.len(), start_time.elapsed().unwrap());
 
@@ -296,7 +299,9 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_s
             proof_spec.presentation_message = Some(challenge.into());
             let device_signature = 
             if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
-                let device = TestDevice::new_from_file(&paths.device_prv_pem);
+                // instantiate the device from the private key path
+                let device_prv_path = &show_data.device_priv_key_path;
+                let device = TestDevice::new_from_file(&device_prv_path);
                 Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
             } else {
                 None

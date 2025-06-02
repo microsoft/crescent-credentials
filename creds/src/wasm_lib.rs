@@ -78,6 +78,8 @@ pub fn create_show_proof_wasm(
 
             log(&msg);
 
+            proof_spec.presentation_message = Some(challenge.into());
+            let device_signature = None; // FIXME: add device signature if needed
             let show_proof = if &client_state.credtype == "mdl" {
                 let age = disc_uid_to_age(&disc_uid).map_err(|_| {
                     "Disclosure UID does not have associated age parameter".to_string()
@@ -85,13 +87,12 @@ pub fn create_show_proof_wasm(
                 create_show_proof_mdl(
                     &mut client_state,
                     &range_pk,
-                    Some(challenge.as_bytes()),
+                    &proof_spec,
                     &io_locations,
-                    None, // FIXME: add device signature
-                )
+                    device_signature
+                ).unwrap()
             } else {
-                proof_spec.presentation_message = Some(challenge.into());
-                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, None).unwrap()
+                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature).unwrap()
             };
 
             let show_proof_b64 = write_to_b64url(&show_proof);
