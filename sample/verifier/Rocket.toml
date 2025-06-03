@@ -16,4 +16,4 @@ site1_proof_spec = '{"revealed": ["email", "tenant_ctry"]}'
 site2_verifier_name = "Soc.ial"
 site2_verifier_domain = "soc.ial"
 site2_disclosure_uid = "crescent://over_18"
-site2_proof_spec = '{"revealed": []}'
+site2_proof_spec = '{"revealed": [], "device_bound" : true}'
