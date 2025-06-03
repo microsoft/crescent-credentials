@@ -381,6 +381,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
         let aux = aux.as_object().unwrap();
         let x = BigUint::from_str_radix(aux["device_pub_x"].as_str().unwrap(), 10).unwrap();
         let y = BigUint::from_str_radix(aux["device_pub_y"].as_str().unwrap(), 10).unwrap();
+        println!("Created device proof");
         Some(DeviceProof::prove(&com0, &com1, &sig, &x, &y))
     } else {
         None
@@ -477,6 +478,7 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
         let aux = aux.as_object().unwrap();
         let x = BigUint::from_str_radix(aux["device_pub_x"].as_str().unwrap(), 10).unwrap();
         let y = BigUint::from_str_radix(aux["device_pub_y"].as_str().unwrap(), 10).unwrap();
+        println!("Created device proof");
         Some(DeviceProof::prove(&com0, &com1, &sig, &x, &y))
     } else {
         None
@@ -654,6 +656,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
             println!("DeviceProof.verify failed");
             return (false, "".to_string());            
         }
+        println!("Device proof verified successfully");
     }
     
     println!("Verification time: {:?}", verify_timer.elapsed());  
@@ -829,6 +832,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
             println!("DeviceProof.verify failed");
             return (false, "".to_string());            
         }
+        println!("Device proof verified successfully");
     }
 
     println!("Verification time: {:?}", verify_timer.elapsed());  

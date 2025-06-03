@@ -24,6 +24,7 @@ use uuid::Uuid;
 use tokio::sync::Mutex;
 use serde_json::{json, Value};
 use jsonwebkey::JsonWebKey;
+use sha2::{Digest, Sha256};
 
 use std::collections::HashMap;
 use std::fs::{self};
@@ -295,8 +296,10 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_s
             let mut proof_spec: ProofSpec = serde_json::from_str(&proof_spec_string)
                 .map_err(|_| "Failed to parse proof spec".to_string())?;
 
-            // Create the show proof
-            proof_spec.presentation_message = Some(challenge.into());
+            // hash the challenge to use as the presentation message (we need to hash it because device (for device-bound creds) only support signing dieests)   
+            proof_spec.presentation_message = Some(Sha256::digest(challenge).to_vec());
+
+            // create the device signature (if cred is device-bound)
             let device_signature = 
             if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
                 // instantiate the device from the private key path
@@ -307,6 +310,7 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_s
                 None
             };
 
+            // create the show proof
             let show_proof =
             if &client_state.credtype == "mdl" {
                 let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())? as u64;

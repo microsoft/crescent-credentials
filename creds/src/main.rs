@@ -206,6 +206,7 @@ pub fn run_show(
     let mut client_state: ClientState<CrescentPairing> = read_from_file(&paths.client_state).unwrap();
     let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
 
+    // load the proof spec (also hashes the presentation message if the cred is device bound)
     let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);
     let device_signature = 
     if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {

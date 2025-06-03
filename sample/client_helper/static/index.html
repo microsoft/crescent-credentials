@@ -139,21 +139,32 @@
                 // the disclosure UID associated with the credential
                 const disclosure_UID = document.getElementById("disclosure-select").value;
 
-                // the selected claims for selective disclosure (if any)
-                let selectedClaims = [];
-                const sdClaimsSection = document.getElementById('sd-claims-section');
-                if (sdClaimsSection.style.display !== "none") {
-                    // Gather all checked claim checkboxes
-                    const checkboxes = document.querySelectorAll('#sd-claims-form input[name="sd_claims"]:checked');
-                    checkboxes.forEach(function(checkbox) {
-                        selectedClaims.push(checkbox.value);
-                    });
-                }
-                
+                // the schema UID for the credential
+                const schema_uid = document.getElementById("schemaUidInput").value;
+
                 // the proof specification (optional, can be empty)
-                let proof_spec = {
-                    'revealed': selectedClaims
+                let proof_spec;
+                if (schema_uid == 'mdl_1') {
+                    proof_spec = {
+                        'revealed': [],
+                        'device_bound': true
+                    }
+                } else {
+                    // the selected claims for selective disclosure (if any)
+                    let selectedClaims = [];
+                    const sdClaimsSection = document.getElementById('sd-claims-section');
+                    if (sdClaimsSection.style.display !== "none") {
+                        // Gather all checked claim checkboxes
+                        const checkboxes = document.querySelectorAll('#sd-claims-form input[name="sd_claims"]:checked');
+                        checkboxes.forEach(function(checkbox) {
+                            selectedClaims.push(checkbox.value);
+                        });
+                    }
+                    proof_spec = {
+                        'revealed': selectedClaims
+                    }
                 }
+
                 console.log('Proof Spec:', proof_spec);
                 
                 // convert the proof specification to a base64url
@@ -168,8 +179,7 @@
                 // Display the Show Proof in the textarea
                 document.getElementById('showProofTextarea').value = show_proof_b64;
                 
-                // Display the test command in the textarea                
-                const schema_uid = document.getElementById("schemaUidInput").value;
+                // Display the test command in the textarea
                 const test_command = `wget --method=POST --body-data='{"schema_uid":"${schema_uid}", "issuer_url":"http://127.0.0.1:8001", "proof":"${show_proof_b64}", "disclosure_uid":"${disclosure_UID}", "session_id":"${challenge}"}' --header='Content-Type: application/json' --server-response --max-redirect=3 -d http://127.0.0.1:8004/verify -O- --no-verbose`;
                 document.getElementById('testCommand').value = test_command;
                 console.log(test_command);
