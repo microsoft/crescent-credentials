@@ -352,7 +352,7 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
         _ => error_template!("Unsupported credential type", verifier_config),
     };
     let mut ps : ProofSpec = serde_json::from_str(&config_proof_spec).unwrap();
-    // hash the challenge to use as the presentation message (we need to hash it because device (for device-bound creds) only support signing dieests)   
+    // hash the challenge to use as the presentation message (we need to hash it because device (for device-bound creds) only support signing digests)   
     ps.presentation_message = Some(Sha256::digest(challenge).to_vec());       
     if cred_type == "jwt" {
         let (valid, info) = verify_show(&vp, &show_proof, &ps);
