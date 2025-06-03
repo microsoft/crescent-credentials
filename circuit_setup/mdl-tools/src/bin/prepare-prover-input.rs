@@ -595,11 +595,11 @@ fn main() {
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
 
     // If device bound, include the device public key in the prover inputs
-    if config["device_bound"].as_bool().is_some_and(|x| x == true) {
+    if config["device_bound"].as_bool().is_some_and(|x| x) {
         let device_key = mso.device_key_info.device_key;
         assert!(device_key.signature_algorithm() == Some(Algorithm::ES256), "Only device keys with the ES256 algorithm are supported");
 
-        let (mut device_key_x, mut device_key_y)  = match device_key {
+        let (mut device_key_x, device_key_y)  = match device_key {
             CoseKey::EC2 { x, y, .. } => (x, y),
             _ => panic!("Unsupported curve type, expected EC2 (https://www.rfc-editor.org/rfc/rfc9053.html#name-elliptic-curve-keys)")
         };
