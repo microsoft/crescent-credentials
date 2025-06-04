@@ -296,7 +296,7 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_s
             let mut proof_spec: ProofSpec = serde_json::from_str(&proof_spec_string)
                 .map_err(|_| "Failed to parse proof spec".to_string())?;
 
-            // hash the challenge to use as the presentation message (we need to hash it because device (for device-bound creds) only support signing dieests)   
+            // hash the challenge to use as the presentation message (we need to hash it because device (for device-bound creds) only support signing digests)   
             proof_spec.presentation_message = Some(Sha256::digest(challenge).to_vec());
 
             // create the device signature (if cred is device-bound)
