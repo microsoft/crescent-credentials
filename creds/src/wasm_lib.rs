@@ -79,7 +79,7 @@ pub fn create_show_proof_wasm(
             log(&msg);
 
             proof_spec.presentation_message = Some(challenge.into());
-            let device_signature = None; // FIXME: add device signature if needed
+            let device_signature = None; // FIXME: add device signature for device-bound cred
             let show_proof = if &client_state.credtype == "mdl" {
                 let age = disc_uid_to_age(&disc_uid).map_err(|_| {
                     "Disclosure UID does not have associated age parameter".to_string()
