@@ -160,7 +160,7 @@ echo "=== circom output end ===" >> ${LOG_FILE}
 NUM_PUBLIC_INPUTS=$(grep -m 1 "public inputs:" "$LOG_FILE" | awk '{print $3}')
 NUM_PUBLIC_OUTPUTS=$(grep -m 1 "public outputs:" "$LOG_FILE" | awk '{print $3}')
 # for mDL, we need to add the device public key to the number of public inputs
-if [ ${CREDTYPE} == 'mdl' ] and ${DEVICE_BOUND} == 1; then
+if [ "${CREDTYPE}" == "mdl" ] && [ "${DEVICE_BOUND}" == "1" ]; then
     echo "Device bound mDL detected, adding device public key to public inputs"
     NUM_PUBLIC_INPUTS=$((NUM_PUBLIC_INPUTS + 2))
 fi
