@@ -294,6 +294,7 @@ template IsZeroMod64(n) {
 
 /*
  * A helper template to calculate the amount of SHA-256 padding. 
+ * 
  * WARNING:
  * The assignment to `pzbb[BITLEN]` uses the `<--` operator, which does **not** enforce any
  * constraint on the assigned value. Although subsequent constraints verify that each
