@@ -651,7 +651,14 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         let com1 = show_proof.show_groth16.commited_inputs[2];
         let bases0 = vec![vp.pvk.vk.gamma_abc_g1[device_key_0_pos], vp.pvk.vk.delta_g1];
         let bases1 = vec![vp.pvk.vk.gamma_abc_g1[device_key_1_pos], vp.pvk.vk.delta_g1];
-        let ret = DeviceProof::verify(show_proof.device_proof.as_ref().unwrap(), &com0.into(), &com1.into(), &bases0, &bases1);
+        let device_proof = match show_proof.device_proof.as_ref() {
+            Some(dp) => dp,
+            None => {
+                println!("DeviceProof.verify failed: device_proof missing in show_proof");
+                return (false, "Device proof missing in show_proof".to_string());
+            }
+        };
+        let ret = DeviceProof::verify(device_proof, &com0.into(), &com1.into(), &bases0, &bases1);
         if !ret {
             println!("DeviceProof.verify failed");
             return (false, "".to_string());            
@@ -827,7 +834,14 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         let com1 = show_proof.show_groth16.commited_inputs[2];
         let bases0 = vec![vp.pvk.vk.gamma_abc_g1[device_key_0_pos], vp.pvk.vk.delta_g1];
         let bases1 = vec![vp.pvk.vk.gamma_abc_g1[device_key_1_pos], vp.pvk.vk.delta_g1];
-        let ret = DeviceProof::verify(show_proof.device_proof.as_ref().unwrap(), &com0.into(), &com1.into(), &bases0, &bases1);
+        let device_proof = match show_proof.device_proof.as_ref() {
+            Some(dp) => dp,
+            None => {
+                println!("DeviceProof.verify failed: device_proof missing in show_proof");
+                return (false, "Device proof missing in show_proof".to_string());
+            }
+        };
+        let ret = DeviceProof::verify(device_proof, &com0.into(), &com1.into(), &bases0, &bases1);
         if !ret {
             println!("DeviceProof.verify failed");
             return (false, "".to_string());            
