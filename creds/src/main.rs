@@ -104,7 +104,6 @@ pub fn run_prover(
     if config.contains_key("credtype") && config.get("credtype").unwrap() == "mdl" {
         let prover_inputs = GenericInputsJSON::new(&paths.mdl_prover_inputs);
         let prover_aux_string = fs::read_to_string(&paths.mdl_prover_aux).unwrap();
-        println!("prover_aux_string: {}", prover_aux_string);
         create_client_state(&paths, &prover_inputs, Some(&prover_aux_string), "mdl").unwrap()
     }
     else {

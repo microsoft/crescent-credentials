@@ -905,7 +905,7 @@ mod tests {
     
         let (prover_inputs, prover_aux) = 
         if cred_type == "mdl" {
-            (GenericInputsJSON::new(&paths.mdl_prover_inputs), Some(json!(&paths.mdl_prover_aux).to_string()))
+            (GenericInputsJSON::new(&paths.mdl_prover_inputs), Some(fs::read_to_string(&paths.mdl_prover_aux).unwrap()))
         }
         else {
             let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
