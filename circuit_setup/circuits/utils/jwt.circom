@@ -3,6 +3,7 @@ pragma circom 2.0.3;
 include "./sha.circom";
 include "./rsa.circom";
 include "./base64.circom";
+include "../circomlib/circuits/bitify.circom";
 
 
 template JWTVerifyWithSuppliedDigest(max_msg_bytes, max_json_bytes, n, k) {
