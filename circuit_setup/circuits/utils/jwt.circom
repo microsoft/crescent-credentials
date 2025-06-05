@@ -162,13 +162,16 @@ template NumPaddingBytes(n) {
 //    The resulting buffer will have length n - 1, but padded with zeros to n.
 //    E.g.:    input: [a, b, c, d, e, f], p = 2
 //             output: [a, b, d, e, f, 0]
-//    Assumes p < 2^15
+//    Assumes p < 2^15, which is checked in this template via Num2Bits.
 template RemoveValue(n) {
     signal input in[n];
     signal output out[n];
     signal input p;
 
-    assert(p < 32768);
+    // Range-checking `p` to ensure it is less than 2^15.
+    // This is required by GreaterEqThan(15).
+    component p_bits = Num2Bits(15);
+    p_bits.in <== p;
 
     component cmp[n];
     signal normal_branch[n];
