@@ -3,6 +3,7 @@ pragma circom 2.1.6;
 include "./circomlib/circuits/comparators.circom";
 include "indicator.circom";
 include "./circomlib/circuits/mimc.circom";
+include "./circomlib/circuits/bitify.circom";
 
 // Converts an array of ascii digits (base-10) and converts them to a field element.
 // The input is big endian and may contain trailing zeros. 
