@@ -130,7 +130,7 @@ template Main(max_msg_bytes, field_byte_len, n, k) {
     // Strategy: 
     //      - prover provides the x-coordinate as circuit input (32-bytes)
     //      - The circuit ensures that the x-coord follows a public prefix
-    //      - the position of the prefix will be hidden (this prevents a malicious from issuer padding other data)
+    //      - the position of the prefix will be hidden (to prevents a malicious issuer from linking users by uniquely padding other data)
     //      - the circuit will split the 32 bytes into two 16-byte pieces, encode as field elements, then output both pieces
     //Prefix: 6d6465766963654b6579496e666fa1696465766963654b6579a401022001215820
     signal device_key_x_prefix[33] <== [109, 100, 101, 118, 105, 99, 101, 75, 101, 121, 73, 110, 102, 111, 161, 105, 100, 101, 118, 105, 99, 101, 75, 101, 121, 164, 1, 2, 32, 1, 33, 88, 32];
