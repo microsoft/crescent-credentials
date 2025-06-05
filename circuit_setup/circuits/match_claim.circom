@@ -3,6 +3,7 @@ pragma circom 2.1.6;
 include "./circomlib/circuits/comparators.circom";
 include "indicator.circom";
 include "./circomlib/circuits/mimc.circom";
+include "./circomlib/circuits/bitify.circom";
 
 // Converts an array of ascii digits (base-10) and converts them to a field element.
 // The input is big endian and may contain trailing zeros. 
@@ -77,6 +78,14 @@ template MatchClaimName(json_byte_len, name_byte_len){
             start.indicator[j - i] * (name[i] - json_bytes[j]) === 0;
         }
     }
+
+    // Enforcing bit-size constraints on `l` and `r`.
+    // These constraints ensure that `l` and `r` are valid inputs for the LessThan comparator,
+    // which assumes inputs are bounded to MAX_JSON_BITLEN bits.
+    component l_bits = Num2Bits(MAX_JSON_BITLEN);
+    l_bits.in <== l;
+    component r_bits = Num2Bits(MAX_JSON_BITLEN);
+    r_bits.in <== r;
 
     // Check the validity of l and r.
     signal interval_valid <== LessThan(MAX_JSON_BITLEN)([l, r]);
