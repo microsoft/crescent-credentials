@@ -207,8 +207,16 @@ fn signup2_page(session_id: String, verifier_config: &State<VerifierConfig>) -> 
             .cloned();
 
         if validation_result.is_some() {
+            // Determine site2_age based on site2_disclosure_uid
+            let site2_age = match verifier_config.site2_disclosure_uid.as_str() {
+                "crescent://over_18" => 18,
+                "crescent://over_21" => 21,
+                "crescent://over_65" => 65,
+                _ => 0,
+            };
             Template::render("signup2", context! {
                 site2_verifier_name: verifier_config.site2_verifier_name.as_str(),
+                site2_age: site2_age,
             })
         } else {
             Template::render("error", context! { error: "Invalid session ID" })
