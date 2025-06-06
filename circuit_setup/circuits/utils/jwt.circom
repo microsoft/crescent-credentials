@@ -71,6 +71,13 @@ template JWTVerify(max_msg_bytes, max_json_bytes, n, k) {
         sha.in_padded[i] <== message[i];
     }
     
+    // Ensuring message_padded_bytes * 8 fits in ceil(log2(8 * max_msg_bytes)) bits,
+    // which is necessary for the Sha256Bytes component!
+    var maxBits = 8 * max_msg_bytes;
+    var bits_len = ceil(log2(maxBits));
+    component paddedBits = Num2Bits(bits_len);
+    paddedBits.in <== message_padded_bytes * 8;
+
     sha.in_len_padded_bytes <== message_padded_bytes;
 
     component jwt_verify = JWTVerifyWithSuppliedDigest(max_msg_bytes, max_json_bytes, n, k);

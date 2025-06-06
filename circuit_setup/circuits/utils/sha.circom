@@ -4,6 +4,9 @@ include "../circomlib/circuits/bitify.circom";
 include "./sha256general.circom";
 include "./sha256partial.circom";
 
+// Assumption: The value `in_len_padded_bytes * 8` must fit within `ceil(log2(max_num_bytes * 8))` bits.
+// This range constraint is assumed (but not enforced) by the underlying `Sha256General` template.
+// It must be enforced externally, via a Num2Bits check, to prevent incorrect hash outputs.
 template Sha256Bytes(max_num_bytes) {
     signal input in_padded[max_num_bytes];
     signal input in_len_padded_bytes;
@@ -27,6 +30,9 @@ template Sha256Bytes(max_num_bytes) {
     }
 }
 
+// Assumption: The value `in_len_padded_bytes * 8` must fit within `ceil(log2(max_num_bytes * 8))` bits.
+// This range constraint is assumed (but not enforced) by the underlying `Sha256Partial` template.
+// It must be enforced externally, via a Num2Bits check, to prevent incorrect hash outputs.
 template Sha256BytesPartial(max_num_bytes) {
     signal input in_padded[max_num_bytes];
     signal input in_len_padded_bytes;
