@@ -212,7 +212,9 @@ fn signup2_page(session_id: String, verifier_config: &State<VerifierConfig>) -> 
                 "crescent://over_18" => 18,
                 "crescent://over_21" => 21,
                 "crescent://over_65" => 65,
-                _ => 0,
+                _ => {
+                    return Template::render("error", context! { error: "Unrecognized disclosure UID" });
+                },
             };
             Template::render("signup2", context! {
                 site2_verifier_name: verifier_config.site2_verifier_name.as_str(),
