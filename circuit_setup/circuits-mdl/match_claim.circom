@@ -294,6 +294,30 @@ template IsZeroMod64(n) {
     }
 }
 
+/*
+ * A helper template to calculate the amount of SHA-256 padding. 
+ * 
+ * WARNING:
+ * The assignment to `pzbb[BITLEN]` uses the `<--` operator, which does **not** enforce any
+ * constraint on the assigned value. Although subsequent constraints verify that each
+ * `pzbb[i]` is a binary value (0 or 1), they do **not** force a _unique_ combination of bits
+ * to correspond exactly to `padding_zero_bytes`. As a result, this template alone permits
+ * “technically valid” witness assignments that do not reflect the correct padding length,
+ * leading to an incorrect total length in the final proof.
+ *
+ * To guarantee correctness, the **caller** must explicitly constrain the final padded length.
+ * For example:
+ *   ```
+ *   component calculate_padding = CalculatePadding();
+ *   calculate_padding.data_len_bytes <== data_len_bytes;
+ *   signal padding_zero_bytes <== calculate_padding.padding_zero_bytes;
+ *   signal data_len_padded_bytes <== data_len_bytes + 1 + 8 + padding_zero_bytes;
+ *
+ *   //Enforce data_len_padded_bytes mod 64 = 0 : 
+ *   component mod64check = IsZeroMod64(32);
+ *   mod64check.in <== data_len_padded_bytes;
+ *   ```  
+*/
 template CalculatePadding(){
 
     signal input data_len_bytes;
