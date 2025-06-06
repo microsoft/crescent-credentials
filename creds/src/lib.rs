@@ -120,14 +120,15 @@ pub(crate) struct ProofSpecInternal {
     pub hashed: Vec<String>, 
     pub presentation_message : Option<Vec<u8>>,
     pub device_bound: bool,
-    pub config_str: String
+    pub config_str: String,
+    pub claim_types: std::collections::BTreeMap<String, String>, // claim name -> claim type
 }
 
 /// Structure to hold all the parts of a show/presentation proof
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShowProof<E: Pairing> {
     pub show_groth16: ShowGroth16<E>,
-    pub show_range_exp: ShowRange<E>, // non-expired range proof (always perfomed)
+    pub show_range_exp: ShowRange<E>, // non-expired range proof (always performed)
     pub show_range_attr: Vec<ShowRange<E>>, // selective attribute range proofs
     pub revealed_inputs: Vec<E::ScalarField>, 
     pub revealed_preimages: Option<String>,
@@ -672,13 +673,19 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     let mut revealed = serde_json::Map::<String, Value>::new();
     for (revealed_idx, attr_name) in proof_spec.revealed.iter().enumerate() {
         let attr_name = attr_name.clone() + "_value";
-        let unpacked = unpack_int_to_string_unquoted( &show_proof.revealed_inputs[revealed_idx].into_bigint());
-        if unpacked.is_err() {
-            println!("Error: Proof was valid, but failed to unpack '{}' attribute, {:?}", attr_name, unpacked.err().unwrap());
-            return (false, "".to_string());
-        }
-        let attr_value = &unpacked.unwrap().clone();
-        revealed.insert(attr_name.clone(), json!(attr_value));
+        let claim_type = proof_spec.claim_types.get(attr_name.trim_end_matches("_value")).map(|s| s.as_str()).unwrap_or("");
+        let attr_value = if claim_type == "number" {
+            json!(show_proof.revealed_inputs[revealed_idx].into_bigint().to_string())
+        } else {
+            match unpack_int_to_string_unquoted(&show_proof.revealed_inputs[revealed_idx].into_bigint()) {
+                Ok(val) => json!(val),
+                Err(_) => {
+                    println!("Error: Proof was valid, but failed to unpack '{}' attribute", attr_name);
+                    return (false, "".to_string());
+                }
+            }
+        };
+        revealed.insert(attr_name.clone(), attr_value);
     }
 
     // Add the hashed revealed attributes to the output
@@ -854,14 +861,20 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
     // Add the revealed attributes to the output, after converting from field element to string
     let mut revealed = serde_json::Map::<String, Value>::new();
     for (revealed_idx, attr_name) in proof_spec.revealed.iter().enumerate() {
-        let attr_name_label = attr_name.clone() + "_value";
-        let unpacked = unpack_int_to_string_unquoted( &show_proof.revealed_inputs[revealed_idx].into_bigint());
-        if unpacked.is_err() {
-            println!("Error: Proof was valid, but failed to unpack '{}' attribute, {:?}", attr_name_label, unpacked.err().unwrap());
-            return (false, "".to_string());
-        }
-        let attr_value = &unpacked.unwrap().clone();
-        revealed.insert(attr_name_label.clone(), json!(attr_value));
+        let attr_name = attr_name.clone() + "_value";
+        let claim_type = proof_spec.claim_types.get(attr_name.trim_end_matches("_value")).map(|s| s.as_str()).unwrap_or("");
+        let attr_value = if claim_type == "integer" {
+            json!(show_proof.revealed_inputs[revealed_idx].into_bigint().to_string())
+        } else {
+            match unpack_int_to_string_unquoted(&show_proof.revealed_inputs[revealed_idx].into_bigint()) {
+                Ok(val) => json!(val),
+                Err(_) => {
+                    println!("Error: Proof was valid, but failed to unpack '{}' attribute", attr_name);
+                    return (false, "".to_string());
+                }
+            }
+        };
+        revealed.insert(attr_name.clone(), attr_value);
     }
 
     // Add the hashed revealed attributes to the output

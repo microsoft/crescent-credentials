@@ -585,6 +585,21 @@ pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &st
     let config = parse_config(config_str)?;
     let mut revealed = vec![];
     let mut hashed = vec![];
+    // Build claim_types map
+    let mut claim_types = std::collections::BTreeMap::new();
+    for (key, value) in config.iter() {
+        // Only process claim entries, skip config keys
+        if crate::prep_inputs::CRESCENT_CONFIG_KEYS.contains(key.as_str()) {
+            continue;
+        }
+        if let Some(obj) = value.as_object() {
+            if let Some(type_str) = obj.get("type").and_then(|v| v.as_str()) {
+                claim_types.insert(key.clone(), type_str.to_string());
+            }
+        }
+    }
+
+    // Check that all revealed attributes are in the config
     for attr in &proof_spec.revealed {
         let config_entry = config.get(attr.as_str()).ok_or(format!("Attribute {} not found in config", attr))?;
         if config_entry.get("reveal_digest").is_some() && config_entry.get("reveal_digest").ok_or("Expected boolean value for 'reveal_digest'")?.as_bool().unwrap() {
@@ -606,5 +621,13 @@ pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &st
         return_error!("Proof spec indicates the credential is device bound, but is missing the presentation message");
     }
 
-    Ok(ProofSpecInternal {revealed, hashed, range_over_year, presentation_message, device_bound, config_str: config_str.to_owned()})
+    Ok(ProofSpecInternal {
+        revealed,
+        hashed,
+        range_over_year,
+        presentation_message,
+        device_bound,
+        config_str: config_str.to_owned(),
+        claim_types,
+    })
 }
