@@ -4,6 +4,7 @@ include "./sha.circom";
 include "./rsa.circom";
 include "./base64.circom";
 include "../circomlib/circuits/bitify.circom";
+include "../functions.circom";
 
 
 template JWTVerifyWithSuppliedDigest(max_msg_bytes, max_json_bytes, n, k) {
@@ -74,7 +75,7 @@ template JWTVerify(max_msg_bytes, max_json_bytes, n, k) {
     // Ensuring message_padded_bytes * 8 fits in ceil(log2(8 * max_msg_bytes)) bits,
     // which is necessary for the Sha256Bytes component!
     var maxBits = 8 * max_msg_bytes;
-    var bits_len = ceil(log2(maxBits));
+    var bits_len = log2Ceil(maxBits);
     component paddedBits = Num2Bits(bits_len);
     paddedBits.in <== message_padded_bytes * 8;
 
