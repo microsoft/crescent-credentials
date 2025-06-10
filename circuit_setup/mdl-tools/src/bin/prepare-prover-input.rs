@@ -574,12 +574,7 @@ fn main() {
     if sig_len % 2 != 0 {
         panic!("Invalid signature length: {}", sig_len);
     }
-    let r_bytes = &signature_bytes[0..sig_len / 2];
-    let s_bytes = &signature_bytes[sig_len / 2..sig_len];
-    let r_limbs = bytes_to_circom_limbs(r_bytes, CIRCOM_ES256_LIMB_BITS);
-    let s_limbs = bytes_to_circom_limbs(s_bytes, CIRCOM_ES256_LIMB_BITS);
-    prover_inputs.insert("signature_r".to_string(), serde_json::json!(r_limbs));
-    prover_inputs.insert("signature_s".to_string(), serde_json::json!(s_limbs));
+    prover_inputs.insert("signature".to_string(), serde_json::json!(signature_bytes));
 
     // process the issuer public key
     let issuer_key_bytes = issuer_pub_key.to_sec1_bytes();
@@ -589,13 +584,7 @@ fn main() {
     if issuer_key_bytes.len() != 65 {
         panic!("Invalid serialized issuer public key length: {}", issuer_key_bytes.len());
     }
-    // skipping the first byte (0x04) which indicates the key is uncompressed
-    let issuer_key_x = &issuer_key_bytes[1..33];
-    let issuer_key_y = &issuer_key_bytes[33..65];
-    let x_limb = bytes_to_circom_limbs(issuer_key_x, CIRCOM_ES256_LIMB_BITS);
-    let y_limb = bytes_to_circom_limbs(issuer_key_y, CIRCOM_ES256_LIMB_BITS);
-    prover_inputs.insert("pubkey_x".to_string(), serde_json::json!(x_limb));
-    prover_inputs.insert("pubkey_y".to_string(), serde_json::json!(y_limb));
+    prover_inputs.insert("pubkey".to_string(), serde_json::json!(&issuer_key_bytes));
     prover_inputs.insert("message_padded_bytes".to_string(), msg_len_after_sha2_padding.into());
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
 

@@ -8,7 +8,7 @@ done
 # remove generated files
 find creds/test-vectors -mindepth 1 ! -name README.md -exec rm -rf {} +
 find circuit_setup/inputs -type f ! -iname 'README.md' ! -name '*.json' -delete
-find circuit_setup/generated_files -type f ! -iname 'README.md' -delete
+find circuit_setup/generated_files -mindepth 1 ! -path 'circuit_setup/generated_files/README.md' -exec rm -rf {} +
 
 # clean wasm
 rm -rf creds/pkg

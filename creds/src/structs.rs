@@ -3,10 +3,11 @@
 
 use crate::utils::bigint_from_str;
 use ark_bn254::Bn254 as ECPairing;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 use num_traits::FromPrimitive;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap};
+use std::str::FromStr;
 
 #[cfg(not(feature = "wasm"))]
 use ark_circom::CircomBuilder;
@@ -124,7 +125,8 @@ impl ProverInput for GenericInputsJSON {
                             builder.push_input(key, bigint_from_str(s));
                         } 
                         else if let serde_json::Value::Number(n) = v {
-                            builder.push_input(key, BigUint::from_u64(n.as_u64().unwrap()).unwrap());
+                            let val = n.as_i64().expect("Expected i64-compatible number");
+                            builder.push_input(key, normalize_i64_to_biguint(val));
                         }                            
                         else if let serde_json::Value::Array(nested_arr) = v {
                             for v2 in nested_arr.iter() {
@@ -177,3 +179,11 @@ impl GenericInputsJSON {
     }
 }
 
+const BN254_PRIME: &str = "21888242871839275222246405745257275088548364400416034343698204186575808495617";
+
+fn normalize_i64_to_biguint(val: i64) -> BigUint {
+    let prime = BigInt::from_str(BN254_PRIME).unwrap();
+    let bigint = BigInt::from(val);
+    let normalized = ((&bigint % &prime) + &prime) % &prime;
+    normalized.to_biguint().unwrap()
+}
