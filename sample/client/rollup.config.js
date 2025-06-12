@@ -8,7 +8,6 @@ import copy from 'rollup-plugin-copy'
 import typescript from 'rollup-plugin-typescript2'
 import { fileURLToPath } from 'url'
 import dotenv from 'rollup-plugin-dotenv'
-import virtual from '@rollup/plugin-virtual'
 
 function getDirname (url) {
   return dirname(fileURLToPath(url))
@@ -121,11 +120,6 @@ const background = {
   },
   watch,
   plugins: [
-    virtual({
-      crescent: `
-        export function create_show_proof_wasm (client_state_b64, range_pk_b64, io_locations_str, disclosureUid, challenge) { return null; }
-        export default function () { return null; }`
-    }),
     ...commonPlugins
   ],
   onwarn: commonWarningHandler
@@ -169,11 +163,6 @@ const popup = {
         { src: 'public/popup.html', dest: 'dist/chrome' },
         { src: 'public/popup.css', dest: 'dist/chrome' }
       ]
-    }),
-    virtual({
-      crescent: `
-        export function create_show_proof_wasm (client_state_b64, range_pk_b64, io_locations_str, disclosureUid, challenge) { return null; }
-        export default function () { return null; }`
     }),
     ...commonPlugins
   ],

@@ -27,7 +27,9 @@ declare module 'crescent' {
     rangePkB64: string,
     ioLocationsStr: string,
     disclosureUid: string,
-    challenge: string
+    challenge: string,
+    proofSpec: string,
+    devicePrivateKeyB64?: string
   ): string
 
   export default function init (): Promise<void>

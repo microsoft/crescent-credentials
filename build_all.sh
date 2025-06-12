@@ -47,12 +47,4 @@ cd ..
 #
 cd sample
 # Node must be available for the .js scripts to be executed
-./setup-sample.sh
-
-#
-# Client setup
-#
-cd client
-npm install
-npm run build:debug
-cd ..
+ ./setup-sample.sh

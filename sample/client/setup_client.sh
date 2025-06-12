@@ -24,10 +24,3 @@ popd > /dev/null
 
 echo "Install NPM dependencies"
 npm install
-
-if [ -f "$CRESCENT_DIR/pkg/package.json" ]; then
-    echo "Installing NPM dependencies for crescent"
-    npm install -D ../../creds/pkg/    
-else
-    echo -e "\n\033[33m[WARNING]No package.json found in ../../creds/pkg. Skipping NPM install.\033[0m\n"
-fi

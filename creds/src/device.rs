@@ -48,6 +48,9 @@ impl TestDevice {
     }
     pub fn new_from_file(secret_key_file : &str) -> Self {
         let secret_key_pem  = std::fs::read_to_string(secret_key_file).unwrap();
+        Self::new_from_pem(&secret_key_pem)
+    }
+    pub fn new_from_pem(secret_key_pem : &str) -> Self {
         let secret_key = secret_key_pem.parse::<p256::SecretKey>().unwrap();
         let keypair = SigningKey::from_bytes(&secret_key.to_bytes()).unwrap();
         let public_key = *keypair.verifying_key();

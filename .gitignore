@@ -15,7 +15,7 @@ circuit_setup/inputs/*/**
 sample/issuer/.well-known/
 sample/issuer/keys/
 sample/client/node_modules
-sample/client/mdl.cbor.hex
+sample/client/mdl.json
 sample/client/dist
 sample/client_helper/data
 sample/verifier/data
