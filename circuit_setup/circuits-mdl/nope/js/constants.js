@@ -1,0 +1,26 @@
+const MAX_SLD_NAME_LEN = 63 + 24 + 3;
+const MAX_TLD_NAME_LEN = 24 + 2;
+const MAX_RSA_SIG_LEN = 256;
+const MAX_RSA_KEY_LEN = MAX_RSA_SIG_LEN + 4;
+// 18 + 26 + 2 * (26 + 10 + 4 + 260)
+const MAX_TLD_RSA_DNSKEY_REC_LEN = 644;
+// 18 + 26 + 2 * (26 + 10 + 4 + 64)
+const MAX_TLD_ECDSA_DNSKEY_REC_LEN = 252;
+// 18 + 90 + 2 * (90 + 10 + 4 + 260)
+const MAX_SLD_RSA_DNSKEY_REC_LEN = 836;
+// 18 + 90 + 2 * (90 + 10 + 4 + 64)
+const MAX_SLD_ECDSA_DNSKEY_REC_LEN = 444;
+const ECDSA_SIG_LEN = 6254;
+
+// Export the constants
+module.exports = {
+  MAX_SLD_NAME_LEN,
+  MAX_TLD_NAME_LEN,
+  MAX_RSA_SIG_LEN,
+  MAX_RSA_KEY_LEN,
+  MAX_TLD_RSA_DNSKEY_REC_LEN,
+  MAX_TLD_ECDSA_DNSKEY_REC_LEN,
+  MAX_SLD_RSA_DNSKEY_REC_LEN,
+  MAX_SLD_ECDSA_DNSKEY_REC_LEN,
+  ECDSA_SIG_LEN
+};
