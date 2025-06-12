@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-set -x
 
 # usage: setup-sample.sh
 
@@ -27,7 +26,7 @@ cd client
 ./setup_client.sh
 npm run build:debug
 
-# Create json file with base64 encoded MDOC and device private key
+# Create json file with base64 encoded mdoc and device private key
 cat <<EOF > mdl.json
 {
   "mdoc": "$(base64 -w 0 "../../circuit_setup/inputs/mdl1/mdl.cbor")",

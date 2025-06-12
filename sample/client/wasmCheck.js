@@ -17,7 +17,7 @@ const wasmFilePath = path.join(wasmDir, 'crescent_bg.wasm');
 
 // if the wasm file exists, exit
 if (fs.existsSync(wasmFilePath)) {
-    console.log('WASM found at:', wasmFilePath);
+    console.log('\x1b[32mWASM found at:\x1b[0m', wasmFilePath)
     process.exit(0);
 }
 

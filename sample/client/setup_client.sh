@@ -16,8 +16,8 @@ pushd $CRESCENT_DIR > /dev/null
 cargo install wasm-pack
 
 # Build crescent wasm package 
-# RUSTFLAGS="-A unused-imports -A unused-assignments -A unused-variables --cfg getrandom_backend=\"wasm_js\"" \
-# wasm-pack build --target web --no-default-features --features wasm || \
+RUSTFLAGS="-A unused-imports -A unused-assignments -A unused-variables --cfg getrandom_backend=\"wasm_js\"" \
+wasm-pack build --target web --no-default-features --features wasm || \
 echo -e "\n\033[33m[WARNING] wasm-pack build failed. Proceeding without it.\033[0m\n"
 
 popd > /dev/null
