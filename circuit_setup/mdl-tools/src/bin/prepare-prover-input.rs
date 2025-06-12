@@ -46,7 +46,6 @@ static MDL_DOCTYPE: &str = "org.iso.18013.5.1.mDL";
 static ISO_MDL_NAMESPACE: &str = "org.iso.18013.5.1";
 static AAMVA_MDL_NAMESPACE: &str = "org.iso.18013.5.1.aamva";
 static SUPPORTED_NAMESPACES: [&str; 2] = [ISO_MDL_NAMESPACE, AAMVA_MDL_NAMESPACE];
-const CIRCOM_ES256_LIMB_BITS: usize = 43;
 
 lazy_static! {
     static ref CRESCENT_CONFIG_KEYS: HashSet<&'static str> = {
@@ -576,6 +575,16 @@ fn main() {
     }
     prover_inputs.insert("signature".to_string(), serde_json::json!(signature_bytes));
 
+
+    // Helper function used to encode bytes as field elements
+    let bytes_to_int = |bytes: &[u8]| -> String {
+        let mut a = BigUint::zero();
+        for i in 0..bytes.len() {
+            a += BigUint::from(bytes[i] as u64) * BigUint::from(256u64).pow(i as u32);
+        }
+        a.to_str_radix(10)
+    };    
+
     // process the issuer public key
     let issuer_key_bytes = issuer_pub_key.to_sec1_bytes();
     if issuer_key_bytes[0] != 0x04 {
@@ -585,6 +594,12 @@ fn main() {
         panic!("Invalid serialized issuer public key length: {}", issuer_key_bytes.len());
     }
     prover_inputs.insert("pubkey".to_string(), serde_json::json!(&issuer_key_bytes));
+    let mut digest = Sha256::digest(&issuer_key_bytes[1..]).to_vec();    // skip hashing the first byte
+    digest = digest[0..digest.len()-1].to_vec();    // truncate digest to 248 bits
+    digest.reverse();
+    let pubkey_hash = bytes_to_int(&digest);  
+    prover_inputs.insert("pubkey_hash".to_string(), serde_json::json!(pubkey_hash));
+
     prover_inputs.insert("message_padded_bytes".to_string(), msg_len_after_sha2_padding.into());
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
 
@@ -611,13 +626,6 @@ fn main() {
 
         device_key_x.reverse();
 
-        let bytes_to_int = |bytes: &[u8]| -> String {
-            let mut a = BigUint::zero();
-            for i in 0..bytes.len() {
-                a += BigUint::from(bytes[i] as u64) * BigUint::from(256u64).pow(i as u32);
-            }
-            a.to_str_radix(10)
-        };
         let device_key_0 = bytes_to_int(&device_key_x[0..16]);
         let device_key_1 = bytes_to_int(&device_key_x[16..32]);
         println!("device_key_0_value: {:?}", device_key_0);

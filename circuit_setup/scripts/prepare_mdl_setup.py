@@ -31,7 +31,7 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
 
     attrs = [k for k in cfg if k not in CRESCENT_CONFIG_KEYS]
 
-    public_inputs = ["pubkey", "valid_until_value", "device_key_0_value", "device_key_1_value"]
+    public_inputs = ["pubkey_hash", "valid_until_value", "device_key_0_value", "device_key_1_value"]
 
     with open(out_path, "w") as f:
 
