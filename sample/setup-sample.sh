@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 # usage: setup-sample.sh
 
@@ -25,7 +26,13 @@ cd ..
 cd client
 ./setup_client.sh
 npm run build:debug
-# until we have an issuer to issue mDLs, we use the ones generated in the Crescent lib
-# the sample expects a hex file, so we convert the binary file to hex
-xxd -p -c 0 "../../circuit_setup/inputs/mdl1/mdl.cbor" | tr -d '\n' > mdl.cbor.hex
+
+# Create json file with base64 encoded MDOC and device private key
+cat <<EOF > mdl.json
+{
+  "mdoc": "$(base64 -w 0 "../../circuit_setup/inputs/mdl1/mdl.cbor")",
+  "devicePrivateKey": "$(base64 -w 0 "../../circuit_setup/inputs/mdl1/device.prv")"
+}
+EOF
+
 cd ..

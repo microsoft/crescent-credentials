@@ -14,7 +14,7 @@ const config = {
   pollStatusRate: parseFloat(process.env.PREPARE_STATUS_RATE ?? '0.07'),
   cardColor: process.env.CARD_COLOR ?? '#4E95D9',
   autoOpen: (process.env.AUTO_OPEN ?? '').trim().toLowerCase() === 'true',
-  wasmShowProof: (process.env.WASM_SHOW_PROOF ?? '').trim().toLowerCase() === 'true'
+  clientHelperShowProof: (process.env.CLIENT_HELPER_SHOW_PROOF ?? '').trim().toLowerCase() === 'true'
 }
 
 export function setClientHelperUrl (url: string): void {

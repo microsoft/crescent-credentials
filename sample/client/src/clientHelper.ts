@@ -19,6 +19,7 @@ export interface ShowData {
   client_state_b64: string
   io_locations_str: string
   range_pk_b64: string
+  device_priv_key_path: string
 }
 
 async function _prepare (issuerUrl: string, jwt: string, schemaUid: string): Promise<RESULT<string, Error>> {
@@ -55,7 +56,7 @@ async function _prepareComplete (cred: Credential): Promise<void> {
   await cred.save()
   await Credential.load()
 
-  if (config.wasmShowProof) {
+  if (!config.clientHelperShowProof) {
     // Request client state from client helper
     const result = await fetchShowData(credUid)
 
