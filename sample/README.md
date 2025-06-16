@@ -54,13 +54,13 @@ The sample lifecycle is described below, the numeral steps reference this diagra
 
 <img src="sample_arch.png" alt="Sample Architecture" width="50%">
 
-The *Issuer* is an "unmodified" conventional JWT issuer (we don't have a mDL issuer, as these are not typically issued from web endpoints). It generates a RSA key pair and publishes the public key in a JSON Web Key set at its `.well-known/jwks.json` location. It offers a login and token issuance page (the sample offers two demo users, "alice" and "bob", sharing a password "password"). For device-bound credentials, we assume that users have long-lived key pairs registered out-of-band with the issuer; freshly-generated keys could easily be used instead by adding modifying the issuance flow.
+The *Issuer* is an "unmodified" conventional JWT issuer (we don't have a mDL issuer, as these are not typically issued from web endpoints). It generates a RSA key pair and publishes the public key in a JSON Web Key set at its `.well-known/jwks.json` location. It offers a login and token issuance page (the sample offers two demo users, "alice" and "bob", sharing a password "password"). For device-bound credentials, we assume that users have long-lived key pairs registered out-of-band with the issuer; freshly-generated keys could easily be used instead by modifying the issuance flow.
 
-The *Setup Service* sets up the Crescent parameters. These parameters, identified by a schema UID, can be shared by all *Issuers* using the same signing algorithm, and the same credential type and schema. The Setup Service calls the `zksetup` library function using an existing JWT or by creating one using dummy claim and signature values. The resulting parameters are made available at a public endpoint.
+The *Setup Service* sets up the Crescent parameters. These parameters, identified by a schema UID, can be shared by all *Issuers* using the same signing algorithm, and the same credential type and schema. The Setup Service calls the `zksetup` library function using an existing credential or by creating one using dummy claim and signature values. The resulting parameters are made available at a public endpoint.
 
 To obtain a JWT, Alice visits the Issuer welcome page using a browser with the *Browser Extension* installed and the *Client Helper* running. She logs in using her username and password, and clicks "Issue" to get issued a JWT. The browser extension reads the JWT from the HTML page and sends it to the Client Helper which 1) retrieves the corresponding Crescent parameters from the Setup Service, and 2) runs the `prove` library function preparing the JWT for later showing. The proving parameters are stored in the Client Helper and associated with the JWT. A mDL can be loaded directly into the Browser Extension, in absence of a sample issuance workflow; the same preparation steps are performed by the Client Helper.
 
-Later, Alice visits a *Verifier* page. Her browser extension detects a meta tag indicating a Crescent proof request requesting a specific disclosure UID (see below), and specifying a random session ID value (the challenge) to be signed by the client as the presentation message, to prevent replay attacks. She opens the extensions and selects the credential to use (matching the requesting type (JWT or mDL) and disclosure capabilities). The Client then generates a showing by calling the `show` library function and sends it to the Verifier endpoint specified in a meta tag. Upon reception, the Verifier downloads the validation parameters from the Setup Service (the first time it sees a presentation for the schema UID) and, for JWTs, the Issuer's public key (the first time it sees credential from this Issuer), and calls the `verify` library function. Upon successful proof validation, Alice is granted access. 
+Later, Alice visits a *Verifier* page. Her browser extension detects a meta tag indicating a Crescent proof request requesting a specific disclosure UID (see below), and specifying a random session ID value (the challenge) to be signed by the client as the presentation message, to prevent replay attacks. She opens the extensions and selects the credential to use (matching the requesting type (JWT or mDL) and disclosure capabilities). The Client then generates a showing by calling the `show` library function and sends it to the Verifier endpoint specified in a meta tag (or, alternatively, asks the Client Helper to generate the proof, if the Browser Extension doesn't support creating them). Upon reception, the Verifier downloads the validation parameters from the Setup Service (the first time it sees a presentation for the schema UID) and, for JWTs, the Issuer's public key (the first time it sees credential from this Issuer), and calls the `verify` library function. Upon successful proof validation, Alice is granted access. 
 
 # Sample details
 
@@ -88,7 +88,7 @@ The sample defines the following *schema UIDs* expressing the credential type an
 
 ## Credential issuance
 
-The following diagram illustrates the credential issuance sequence.
+The following diagram illustrates the JWT credential issuance sequence; mDLs must be imported manually in the Browser Extension, from which point interactions with the Setup Service and Client Helper are the same.
 
 ```mermaid
 sequenceDiagram
@@ -120,7 +120,7 @@ sequenceDiagram
 
 ## Credential deletion
 
-The following diagram illustrates the the credential deletion sequence.
+The following diagram illustrates the credential deletion sequence.
 
 ```mermaid
 sequenceDiagram
@@ -130,10 +130,9 @@ sequenceDiagram
     E->>C: fetch /delete/?cred_uid=<cred_uid>
 ```
 
-
 ## Proof presentation
 
-The following diagram illustrates the proof presentation sequence.
+The following diagram illustrates the proof presentation sequence, for both JWT and mDL credentials. The flow differs for a Browser Extension that does not support creating show proofs (see [`client/README.md`](./client/README.md)). 
 
 ```mermaid
 sequenceDiagram
@@ -143,16 +142,20 @@ sequenceDiagram
     participant S as Setup Service
     participant V as Verifier
     participant I as Issuer
-    B->>V: visit login page
+    B->>V: visit login/sign-up page
     V->>E: read {disclosure_uid, verify_url, challenge, proof_spec} from <meta> tag
-    E->>E: filter JWT that support disclosure_uid
-    B->>E: user selects a JWT to present
-    E->>C: fetch show proof from /show?cred_uid=<cred_uid>&disc_uid=<disclosure_uid>&pm=<challenge>&ps=<proof_spec>
+    E->>E: filter credential that supports disclosure_uid
+    B->>E: select a credential to present
+    opt if Browser Extension doesn't support show proof
+        E->>C: fetch show proof from /show?cred_uid=<cred_uid>&disc_uid=<disclosure_uid>&pm=<challenge>&ps=<proof_spec>
+    end
     C->>C: generate Crescent proof
     C->>E: return proof
     E->>V: post {proof, schema_uid, issuer_url, disclosure_uid} to verify_url
     V->>S: fetch Crescent verify params from /verify_params/<schema_uid>
-    V->>I: fetch JWK set from <issuer_url>/.well-known/jwks.json
+    opt For JWT
+       V->>I: fetch JWK set from <issuer_url>/.well-known/jwks.json
+    end
     V->>V: verify proof
     V-->>B: redirect to resource page (on success)
 ```
