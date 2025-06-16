@@ -27,6 +27,7 @@ cd client
 npm run build:debug
 
 # Create json file with base64 encoded mdoc and device private key
+# (until we have an issuer to issue mDLs, we use the ones generated in the Crescent lib)
 cat <<EOF > mdl.json
 {
   "mdoc": "$(base64 -w 0 "../../circuit_setup/inputs/mdl1/mdl.cbor")",

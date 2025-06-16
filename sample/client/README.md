@@ -28,8 +28,8 @@ Build the extension (4 modes):
 
 ## Show Proof Generation
 
-The show-proof can be generated in the browser extension or offloaded to the client helper service. The default is to generate the proof in the browser extension.
-To do the proof generation in the client-helper-service, set the `CLIENT_HELPER_SHOW_PROOF=true` in the `.env` file or by setting `CLIENT_HELPER_SHOW_PROOF=true` in your environment before running the build command.
+The show proof can be generated in the browser extension or offloaded to the client helper service. The default is to generate the proof in the browser extension.
+To do the proof generation in the client helper service, set the `CLIENT_HELPER_SHOW_PROOF=true` in the `.env` file or by setting `CLIENT_HELPER_SHOW_PROOF=true` in your environment before running the build command.
 
 ```bash
 CLIENT_HELPER_SHOW_PROOF=true ./setup_client.sh
