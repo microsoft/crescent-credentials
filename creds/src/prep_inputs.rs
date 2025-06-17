@@ -146,7 +146,7 @@ Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
         padded_m.push(0);
     }
   
-    // Begin creating prover's output. Everthing must have string type for Circom
+    // Begin creating prover's output. Everything must have string type for Circom
     let mut prover_inputs_json = serde_json::Map::new();
     let mut public_ios_json = serde_json::Map::new();
     let mut prover_aux_json = serde_json::Map::new();

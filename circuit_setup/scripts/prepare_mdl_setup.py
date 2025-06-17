@@ -54,18 +54,19 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
             # read config
             attr_type = cfg[name].get("type")
             reveal = cfg[name].get("reveal")
+            reveal_digest = cfg[name].get("reveal_digest")
             max_claim_byte_len = cfg[name].get("max_claim_byte_len")
             name_identifier, name_identifier_len = get_cbor_encoded_name_identifier(name)
             name_preimage_len = 128 # don't hardcode; calculate from max_claim_byte_len?
 
-            if (reveal is None) or (reveal == "false"):
+            if ((reveal is None) or (reveal == "false")) and ((reveal_digest is None) or (reveal_digest == "false")):
                 print(f"Claim {name} is not revealed; not currently supported")
                 sys.exit(-1)
 
             print(f"Writing circuit code for {name} ({attr_type})")                        
 
             # add attribute to the public inputs
-            if name not in public_inputs:
+            if name not in public_inputs and reveal:
                 public_inputs.append(f"{name}_value")
 
             f.write(f"""
@@ -73,7 +74,13 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
     //  {name}
     // ------------------------------------------------------------
     var {name}_preimage_len = {name_preimage_len};
+""")
+            if reveal:
+                f.write(f"""
     signal input {name}_value;
+
+""")                
+            f.write(f"""
     signal input {name}_id;
     signal input {name}_preimage[{name}_preimage_len];
     signal input {name}_identifier_l; // The start position of the {name} identifier in the preimage
@@ -142,7 +149,9 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
                 f.write(f"""
     signal input {name}_value_l; // The start position in preimage of the {name} value
     signal input {name}_value_r; // The end position in preimage of the {name} value
-
+""")
+                if reveal:
+                    f.write(f"""
     component reveal_{name} = RevealClaimValue({name}_preimage_len, {max_claim_byte_len}, {MAX_FIELD_BYTE_LEN}, 0);
     reveal_{name}.json_bytes <== {name}_preimage;
     reveal_{name}.l <== {name}_value_l;
@@ -152,7 +161,25 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
     log("reveal_{name}.value = ", reveal_{name}.value);
     {name}_value === reveal_{name}.value;
 """)
-
+                elif reveal_digest:
+                    f.write(f"""
+    component hash_reveal_{name} = HashRevealClaimValue({name}_preimage_len, {max_claim_byte_len}, {MAX_FIELD_BYTE_LEN}, 0);
+    hash_reveal_{name}.json_bytes <== {name}_preimage;
+    hash_reveal_{name}.l <== {name}_value_l;
+    hash_reveal_{name}.r <== {name}_value_r;
+    // log each byte of the preimage value between l and r
+    for (var i = {name}_value_l; i < {name}_value_r; i++) {{
+        log("{name}_preimage[", i, "] = ", {name}_preimage[i]);
+    }}
+    signal output {name}_digest;
+    {name}_digest <== hash_reveal_{name}.digest;
+    log("{name}_digest = ", {name}_digest);
+    
+""")
+                else:
+                    print(f"Claim {name} is not revealed; not currently supported")
+                    sys.exit(-1)
+    # FIXME: add support for numbers?
         # ---------- final component -----------------------
         pub_list = ", ".join(public_inputs)
         f.write(f"""

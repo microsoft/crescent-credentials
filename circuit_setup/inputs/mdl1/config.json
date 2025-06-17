@@ -20,6 +20,18 @@
         "type": "integer",
         "reveal": true,
         "max_claim_byte_len": 31
+    },
+
+    "family_name": {
+        "type": "string",
+        "reveal_digest": true,
+        "max_claim_byte_len": 62
+    },
+
+    "given_name": {
+        "type": "string",
+        "reveal_digest": true,
+        "max_claim_byte_len": 62
     }
 
 }

@@ -509,17 +509,22 @@ fn main() {
         let claim_name = key.as_str();
         let entry = config[claim_name].as_object().ok_or(format!("Config file entry for claim {}, does not have object type", claim_name)).unwrap();
         let claim_type = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", claim_name)).unwrap();
-        let reveal = entry["reveal"].as_bool().unwrap_or(false);
+        let reveal = entry.get("reveal").and_then(|v| v.as_bool()).unwrap_or(false);
+        let reveal_digest = entry.get("reveal_digest").and_then(|v| v.as_bool()).unwrap_or(false);
         let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().ok_or(format!("Config file entry for claim {} does not have a valid u64 'max_claim_byte_len'", claim_name)).map(|v| v as usize).unwrap();
-        println!("\nProcessing {} ({})", claim_name, claim_type);
 
-        if !reveal {
-            panic!("Claim {} is not revealed: not currently supported", claim_name);
+        if !reveal && !reveal_digest {
+            println!("Claim {} is not revealed or reveal_digest: skipping", claim_name);
+            continue;
         }
+
+        println!("\nProcessing {} ({}) for {}", claim_name, claim_type, if reveal { "reveal" } else { "reveal_digest" });
 
         let claim_info = find_value_digest_info(&namespaces, &mso, &tbs_data, claim_name).unwrap();
         println!("claim_info ({}): {:?}", claim_name, claim_info);
         prover_inputs.insert(format!("{}_id", claim_name).to_string(), serde_json::json!(claim_info.id));
+        let claim_value_str = claim_info.value.as_str();
+
         let claim_preimage = sha256_padding(claim_info.preimage.as_ref());
         if claim_preimage.len() != 128 { // FIXME: don't hardcode this value. Currently correct for the mDL we generate, but not in general
             panic!("Invalid {}_preimage length: {}; expected 128 (hardcoded in circom circuit)", claim_name, claim_preimage.len());
@@ -529,31 +534,54 @@ fn main() {
         prover_inputs.insert(format!("{}_encoded_r", claim_name).to_string(), serde_json::json!(claim_info.encoded_r));
         prover_inputs.insert(format!("{}_identifier_l", claim_name).to_string(), serde_json::json!(claim_info.identifier_l));
 
-        let claim_value_str = claim_info.value.as_str();
-        match claim_type {
-            "string" => {
-                // for string values, we skip the first CBOR byte (0x60) which indicates the string length, to only compare the claim value
-                // FIXME: not true in general, only for short strings!
-                let value_l = claim_info.value_l + 1;
-                prover_inputs.insert(format!("{}_value_l", claim_name).to_string(), serde_json::json!(value_l));
-                prover_inputs.insert(format!("{}_value_r", claim_name).to_string(), serde_json::json!(claim_info.value_r));
-                let claim_value = pack_string_to_int_unquoted(claim_value_str, max_claim_byte_len).unwrap();
-                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
-            },
-            "date" => {
-                // we don't need the value_l and value_r for date
-                let claim_value = ymd_to_daystamp(claim_value_str).unwrap();
-                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
-            },
-            "integer" => {
-                // encode integer directly
-                prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value_str));
-            },
-            // TODO: add support for other claim types
-            &_ => {
-                panic!("Unsupported claim type: {}", claim_type);
-            }
-        };
+        if reveal {
+            match claim_type {
+                "string" => {
+                    // for string values, we skip the first CBOR byte (0x60) which indicates the string length, to only compare the claim value
+                    // FIXME: not true in general, only for short strings!
+                    let value_l = claim_info.value_l + 1;
+                    prover_inputs.insert(format!("{}_value_l", claim_name).to_string(), serde_json::json!(value_l));
+                    prover_inputs.insert(format!("{}_value_r", claim_name).to_string(), serde_json::json!(claim_info.value_r));
+                    let claim_value = pack_string_to_int_unquoted(claim_value_str, max_claim_byte_len).unwrap();
+                    prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
+                },
+                "date" => {
+                    // we don't need the value_l and value_r for date
+                    let claim_value = ymd_to_daystamp(claim_value_str).unwrap();
+                    prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
+                },
+                "integer" => {
+                    // encode integer directly
+                    prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value_str));
+                },
+                // TODO: add support for other claim types
+                &_ => {
+                    panic!("Unsupported claim type: {}", claim_type);
+                }
+            };
+        } else if reveal_digest {
+            // Add the preimage to the prover auxiliary data
+            match claim_type {
+                    "integer" => {
+                        prover_aux.insert(claim_name.to_string(), serde_json::json!(claim_value_str));
+                    }
+                    "string" => {
+                        if claim_value_str.len() > max_claim_byte_len as usize {
+                            panic!("Claim too large ({} bytes), largest allowed by configuration is {} bytes", claim_value_str.len(), max_claim_byte_len);
+                        }
+                        // for string values, we skip the first CBOR byte (0x60) which indicates the string length, to only compare the claim value
+                        // FIXME: not true in general, only for short strings!
+                        let value_l = claim_info.value_l + 1;
+                        prover_inputs.insert(format!("{}_value_l", claim_name).to_string(), serde_json::json!(value_l));
+                        prover_inputs.insert(format!("{}_value_r", claim_name).to_string(), serde_json::json!(claim_info.value_r));
+                        prover_aux.insert(claim_name.to_string(), serde_json::json!(claim_value_str));
+                    }
+                    _ => {
+                        // TODO: date?
+                        panic!("Can only reveal number types and string types as a single field element for now. See also `reveal_bytes`.")
+                    }
+                }
+        }
     }
 
     // extract the signature from the issuer_auth
