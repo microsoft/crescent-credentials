@@ -471,6 +471,11 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let show_range_exp = client_state.show_range(&com_valid_until_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
     let device_proof = 
     if proof_spec.device_bound {
+
+        if device_signature.is_none() {
+            println!("Warning: No device signature provided for device bound credential");
+        }
+
         assert!(client_state.committed_input_openings.len() >= 3);
         let com0 = client_state.committed_input_openings[1].clone();
         let com1 = client_state.committed_input_openings[2].clone();

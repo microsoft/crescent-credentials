@@ -27,24 +27,31 @@ declare global {
 globalThis.js_now_seconds = (): bigint => BigInt(Math.floor(Date.now() / 1000))
 
 // eslint-disable-next-line @typescript-eslint/max-params
-async function handleDisclose (id: string, destinationUrl: string, disclosureUid: string, challenge: string, proofSpec: string): Promise<void> {
+async function handleDisclose (id: string, destinationUrl: string, disclosureUid: string, challenge: string, proofSpec: string, devicePrivateKey?: string): Promise<void> {
   const cred = Credential.get(id)
   assert(cred)
 
-  console.debug('Disclosing credential', cred.id, destinationUrl, disclosureUid, challenge, proofSpec)
+  console.debug('Disclosing credential', cred.id, destinationUrl, disclosureUid, challenge, proofSpec, devicePrivateKey)
 
   let showProof: string | null = null
 
-  if (config.wasmShowProof) {
+  if (!config.clientHelperShowProof) {
     await init(/* wasm module */)
     const showParams = cred.data.showData as ClientHelperShowResponse
-    showProof = create_show_proof_wasm(
-      showParams.client_state_b64,
-      showParams.range_pk_b64,
-      showParams.io_locations_str,
-      disclosureUid,
-      challenge
-    ).replace('show_proof_b64: ', '').replace(/"/g, '')
+    try {
+      showProof = create_show_proof_wasm(
+        showParams.client_state_b64,
+        showParams.range_pk_b64,
+        showParams.io_locations_str,
+        disclosureUid,
+        challenge,
+        proofSpec,
+        devicePrivateKey
+      )
+    }
+    catch (e) {
+      console.error('Failed to create show proof:', e)
+    }
     assert(showProof)
   }
   else {
@@ -71,8 +78,8 @@ async function handleDisclose (id: string, destinationUrl: string, disclosureUid
 }
 
 // eslint-disable-next-line @typescript-eslint/max-params
-export async function disclose (cred: Credential, verifierUrl: string, disclosureUid: string, challenge: string, proofSpec: string): Promise<void> {
-  void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, cred.id, verifierUrl, disclosureUid, challenge, proofSpec)
+export async function disclose (cred: Credential, verifierUrl: string, disclosureUid: string, challenge: string, proofSpec: string, devicePrivateKey?: string): Promise<void> {
+  void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, cred.id, verifierUrl, disclosureUid, challenge, proofSpec, devicePrivateKey)
 }
 
 // if this is running the the extension background service worker, then listen for messages
