@@ -17,8 +17,8 @@
 //    - The claims JSON file should contain two keys: "org.iso.18013.5.1" and "org.iso.18013.5.1.aamva"
 //    - The device key can be generated using the ../scripts/gen_mdl_device_key.sh script
 //    - The issuer key and cert chain can be generated using the ../scripts/gen_x509_cert_chain.sh script
-//    - To test: cargo run --bin mdl-gen -- -c ../inputs/mdl1/claims.json -d ../inputs/mdl1/device_private_key.pem
-//                                          -k ../inputs/mdl1/issuer.priv -x ../inputs/mdl1/issuer_certs.pem
+//    - To test: cargo run --bin mdl-gen -- -c ../inputs/mdl1/claims.json -d ../inputs/mdl1/device.prv
+//                                          -k ../inputs/mdl1/issuer.prv -x ../inputs/mdl1/issuer_certs.pem
 //                                          -o ../generated_files/mdl1/mdl.cbor
 
 use std::collections::BTreeMap;
@@ -93,7 +93,6 @@ fn mdoc_builder(claims: String, device_priv_key: String) -> Builder {
     }
 
     // TODO: should read these values from a config file
-    // FIXME: how do these compare to the ones in the claims.json file?
     let now = OffsetDateTime::now_utc();
     let validity_info = ValidityInfo {
         signed: now,

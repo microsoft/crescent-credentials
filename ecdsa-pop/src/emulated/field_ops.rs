@@ -798,7 +798,7 @@ where
             return Ok(());
         }
 
-        let num_chunks = (self.len() + P::num_limbs() - 1) / P::num_limbs();
+        let num_chunks = self.len().div_ceil(P::num_limbs());
         let mut chunks: Vec<Self> = vec![];
 
         match &self.limbs {

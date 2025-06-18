@@ -103,11 +103,12 @@ impl<E: Pairing> VerifierParams<E> {
 }
 
 // Proof specification describing what is to be proven during a Show proof.  Currently supporting selective disclosure
-// of attributes as field elements or hashed values.  Will likely be extended in the future to support other predicates.
-// The range proof that "exp" is in the future is always done.
+// of attributes as field elements or hashed values, and range proofs.
+// The range proof for the expiration date ("exp" for JWT, "valid_until" for mDL) is in the future is always done.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProofSpec {
     pub revealed: Vec<String>,
+    pub range_over_year: Option<std::collections::BTreeMap<String, u64>>,
     pub presentation_message: Option<Vec<u8>>,
     pub device_bound: Option<bool>,
 }
@@ -115,18 +116,20 @@ pub struct ProofSpec {
 #[derive(Serialize)]
 pub(crate) struct ProofSpecInternal {
     pub revealed: Vec<String>,
+    pub range_over_year: Vec<(String, u64)>,
     pub hashed: Vec<String>, 
     pub presentation_message : Option<Vec<u8>>,
     pub device_bound: bool,
-    pub config_str: String
+    pub config_str: String,
+    pub claim_types: std::collections::BTreeMap<String, String>, // claim name -> claim type
 }
 
 /// Structure to hold all the parts of a show/presentation proof
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShowProof<E: Pairing> {
     pub show_groth16: ShowGroth16<E>,
-    pub show_range: ShowRange<E>,
-    pub show_range2: Option<ShowRange<E>>, 
+    pub show_range_exp: ShowRange<E>, // non-expired range proof (always performed)
+    pub show_range_attr: Vec<ShowRange<E>>, // selective attribute range proofs
     pub revealed_inputs: Vec<E::ScalarField>, 
     pub revealed_preimages: Option<String>,
     pub inputs_len: usize, 
@@ -151,7 +154,8 @@ pub struct CachePaths {
    pub prover_params: String,   
    pub client_state: String, 
    pub show_proof: String,
-   pub mdl_prover_inputs: String, 
+   pub mdl_prover_inputs: String,
+   pub mdl_prover_aux: String,
    pub proof_spec: String,
    pub device_pub_pem: String,
    pub device_prv_pem: String
@@ -196,6 +200,7 @@ impl CachePaths {
             client_state: format!("{}client_state.bin", &cache_path),
             show_proof: format!("{}show_proof.bin", &cache_path),
             mdl_prover_inputs: format!("{}prover_inputs.json", &base_path_str),
+            mdl_prover_aux: format!("{}prover_aux.json", &base_path_str),
             proof_spec: format!("{}proof_spec.json", &base_path_str),
             device_pub_pem: format!("{}device.pub", &base_path_str),
             device_prv_pem: format!("{}device.prv", &base_path_str),
@@ -294,7 +299,6 @@ pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSO
         prover_params.config_str.clone()
     );
     client_state.credtype = credtype.to_string();
-
     Ok(client_state)
 }
 
@@ -302,7 +306,6 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
 {
     // Create Groth16 rerandomized proof for showing
     let exp_value_pos = io_locations.get_io_location("exp_value").unwrap();
-    // The IOs are exp, email, family_name, given_name, tenant_ctry, tenant_region_scope.  Hidden by default
     let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
 
@@ -367,7 +370,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     let mut com_exp_value = client_state.committed_input_openings[0].clone();
     com_exp_value.m -= cur_time;
     com_exp_value.c -= com_exp_value.bases[0] * cur_time;
-    let show_range = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
+    let show_range_exp = client_state.show_range(&com_exp_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
 
     let device_proof = 
     if proof_spec.device_bound {
@@ -379,6 +382,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
         let aux = aux.as_object().unwrap();
         let x = BigUint::from_str_radix(aux["device_pub_x"].as_str().unwrap(), 10).unwrap();
         let y = BigUint::from_str_radix(aux["device_pub_y"].as_str().unwrap(), 10).unwrap();
+        println!("Created device proof");
         Some(DeviceProof::prove(&com0, &com1, &sig, &x, &y))
     } else {
         None
@@ -391,22 +395,71 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     } else {
         Some(serde_json::to_string(&revealed_preimages).unwrap())
     };
-    Ok(ShowProof{ show_groth16, show_range, show_range2: None, revealed_inputs, revealed_preimages, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof})
+    let show_range_attr= vec![]; // no attribute range proofs for JWT yet
+    Ok(ShowProof{ show_groth16, show_range_exp, show_range_attr, revealed_inputs, revealed_preimages, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof})
 }
 
-pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, pm: Option<&[u8]>, io_locations: &IOLocations, age: usize) -> ShowProof<ECPairing>
+// TODO: refactor this function and create_show_proof into one
+pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk : &RangeProofPK<ECPairing>, proof_spec: &ProofSpec, io_locations: &IOLocations, device_signature: Option<Vec<u8>>) -> Result<ShowProof<ECPairing>, Box<dyn Error>>
 {
     // Create Groth16 rerandomized proof for showing
+
+    let proof_spec = create_proof_spec_internal(proof_spec, &client_state.config_str)?;
+
+    // commit the expiration date (for non-expired range proof)
     let valid_until_value_pos = io_locations.get_io_location("valid_until_value").unwrap();
-    let dob_value_pos = io_locations.get_io_location("dob_value").unwrap();
-    
-    let mut io_types = vec![PublicIOType::Revealed; client_state.inputs.len()];
+    let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
     io_types[valid_until_value_pos - 1] = PublicIOType::Committed;
-    io_types[dob_value_pos - 1] = PublicIOType::Committed;
+    // for each range proofed attribute, set the position to Committed
+    for (attr, _) in &proof_spec.range_over_year {
+        let io_loc = io_locations.get_io_location(&format!("{}_value", &attr)).unwrap();
+        io_types[io_loc - 1] = PublicIOType::Committed;
+    }
 
-    let revealed_inputs : Vec<<ECPairing as Pairing>::ScalarField> = vec![];
+    for i in io_locations.get_public_key_indices() {
+        io_types[i] = PublicIOType::Revealed;
+    }
 
-    let show_groth16 = client_state.show_groth16(pm, &io_types);    
+    // For the attributes revealed as field elements, we set the position to Revealed and send the value
+    let mut revealed_inputs = vec![];
+    for attr in &proof_spec.revealed {
+        let io_loc = io_locations.get_io_location(&format!("{}_value", &attr)).unwrap();
+        io_types[io_loc - 1] = PublicIOType::Revealed;
+        revealed_inputs.push(client_state.inputs[io_loc - 1]);
+    }
+
+    // For the attributes revealed as digests, we provide the preimage, the verifier will hash it to get the field element
+    let mut revealed_preimages = serde_json::Map::new();
+    for attr in &proof_spec.hashed {
+        let io_loc = match io_locations.get_io_location(&format!("{}_digest", &attr)) {
+            Ok(loc) => loc,
+            Err(_) => {
+                return_error!(
+                    format!("Asked to reveal hashed attribute {}, but did not find it in io_locations\nIO locations: {:?}", attr, io_locations.get_all_names()));
+            }
+        };        
+
+        io_types[io_loc - 1] = PublicIOType::Revealed;
+
+        if client_state.aux.is_none() {
+            return_error!(format!("Proof spec asked to reveal hashed attribute {}, but client state is missing aux data", attr));
+        }
+        let aux = serde_json::from_str::<Value>(client_state.aux.as_ref().unwrap()).unwrap();
+        let aux = aux.as_object().unwrap();
+        revealed_preimages.insert(attr.clone(), json!(aux[attr].clone().to_string()));
+    }
+
+    // If the credential is device bound, the public key attributes must be committed
+    if proof_spec.device_bound {
+        let device_key_0_pos = io_locations.get_io_location("device_key_0_value").unwrap();
+        let device_key_1_pos = io_locations.get_io_location("device_key_1_value").unwrap();
+        io_types[device_key_0_pos - 1] = PublicIOType::Committed;
+        io_types[device_key_1_pos - 1] = PublicIOType::Committed;
+    }
+
+    // Serialize the proof spec as the context
+    let context_str = serde_json::to_string(&proof_spec).unwrap();
+    let show_groth16 = client_state.show_groth16(Some(context_str.as_bytes()), &io_types);    
     
     // Create fresh range proof for validUntil
     let time_sec = utc_now_seconds();
@@ -415,17 +468,45 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let mut com_valid_until_value = client_state.committed_input_openings[0].clone();
     com_valid_until_value.m -= cur_time;
     com_valid_until_value.c -= com_valid_until_value.bases[0] * cur_time;
-    let show_range = client_state.show_range(&com_valid_until_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
+    let show_range_exp = client_state.show_range(&com_valid_until_value, RANGE_PROOF_INTERVAL_BITS, range_pk);
+    let device_proof = 
+    if proof_spec.device_bound {
 
-    // Create fresh range proof for birth_date; prove age is over 21
-    let days_in_21y = Fr::from(days_to_be_age(age) as u64);
-    let mut com_dob = client_state.committed_input_openings[1].clone();
-    com_dob.m -= days_in_21y;
-    com_dob.c -= com_dob.bases[0] * days_in_21y;
-    let show_range2 = client_state.show_range(&com_dob, RANGE_PROOF_INTERVAL_BITS, range_pk);       
+        if device_signature.is_none() {
+            println!("Warning: No device signature provided for device bound credential");
+        }
+
+        assert!(client_state.committed_input_openings.len() >= 3);
+        let com0 = client_state.committed_input_openings[1].clone();
+        let com1 = client_state.committed_input_openings[2].clone();
+        let sig = ECDSASig::new_from_bytes(&proof_spec.presentation_message.unwrap(), &device_signature.unwrap());
+        let aux = serde_json::from_str::<Value>(client_state.aux.as_ref().unwrap()).unwrap();
+        let aux = aux.as_object().unwrap();
+        let x = BigUint::from_str_radix(aux["device_pub_x"].as_str().unwrap(), 10).unwrap();
+        let y = BigUint::from_str_radix(aux["device_pub_y"].as_str().unwrap(), 10).unwrap();
+        println!("Created device proof");
+        Some(DeviceProof::prove(&com0, &com1, &sig, &x, &y))
+    } else {
+        None
+    };
+
+    let mut show_range_attr= vec![];
+    let mut commitment_index = 3; // skip the first 3 commitments (validUntil, device_key_0, device_key_1)
+    // for each range-proofed attribute, create a fresh range proof that the attribute is at least "age" years old // TODO: generalize to non-age attributes
+    for (_, age) in &proof_spec.range_over_year {
+        let days_in_age = Fr::from(days_to_be_age(*age) as u64);
+        let mut com_attr = client_state.committed_input_openings[commitment_index].clone();
+        com_attr.m -= days_in_age;
+        com_attr.c -= com_attr.bases[0] * days_in_age;
+
+        let show_range_a = client_state.show_range(&com_attr, RANGE_PROOF_INTERVAL_BITS, range_pk);       
+
+        show_range_attr.push(show_range_a);
+        commitment_index += 1;
+    }
 
     // Assemble proof and return
-    ShowProof{ show_groth16, show_range, show_range2: Some(show_range2), revealed_inputs, revealed_preimages: None, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof: None}
+    Ok(ShowProof{ show_groth16, show_range_exp, show_range_attr, revealed_inputs, revealed_preimages: None, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof})
 }
 
 fn sort_by_io_location(attrs: &[String], io_locations: &IOLocations) -> Vec<String> {
@@ -450,14 +531,14 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         io_types[i] = PublicIOType::Revealed;
     }
 
-    let proof_spec = create_proof_spec_internal(proof_spec, &vp.config_str); 
+    let proof_spec = create_proof_spec_internal(proof_spec, &vp.config_str);
     if proof_spec.is_err() {
         println!("Failed to create internal proof spec");
         return (false, "".to_string());
     }
     let proof_spec = proof_spec.unwrap();
 
-    // Set attributes to Revealed
+    // Set disclosed attributes to Revealed
     for attr in &proof_spec.revealed {
         let io_loc = io_locations.get_io_location(&format!("{}_value", &attr));
         if io_loc.is_err() {
@@ -536,12 +617,6 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     inputs.extend(public_key_inputs.unwrap());
     inputs.extend(show_proof.revealed_inputs.clone());
     
-    // println!("Verifier got revealed inputs  : {:?}", &show_proof.revealed_inputs);
-    // println!("Created inputs: ");
-    // for (i, input) in inputs.clone().into_iter().enumerate() {
-    //     println!("input {}  =  {:?}", i, input.into_bigint().to_string());
-    // }
-    
     let context_str = serde_json::to_string(&proof_spec).unwrap();
 
     let verify_timer = std::time::Instant::now();
@@ -552,12 +627,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     }
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = utc_now_seconds();
-    let delta = 
-        if show_proof.cur_time < now_seconds {
-            now_seconds - show_proof.cur_time
-        } else {
-            0
-    };
+    let delta = now_seconds.saturating_sub(show_proof.cur_time);
     println!("Proof created {} seconds ago", delta);    
 
     if delta > SHOW_PROOF_VALIDITY_SECONDS {
@@ -567,7 +637,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
 
     let mut ped_com_exp_value = show_proof.show_groth16.commited_inputs[0];
     ped_com_exp_value -= vp.pvk.vk.gamma_abc_g1[exp_value_pos] * cur_time;
-    let ret = show_proof.show_range.verify(
+    let ret = show_proof.show_range_exp.verify(
         &ped_com_exp_value,
         RANGE_PROOF_INTERVAL_BITS,
         &vp.range_vk,
@@ -587,11 +657,19 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         let com1 = show_proof.show_groth16.commited_inputs[2];
         let bases0 = vec![vp.pvk.vk.gamma_abc_g1[device_key_0_pos], vp.pvk.vk.delta_g1];
         let bases1 = vec![vp.pvk.vk.gamma_abc_g1[device_key_1_pos], vp.pvk.vk.delta_g1];
-        let ret = DeviceProof::verify(show_proof.device_proof.as_ref().unwrap(), &com0.into(), &com1.into(), &bases0, &bases1);
+        let device_proof = match show_proof.device_proof.as_ref() {
+            Some(dp) => dp,
+            None => {
+                println!("DeviceProof.verify failed: device_proof missing in show_proof");
+                return (false, "Device proof missing in show_proof".to_string());
+            }
+        };
+        let ret = DeviceProof::verify(device_proof, &com0.into(), &com1.into(), &bases0, &bases1);
         if !ret {
             println!("DeviceProof.verify failed");
             return (false, "".to_string());            
         }
+        println!("Device proof verified successfully");
     }
     
     println!("Verification time: {:?}", verify_timer.elapsed());  
@@ -600,13 +678,19 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     let mut revealed = serde_json::Map::<String, Value>::new();
     for (revealed_idx, attr_name) in proof_spec.revealed.iter().enumerate() {
         let attr_name = attr_name.clone() + "_value";
-        let unpacked = unpack_int_to_string_unquoted( &show_proof.revealed_inputs[revealed_idx].into_bigint());
-        if unpacked.is_err() {
-            println!("Error: Proof was valid, but failed to unpack '{}' attribute, {:?}", attr_name, unpacked.err().unwrap());
-            return (false, "".to_string());
-        }
-        let attr_value = &unpacked.unwrap().clone();
-        revealed.insert(attr_name.clone(), json!(attr_value));
+        let claim_type = proof_spec.claim_types.get(attr_name.trim_end_matches("_value")).map(|s| s.as_str()).unwrap_or("");
+        let attr_value = if claim_type == "number" {
+            json!(show_proof.revealed_inputs[revealed_idx].into_bigint().to_string())
+        } else {
+            match unpack_int_to_string_unquoted(&show_proof.revealed_inputs[revealed_idx].into_bigint()) {
+                Ok(val) => json!(val),
+                Err(_) => {
+                    println!("Error: Proof was valid, but failed to unpack '{}' attribute", attr_name);
+                    return (false, "".to_string());
+                }
+            }
+        };
+        revealed.insert(attr_name.clone(), attr_value);
     }
 
     // Add the hashed revealed attributes to the output
@@ -629,14 +713,56 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     (true, serde_json::to_string(&revealed).unwrap())
 }
 
-pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, pm: Option<&[u8]>, age: usize) -> (bool, String)
+pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPairing>, proof_spec: &ProofSpec) -> (bool, String)
 {
+    let proof_spec = create_proof_spec_internal(proof_spec, &vp.config_str);
+    if proof_spec.is_err() {
+        println!("Failed to create internal proof spec: {:?}", proof_spec.err().unwrap());
+        return (false, "".to_string());
+    }
+    let proof_spec = proof_spec.unwrap();
+
     let io_locations = IOLocations::new_from_str(&vp.io_locations_str);
     let valid_until_value_pos = io_locations.get_io_location("valid_until_value").unwrap();
-    let dob_value_pos = io_locations.get_io_location("dob_value").unwrap();
-    let mut io_types = vec![PublicIOType::Revealed; show_proof.inputs_len];
+    let mut io_types = vec![PublicIOType::Hidden; show_proof.inputs_len];
     io_types[valid_until_value_pos - 1] = PublicIOType::Committed;
-    io_types[dob_value_pos - 1] = PublicIOType::Committed;
+    // for each range proofed attribute, set the position to Committed
+    for (attr, _) in &proof_spec.range_over_year {
+        let io_loc = match io_locations.get_io_location(&format!("{}_value", &attr)) {
+            Ok(loc) => loc,
+            Err(_) => {
+                println!("Asked to prove range for attribute {}, but did not find it in io_locations", attr);
+                return (false, "".to_string());
+            }
+        };
+        io_types[io_loc - 1] = PublicIOType::Committed;
+    }
+
+    for i in io_locations.get_public_key_indices() {
+        io_types[i] = PublicIOType::Revealed;
+    }
+
+    // Set attributes to Revealed
+    for attr in &proof_spec.revealed {
+        let io_loc = io_locations.get_io_location(&format!("{}_value", &attr));
+        if io_loc.is_err() {
+            println!("Asked to reveal attribute {}, but did not find it in io_locations", attr);
+            println!("IO locations: {:?}", io_locations.get_all_names());
+            return (false, "".to_string());
+        }
+        let io_loc = io_loc.unwrap();
+        io_types[io_loc - 1] = PublicIOType::Revealed;
+    }
+
+    // TODO: hashed attributes (see JWT)
+
+    // If the credential is device bound, the device public key attributes must be committed
+    if proof_spec.device_bound {
+        let device_key_0_pos = io_locations.get_io_location("device_key_0_value").unwrap();
+        let device_key_1_pos = io_locations.get_io_location("device_key_1_value").unwrap();
+        io_types[device_key_0_pos - 1] = PublicIOType::Committed;
+        io_types[device_key_1_pos - 1] = PublicIOType::Committed;
+    }
 
     // Create an inputs vector with the inputs from the prover, and the issuer's public key
     let public_key_inputs = pem_to_inputs::<<ECPairing as Pairing>::ScalarField>(&vp.issuer_pem);
@@ -644,31 +770,22 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         print!("Error: Failed to convert issuer public key to input values");
         return (false, "".to_string());
     }
-    let mut inputs = public_key_inputs.unwrap();
-    inputs.extend(show_proof.revealed_inputs.clone());     
+    let mut inputs = vec![];
+    // inputs.extend(revealed_hashed); TODO: uncomment when hashed attributes are implemented
+    inputs.extend(public_key_inputs.unwrap());
+    inputs.extend(show_proof.revealed_inputs.clone());
     
-
-    // println!("Verifier got revealed inputs: {:?}", &show_proof.revealed_inputs);
-    // println!("Created inputs:");
-    // for (i, input) in inputs.clone().into_iter().enumerate() {
-    //     println!("input {} =  {:?}", i, input.into_bigint().to_string());
-    // }
+    let context_str = serde_json::to_string(&proof_spec).unwrap();
 
     let verify_timer = std::time::Instant::now();
-    show_proof.show_groth16.verify(&vp.vk, &vp.pvk, pm, &io_types, &inputs);
-    let ret = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, pm, &io_types, &inputs);
+    let ret: bool = show_proof.show_groth16.verify(&vp.vk, &vp.pvk, Some(context_str.as_bytes()), &io_types, &inputs);
     if !ret {
         println!("show_groth16.verify failed");
         return (false, "".to_string());
     }
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = utc_now_seconds();
-    let delta = 
-        if show_proof.cur_time < now_seconds {
-            now_seconds - show_proof.cur_time
-        } else {
-            0
-    };
+    let delta = now_seconds.saturating_sub(show_proof.cur_time);
     println!("Proof created {} seconds ago", delta);    
 
     if delta > SHOW_PROOF_VALIDITY_SECONDS {
@@ -678,7 +795,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
 
     let mut ped_com_valid_until_value = show_proof.show_groth16.commited_inputs[0];
     ped_com_valid_until_value -= vp.pvk.vk.gamma_abc_g1[valid_until_value_pos] * cur_time;
-    let ret = show_proof.show_range.verify(
+    let ret = show_proof.show_range_exp.verify(
         &ped_com_valid_until_value,
         RANGE_PROOF_INTERVAL_BITS,
         &vp.range_vk,
@@ -687,35 +804,88 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         "valid_until_value",
     );
     if !ret {
-        println!("show_range.verify failed");
+        println!("show_range_exp.verify failed");
         return (false, "".to_string());
     }      
 
-    if show_proof.show_range2.is_none() {
-        println!("mDL proof is invalid; missing second range proof");
-        return (false, "".to_string());
+    for (i, show_range_attr) in show_proof.show_range_attr.iter().enumerate() {
+        let commitment_index = i + 3; // skip the first 3 (validUntil, device_key_0, device_key_1)
+        let attr_name = &proof_spec.range_over_year[i].0;
+        let attr_label = format!("{}_value", &attr_name);
+        let age = proof_spec.range_over_year[i].1;
+        let days_in_age = Fr::from(days_to_be_age(age) as u64);
+        let mut ped_com_attr_value = show_proof.show_groth16.commited_inputs[commitment_index];
+        let io_pos = match io_locations.get_io_location(&attr_label) {
+            Ok(loc) => loc,
+            Err(_) => {
+                println!("Asked to prove range for attribute {}, but did not find it in io_locations", attr_name);
+                return (false, "".to_string());
+            }
+        };
+        ped_com_attr_value -= vp.pvk.vk.gamma_abc_g1[io_pos] * days_in_age;
+
+        let ret = show_range_attr.verify(
+            &ped_com_attr_value,
+            RANGE_PROOF_INTERVAL_BITS,
+            &vp.range_vk,
+            &io_locations,
+            &vp.pvk,
+            &attr_label,
+        );
+        if !ret {
+            println!("show_range_attr.verify failed");
+            return (false, "".to_string());
+        }
+        println!("range proof for {} such that age is over {} succeeded", attr_name, age);
     }
-    let days_in_age = Fr::from(days_to_be_age(age) as u64);
-    let mut ped_com_dob = show_proof.show_groth16.commited_inputs[1];
-    ped_com_dob -= vp.pvk.vk.gamma_abc_g1[dob_value_pos] * days_in_age;
-    let ret = show_proof.show_range2.as_ref().unwrap().verify(
-        &ped_com_dob,
-        RANGE_PROOF_INTERVAL_BITS,
-        &vp.range_vk,
-        &io_locations,
-        &vp.pvk,
-        "dob_value",
-    );
-    if !ret {
-        println!("show_range2.verify failed");
-        return (false, "".to_string());
-    }      
+
+    if proof_spec.device_bound {
+        let device_key_0_pos = io_locations.get_io_location("device_key_0_value").unwrap();
+        let device_key_1_pos = io_locations.get_io_location("device_key_1_value").unwrap();        
+        let com0 = show_proof.show_groth16.commited_inputs[1];
+        let com1 = show_proof.show_groth16.commited_inputs[2];
+        let bases0 = vec![vp.pvk.vk.gamma_abc_g1[device_key_0_pos], vp.pvk.vk.delta_g1];
+        let bases1 = vec![vp.pvk.vk.gamma_abc_g1[device_key_1_pos], vp.pvk.vk.delta_g1];
+        let device_proof = match show_proof.device_proof.as_ref() {
+            Some(dp) => dp,
+            None => {
+                println!("DeviceProof.verify failed: device_proof missing in show_proof");
+                return (false, "Device proof missing in show_proof".to_string());
+            }
+        };
+        let ret = DeviceProof::verify(device_proof, &com0.into(), &com1.into(), &bases0, &bases1);
+        if !ret {
+            println!("DeviceProof.verify failed");
+            return (false, "".to_string());            
+        }
+        println!("Device proof verified successfully");
+    }
 
     println!("Verification time: {:?}", verify_timer.elapsed());  
 
-    println!("mDL is valid, holder is over {} years old", age);
+    // Add the revealed attributes to the output, after converting from field element to string
+    let mut revealed = serde_json::Map::<String, Value>::new();
+    for (revealed_idx, attr_name) in proof_spec.revealed.iter().enumerate() {
+        let attr_name = attr_name.clone() + "_value";
+        let claim_type = proof_spec.claim_types.get(attr_name.trim_end_matches("_value")).map(|s| s.as_str()).unwrap_or("");
+        let attr_value = if claim_type == "integer" {
+            json!(show_proof.revealed_inputs[revealed_idx].into_bigint().to_string())
+        } else {
+            match unpack_int_to_string_unquoted(&show_proof.revealed_inputs[revealed_idx].into_bigint()) {
+                Ok(val) => json!(val),
+                Err(_) => {
+                    println!("Error: Proof was valid, but failed to unpack '{}' attribute", attr_name);
+                    return (false, "".to_string());
+                }
+            }
+        };
+        revealed.insert(attr_name.clone(), attr_value);
+    }
 
-    (true, "".to_string())
+    // Add the hashed revealed attributes to the output
+    // TODO
+
+    (true, serde_json::to_string(&revealed).unwrap())
 }
 
 #[cfg(test)]
@@ -724,11 +894,14 @@ mod tests {
     use crate::{device::TestDevice, prep_inputs::{parse_config, prepare_prover_inputs}};
     use serial_test::serial;
 
-    const MDL_AGE_GT : usize = 18; 
-
     // We run the end-to-end tests with [serial] because they use a lot of memory, 
     // if two are run at the same time some machines do not have enough RAM
 
+    #[test]
+    #[serial]
+    pub fn end_to_end_test_rs256() {
+        run_test("rs256", "jwt");
+    }
     #[test]
     #[serial]
     pub fn end_to_end_test_rs256_sd() {
@@ -750,7 +923,7 @@ mod tests {
         let base_path = PathBuf::from(format!("test-vectors/{}", name));
         let paths = CachePaths::new(base_path.clone());
 
-        println!("Runing end-to-end-test for {}, credential type {}", name, cred_type);
+        println!("Running end-to-end-test for {}, credential type {}", name, cred_type);
         println!("Requires that `../setup/run_setup.sh {}` has already been run", name);
         println!("These tests are slow; best run with the `--release` flag"); 
 
@@ -764,7 +937,7 @@ mod tests {
     
         let (prover_inputs, prover_aux) = 
         if cred_type == "mdl" {
-            (GenericInputsJSON::new(&paths.mdl_prover_inputs), None)
+            (GenericInputsJSON::new(&paths.mdl_prover_inputs), Some(fs::read_to_string(&paths.mdl_prover_aux).unwrap()))
         }
         else {
             let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
@@ -784,26 +957,24 @@ mod tests {
         let pm = "some presentation message".to_string();
         let io_locations = IOLocations::new(&paths.io_locations);    
         let range_pk : RangeProofPK<CrescentPairing> = read_from_file(&paths.range_pk).unwrap();
-        let show_proof = if client_state.credtype == "mdl" {
-            create_show_proof_mdl(&mut client_state, &range_pk, Some(pm.as_bytes()), &io_locations, MDL_AGE_GT)  
+        assert!(PathBuf::from(&paths.proof_spec).exists());
+        let ps_raw = fs::read_to_string(&paths.proof_spec).expect("Proof spec file exists, but failed while reading it");
+        let mut proof_spec : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
+        proof_spec.presentation_message = Some(pm.as_bytes().to_vec());
+        let device_signature = 
+        if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
+            let device = TestDevice::new_from_file(&paths.device_prv_pem);
+            Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
         } else {
-            assert!(PathBuf::from(&paths.proof_spec).exists());
-            let ps_raw = fs::read_to_string(&paths.proof_spec).expect("Proof spec file exists, but failed while reading it");
-            let mut proof_spec : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
-            proof_spec.presentation_message = Some(pm.as_bytes().to_vec());
-
-            let device_signature = 
-            if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
-                let device = TestDevice::new_from_file(&paths.device_prv_pem);
-                Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
-            } else {
-                None
-            };
-
-            let proof = create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature);
-            assert!(proof.is_ok());
-            proof.unwrap()
+            None
         };
+        let proof = if cred_type == "mdl" {
+            create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations, device_signature)
+        } else {
+            create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature)
+        };
+        assert!(proof.is_ok());
+        let show_proof = proof.unwrap();
 
         write_to_file(&show_proof, &paths.show_proof);
         let show_proof : ShowProof<CrescentPairing> = read_from_file(&paths.show_proof).unwrap();
@@ -816,14 +987,13 @@ mod tests {
         let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     
         let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str: config_str.clone()};
-    
-        let (verify_result, _data) = if show_proof.show_range2.is_some() {
-            verify_show_mdl(&vp, &show_proof, Some(pm.as_bytes()), MDL_AGE_GT)
+        assert!(PathBuf::from(&paths.proof_spec).exists());
+        let ps_raw = fs::read_to_string(&paths.proof_spec).expect("Proof spec file exists, but failed while reading it");
+        let mut proof_spec : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
+        proof_spec.presentation_message = Some(pm.as_bytes().to_vec());
+        let (verify_result, _data) = if cred_type == "mdl" {
+            verify_show_mdl(&vp, &show_proof, &proof_spec)
         } else {
-            assert!(PathBuf::from(&paths.proof_spec).exists());
-            let ps_raw = fs::read_to_string(&paths.proof_spec).expect("Proof spec file exists, but failed while reading it");
-            let mut proof_spec : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
-            proof_spec.presentation_message = Some(pm.as_bytes().to_vec());
             verify_show(&vp, &show_proof, &proof_spec)
         };
         assert!(verify_result);

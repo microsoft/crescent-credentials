@@ -20,8 +20,9 @@ def main_circom_header(config):
     template_filename = ''
     if config['alg'] == 'RS256':
         template_filename = "circuits/main_header_rs256.circom.template"
-    elif config['alg'] == 'ES256K':
-        template_filename = "circuits/main_header_es256k.circom.template"
+# TODO: add support for ES256K
+#    elif config['alg'] == 'ES256K':
+#       template_filename = "circuits/main_header_es256k.circom.template"
     else :
         print("Error: Unsupported algorithm")
         sys.exit(-1)
@@ -145,7 +146,7 @@ def prepare_circom(config, circom_output_file):
 
 ###  begin reveal hashed          
             elif claim_reveal_hashed(config[name]):
-                f.write('''var {}_max_claim_byte_len = {};'''.format(name, config[name]["max_claim_byte_len"]))
+                f.write('''    var {}_max_claim_byte_len = {};'''.format(name, config[name]["max_claim_byte_len"]))
                 
                 is_number = 0
                 if typ == 1:

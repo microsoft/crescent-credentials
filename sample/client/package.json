@@ -11,6 +11,7 @@
     "build:watch": "npm run build:debug -- -w",
     "lint": "eslint .",
     "lint:fix": "eslint --fix src/*.ts",
+    "preinstall": "node ./wasmCheck.js",
     "test": "echo \"Error: no tests\" && exit 1"
   },
   "author": "",
@@ -24,6 +25,7 @@
     "@rollup/plugin-virtual": "^3.0.2",
     "@stylistic/eslint-plugin": "^2.8.0",
     "@types/chrome": "0.0.272",
+    "crescent": "file:../../creds/pkg",
     "cross-env": "^7.0.3",
     "dotenv": "^16.4.5",
     "eslint": "8.57.1",

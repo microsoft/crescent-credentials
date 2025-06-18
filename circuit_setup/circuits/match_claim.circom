@@ -3,6 +3,7 @@ pragma circom 2.1.6;
 include "./circomlib/circuits/comparators.circom";
 include "indicator.circom";
 include "./circomlib/circuits/mimc.circom";
+include "./circomlib/circuits/bitify.circom";
 
 // Converts an array of ascii digits (base-10) and converts them to a field element.
 // The input is big endian and may contain trailing zeros. 
@@ -77,6 +78,14 @@ template MatchClaimName(json_byte_len, name_byte_len){
             start.indicator[j - i] * (name[i] - json_bytes[j]) === 0;
         }
     }
+
+    // Enforcing bit-size constraints on `l` and `r`.
+    // These constraints ensure that `l` and `r` are valid inputs for the LessThan comparator,
+    // which assumes inputs are bounded to MAX_JSON_BITLEN bits.
+    component l_bits = Num2Bits(MAX_JSON_BITLEN);
+    l_bits.in <== l;
+    component r_bits = Num2Bits(MAX_JSON_BITLEN);
+    r_bits.in <== r;
 
     // Check the validity of l and r.
     signal interval_valid <== LessThan(MAX_JSON_BITLEN)([l, r]);
@@ -292,6 +301,30 @@ template IsZeroMod64(n) {
     }
 }
 
+/*
+ * A helper template to calculate the amount of SHA-256 padding. 
+ * 
+ * WARNING:
+ * The assignment to `pzbb[BITLEN]` uses the `<--` operator, which does **not** enforce any
+ * constraint on the assigned value. Although subsequent constraints verify that each
+ * `pzbb[i]` is a binary value (0 or 1), they do **not** force a _unique_ combination of bits
+ * to correspond exactly to `padding_zero_bytes`. As a result, this template alone permits
+ * “technically valid” witness assignments that do not reflect the correct padding length,
+ * leading to an incorrect total length in the final proof.
+ *
+ * To guarantee correctness, the **caller** must explicitly constrain the final padded length.
+ * For example:
+ *   ```
+ *   component calculate_padding = CalculatePadding();
+ *   calculate_padding.data_len_bytes <== data_len_bytes;
+ *   signal padding_zero_bytes <== calculate_padding.padding_zero_bytes;
+ *   signal data_len_padded_bytes <== data_len_bytes + 1 + 8 + padding_zero_bytes;
+ *
+ *   //Enforce data_len_padded_bytes mod 64 = 0 : 
+ *   component mod64check = IsZeroMod64(32);
+ *   mod64check.in <== data_len_padded_bytes;
+ *   ```  
+*/
 template CalculatePadding(){
 
     signal input data_len_bytes;

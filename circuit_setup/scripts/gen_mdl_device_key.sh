@@ -3,8 +3,8 @@
 
 #!/usr/bin/bash
 
-PRIVATE_KEY=../inputs/mdl1/device_private_key.pem
-PUBLIC_KEY=../inputs/mdl1/device_public_key.pem
+PRIVATE_KEY=../inputs/mdl1/device.prv
+PUBLIC_KEY=../inputs/mdl1/device.pub
 
 echo "Generating mDL device key pair"
 

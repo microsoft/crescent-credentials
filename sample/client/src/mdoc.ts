@@ -6,12 +6,14 @@
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 
 import { decode as cborDecode } from './cbor.js'
+import { base64Decode } from './utils.js'
 
 export interface mdocDocument {
   docType: string
   namespaces: Record<string, Array<nameSpace | nameSpaceTag>>
   mso: Record<string, unknown>
   issuerAuth: unknown[]
+  devicePrivateKey?: string
 }
 
 interface nameSpaceTag {
@@ -37,29 +39,22 @@ function _bytesToImage (bytes: Uint8Array): HTMLImageElement {
   return img
 }
 
-function hexToUint8Array (hexString: string): Uint8Array {
-  if (hexString.length % 2 !== 0) {
-    throw new Error('Invalid hexString')
+export function decode (json: string): RESULT<mdocDocument, Error> {
+  try {
+    const obj: { mdoc: string, devicePrivateKey?: string } = JSON.parse(json)
+    const u8mdoc = base64Decode(obj.mdoc)
+    const decoded = cborDecode<mdocDocument>(u8mdoc);
+    (decoded.namespaces['org.iso.18013.5.1'] as nameSpaceTag[]).forEach((ns: nameSpaceTag, i) => {
+      const decodedTag = cborDecode<nameSpace>(ns.value)
+      decoded.namespaces['org.iso.18013.5.1'][i] = decodedTag
+    })
+    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+    decoded.devicePrivateKey = obj.devicePrivateKey && atob(obj.devicePrivateKey)
+    return { ok: true, value: decoded }
   }
-  if (!/^[0-9a-fA-F]+$/.test(hexString)) {
-    throw new Error('Invalid hexString')
+  catch (e) {
+    return { ok: false, error: new Error('Invalid JSON input') }
   }
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const hexPairs = hexString.match(/.{1,2}/g)!
-
-  return new Uint8Array(hexPairs.map(byte => parseInt(byte, 16)))
-}
-
-export function decode (hex: string): RESULT<mdocDocument, Error> {
-  const bytes = hexToUint8Array(hex)
-  const decoded = cborDecode<mdocDocument>(bytes);
-
-  (decoded.namespaces['org.iso.18013.5.1'] as nameSpaceTag[]).forEach((ns: nameSpaceTag, i) => {
-    const decodedTag = cborDecode<nameSpace>(ns.value)
-    decoded.namespaces['org.iso.18013.5.1'][i] = decodedTag
-  })
-
-  return { ok: true, value: decoded }
 }
 
 function _decodeElementValue (ns: nameSpace): void {

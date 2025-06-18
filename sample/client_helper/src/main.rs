@@ -10,6 +10,7 @@ use crescent::structs::{GenericInputsJSON, IOLocations};
 use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, CachePaths, CrescentPairing, ProofSpec};
 use crescent::utils::{read_from_b64url, read_from_file, write_to_b64url};
 use crescent::ProverParams;
+use crescent::device::TestDevice;
 
 use crescent_sample_setup_service::common::*;
 
@@ -23,6 +24,7 @@ use uuid::Uuid;
 use tokio::sync::Mutex;
 use serde_json::{json, Value};
 use jsonwebkey::JsonWebKey;
+use sha2::{Digest, Sha256};
 
 use std::collections::HashMap;
 use std::fs::{self};
@@ -53,7 +55,8 @@ struct SharedState(Arc<Mutex<HashMap<String, Option<ShowData>>>>);
 struct ShowData {
     client_state_b64: String,
     range_pk_b64: String,
-    io_locations_str: String
+    io_locations_str: String,
+    device_priv_key_path: String
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -119,7 +122,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<
     // verify if the schema_uid is one of our supported SCHEMA_UIDS
     if !SCHEMA_UIDS.contains(&cred_info.schema_uid.as_str()) {
         println!("Unsupported schema UID: {}", cred_info.schema_uid);
-        return Json(("error".to_string(), None)); // FIXME: not the right way to handler errors
+        return Json(("error".to_string(), None)); // FIXME: not the right way to handle errors
     }
     let cred_type = cred_type_from_schema(&cred_info.schema_uid).unwrap();
 
@@ -170,6 +173,7 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<
         println!("Parsed claims: {:?}", sd_claims);    
     }
 
+    // prepare the show data in a separate task using the per-credential folder
     rocket::tokio::spawn(async move {
         let task_result: Result<(), String> = async {
             let start_time = std::time::SystemTime::now();
@@ -177,7 +181,6 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<
                 // fetch the issuer's JWK
                 fetch_and_save_jwk(&issuer_url, &cred_folder).await?;
 
-                // prepare the show data in a separate task using the per-credential folder
                 println!("got schema_uid = {}", &cred_info.schema_uid);
                 println!("got issuer_url = {}", &cred_info.issuer_url);
             }
@@ -215,8 +218,10 @@ async fn prepare(cred_info: Json<CredInfo>, state: &State<SharedState>) -> Json<
 
             let client_state_b64 = write_to_b64url(&client_state);
             println!("Done, client state is a base64_url encoded string that is {} chars long", client_state_b64.len());
-            let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str };
-
+            
+            // save the path to the device private key if the credential is device-bound
+            let device_priv_key_path = paths.device_prv_pem.clone();
+            let show_data = ShowData { client_state_b64, range_pk_b64, io_locations_str, device_priv_key_path };
             println!("Task complete, storing ShowData (size: {:?} bytes, took {:?})",
                 show_data.client_state_b64.len() + show_data.io_locations_str.len() + show_data.range_pk_b64.len(), start_time.elapsed().unwrap());
 
@@ -267,8 +272,6 @@ async fn get_show_data(cred_uid: String, state: &State<SharedState>) -> Result<J
 async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_spec: String, state: &State<SharedState>) -> Result<String, String> {
     println!("*** /show called with credential UID {}, disc_uid {}, challenge {}, and proof_spec {}", cred_uid, disc_uid, challenge, proof_spec);
     let tasks = state.inner().0.lock().await;
-    // Parse the challenge as a byte array for the presentation message
-    let pm = challenge.as_bytes();
 
     match tasks.get(&cred_uid) {
         Some(Some(show_data)) => {
@@ -292,17 +295,30 @@ async fn show<'a>(cred_uid: String, disc_uid: String, challenge: String, proof_s
             println!("Parsed proof spec from b64: {:?}", proof_spec_string);
             let mut proof_spec: ProofSpec = serde_json::from_str(&proof_spec_string)
                 .map_err(|_| "Failed to parse proof spec".to_string())?;
-            println!("Parsed proof spec: {:?}", proof_spec);
 
-            // Create the show proof
+            // hash the challenge to use as the presentation message (we need to hash it because device (for device-bound creds) only support signing digests)   
+            proof_spec.presentation_message = Some(Sha256::digest(challenge).to_vec());
+
+            // create the device signature (if cred is device-bound)
+            let device_signature = 
+            if proof_spec.device_bound.is_some() && proof_spec.device_bound.unwrap() {
+                // instantiate the device from the private key path
+                let device_prv_path = &show_data.device_priv_key_path;
+                let device = TestDevice::new_from_file(&device_prv_path);
+                Some(device.sign(proof_spec.presentation_message.as_ref().unwrap()))
+            } else {
+                None
+            };
+
+            // create the show proof
             let show_proof =
             if &client_state.credtype == "mdl" {
-                let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())?;
-                create_show_proof_mdl(&mut client_state, &range_pk, Some(pm), &io_locations, age)
+                let age = disc_uid_to_age(&disc_uid).map_err(|_| "Disclosure UID does not have associated age parameter".to_string())? as u64;
+                proof_spec.range_over_year = Some(std::collections::BTreeMap::from([("birth_date".to_string(), age)]));
+                create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations, device_signature).map_err(|e| format!("Failed to create show proof. {:?}", e))?
             }
             else {
-                proof_spec.presentation_message = Some(challenge.into());
-                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, None).map_err(|e| format!("Failed to create show proof. {:?}", e))?
+                create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature).map_err(|e| format!("Failed to create show proof. {:?}", e))?
             };
             
             // Return the show proof as a base64-url encoded string

@@ -1,5 +1,25 @@
 {
     "credtype": "mdl",
     "alg": "ES256",
-    "max_cred_len": 1792
+    "device_bound": true,
+    "max_cred_len": 1792,
+
+    "birth_date": {
+        "type": "date",
+        "reveal": true,
+        "max_claim_byte_len": 31
+    },
+
+    "resident_state": {
+        "type": "string",
+        "reveal": true,
+        "max_claim_byte_len": 31
+    },
+
+    "height": {
+        "type": "integer",
+        "reveal": true,
+        "max_claim_byte_len": 31
+    }
+
 }

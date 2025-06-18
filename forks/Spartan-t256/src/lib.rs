@@ -3,10 +3,8 @@
 // #![deny(missing_docs)]
 #![allow(clippy::assertions_on_result_states)]
 
-// https://github.com/microsoft/Spartan/tree/master
 extern crate byteorder;
 extern crate core;
-extern crate curve25519_dalek;
 extern crate digest;
 extern crate merlin;
 extern crate rand;
@@ -19,7 +17,6 @@ mod commitments;
 mod dense_mlpoly;
 mod errors;
 mod group;
-pub mod group25519;
 mod math;
 mod nizk;
 mod product_tree;

@@ -1,0 +1,100 @@
+
+Fork of halo2curves that adds support for the T256 curve
+https://neuromancer.sk/std/other/Tom-256
+
+HEAD was b6fa078aa36d04d7eb654a1e2f823e3fdf971041
+
+Changes:
+- Adds src/t256
+and adds it to lib.rs:
+
+diff --git a/src/lib.rs b/src/lib.rs
+index 35b2bec..2e21ce0 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -14,6 +14,7 @@ pub mod pluto_eris;
+ pub mod secp256k1;
+ pub mod secp256r1;
+ pub mod secq256k1;
++pub mod t256;
+ 
+ #[macro_use]
+ mod derive;
+
+
+To run some MSM benchmarks, apply this patch
+
++++ b/benches/msm.rs
+@@ -18,7 +18,7 @@ use criterion::{BenchmarkId, Criterion};
+ use ff::{Field, PrimeField};
+ use group::prime::PrimeCurveAffine;
+ use halo2curves::{
+-    bn256::{Fr as Scalar, G1Affine as Point},
++    t256::{Fq as Scalar, T256Affine as Point},
+     msm::{msm_best, msm_serial},
+ };
+ use rand_core::{RngCore, SeedableRng};
+@@ -29,8 +29,11 @@ use rayon::{
+ };
+
+ const SAMPLE_SIZE: usize = 10;
+-const SINGLECORE_RANGE: [u8; 6] = [3, 8, 10, 12, 14, 16];
+-const MULTICORE_RANGE: [u8; 9] = [3, 8, 10, 12, 14, 16, 18, 20, 22];
++//const SINGLECORE_RANGE: [u8; 6] = [3, 8, 10, 12, 14, 16];
++//const SINGLECORE_RANGE: [u8; 3] = [10, 12, 14];
++const SINGLECORE_RANGE: [u8; 1] = [1];
++//const MULTICORE_RANGE: [u8; 9] = [3, 8, 10, 12, 14, 16, 18, 20, 22];
++const MULTICORE_RANGE: [u8; 4] = [10, 11, 13, 14];
+ const SEED: [u8; 16] = [
+     0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc, 0xe5,
+ ];
+@@ -127,7 +130,8 @@ fn msm(c: &mut Criterion) {
+         .max()
+         .unwrap_or(&16);
+     let bases = generate_curvepoints(max_k);
+-    let bits = [1, 8, 16, 32, 64, 128, 256];
++//    let bits = [1, 8, 16, 32, 64, 128, 256];
++    let bits = [256];
+     let coeffs: Vec<_> = bits
+         .iter()
+         .map(|b| generate_coefficients(max_k, *b))
+@@ -161,5 +165,37 @@ fn msm(c: &mut Criterion) {
+     group.finish();
+ }
+
+-criterion_group!(benches, msm);
++fn simple_msm(c: &mut Criterion) {
++    let mut group = c.benchmark_group("simple_msm");
++
++    let max_k = 14;
++
++    let bases = generate_curvepoints(max_k);
++    let scalars = generate_coefficients(max_k, 256);
++
++    for k in [11, 12, 13, 14] {
++             let id = format!("msm with 2**{k} terms");
++            group
++                .bench_function(BenchmarkId::new("singlecore", id.clone()), |b| {
++                    assert!(k < 64);
++                    let n: usize = 1 << k;
++                    let mut acc = Point::identity().into();
++                    b.iter(|| msm_serial(&scalars[..n], &bases[..n], &mut acc));
++                })
++                .sample_size(10);
++
++            group
++                .bench_function(BenchmarkId::new("multicore", id), |b| {
++                    assert!(k < 64);
++                    let n: usize = 1 << k;
++                    b.iter(|| {
++                        halo2curves::msm::msm_parallel(&scalars[..n], &bases[..n]);
++                    })
++                })
++                .sample_size(SAMPLE_SIZE);
++    }
++    group.finish();
++}
++
++criterion_group!(benches, simple_msm);
+ criterion_main!(benches);
+

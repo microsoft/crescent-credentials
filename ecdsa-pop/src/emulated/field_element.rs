@@ -483,7 +483,7 @@ where
                 ));
             }
 
-            let new_num_limbs = (allocated_limbs.len() + group_size - 1) / group_size;
+            let new_num_limbs = allocated_limbs.len().div_ceil(group_size);
             let mut res = vec![Num::<F>::zero(); new_num_limbs];
 
             for i in 0..new_num_limbs {
@@ -771,7 +771,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::u128;
     use bellpepper::gadgets::multipack::pack_bits;
     use bellpepper_core::test_cs::TestConstraintSystem;
     use num_bigint::RandBigInt;
@@ -1747,14 +1746,14 @@ mod tests {
         assert_eq!(cs.num_constraints(), 1226);
     }
 
-    fn allocated_bits_to_emulated_fe<CS, F1, EFP>(mut cs: CS, a : &Vec<AllocatedBit>) 
+    fn allocated_bits_to_emulated_fe<CS, F1, EFP>(mut cs: CS, a : &[AllocatedBit]) 
     -> Result<EmulatedFieldElement<F1, EFP>, SynthesisError>
         where 
         CS: ConstraintSystem<F1>,
         F1: PrimeFieldBits,
         EFP: EmulatedFieldParams
     {
-        assert!(a.len() > 0);
+        assert!(!a.is_empty());
 
         // Make vector of limbs (F1 values used to emulate F2)
         let mut limbs : Vec<Num<F1>> = Vec::with_capacity(16);
@@ -1764,7 +1763,7 @@ mod tests {
             let bpl = EFP::bits_per_limb();
             let limb_size = if i == num_limbs - 1 && a.len()%bpl!=0 {a.len()%bpl} else {bpl};
             let limb_bits = &a[i*bpl .. i*bpl + limb_size];
-            let limb_bits : Vec<Boolean> = limb_bits.into_iter().map(|x| Boolean::from(x.clone())).collect();
+            let limb_bits : Vec<Boolean> = limb_bits.iter().map(|x| Boolean::from(x.clone())).collect();
             let limb_i = pack_bits(&mut cs.namespace(|| format!("pack limb {}", i)), &limb_bits)?.into();
             limbs.push(limb_i);
         }

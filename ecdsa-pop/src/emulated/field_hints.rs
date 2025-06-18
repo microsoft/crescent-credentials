@@ -41,6 +41,7 @@ where
         CS: ConstraintSystem<F>,
     {
         // TODO: Check the need for the "+ 1"
+        #[allow(clippy::manual_div_ceil)]
         let num_res_limbs = (self.len()*P::bits_per_limb() + self.overflow + 1
             - (P::modulus().bits() as usize)    // Deduct the modulus bit size
             + P::bits_per_limb() - 1) /         // This term is to round up to next integer

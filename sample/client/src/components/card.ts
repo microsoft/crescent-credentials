@@ -13,12 +13,13 @@ import type { Card_status, CredentialWithCard } from '../cred'
 import 'dotenv/config'
 import './collapsible.js'
 import myConfig from '../config'
+import type { mdocDocument } from '../mdoc'
 
 export class CardElement extends LitElement {
   private _ready = false
   private readonly _status: Card_status = 'PENDING'
   private readonly _progress = 0
-  public _disclosureParams: { verifierUrl: string, disclosureValues: string[], disclosureUid: string, disclosureChallenge: string, proofSpec: string } | null = null
+  public _disclosureParams: { verifierUrl: string, disclosureValues: string[], disclosureUid: string, disclosureChallenge: string, proofSpec: string, devicePrivateKey?: string } | null = null
 
   @property({ type: Object })
   private _credential: CredentialWithCard | null = null
@@ -243,7 +244,9 @@ export class CardElement extends LitElement {
     })
 
     discloseVerifierLabel.innerText = `to ${verifierUrl.replace(/^.*?:\/\/([^/:?#]+).*$/, '$1')}?`
-    this._disclosureParams = { verifierUrl, disclosureValues, disclosureUid, disclosureChallenge, proofSpec }
+
+    const devicePrivateKey = (this._credential?.data.token.value as mdocDocument).devicePrivateKey
+    this._disclosureParams = { verifierUrl, disclosureValues, disclosureUid, disclosureChallenge, proofSpec, devicePrivateKey }
   }
 
   get progress (): { show: () => void, hide: () => void, value: number, label: string } {
@@ -312,7 +315,7 @@ export class CardElement extends LitElement {
     assert(this._disclosureParams.disclosureUid)
     assert(this._disclosureParams.disclosureChallenge)
     assert(this._disclosureParams.proofSpec)
-    this._credential.disclose(this._disclosureParams.verifierUrl, this._disclosureParams.disclosureUid, this._disclosureParams.disclosureChallenge, this._disclosureParams.proofSpec)
+    this._credential.disclose(this._disclosureParams.verifierUrl, this._disclosureParams.disclosureUid, this._disclosureParams.disclosureChallenge, this._disclosureParams.proofSpec, this._disclosureParams.devicePrivateKey)
   }
 
   get credential (): CredentialWithCard {

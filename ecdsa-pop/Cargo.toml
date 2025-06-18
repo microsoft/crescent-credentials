@@ -14,7 +14,7 @@ ff = { version = "0.13.0", features = ["derive"] }
 #neptune = { version = "13.0.0", default-features = false } # Poseidon.  v13 depends on bellpepper 4.0, but spartan must use 2.0
 neptune = {path = './neptune', default-features = false}   # Our fork of neptune that works with bellpepper 2.0
 generic-array = "1.0.0"
-halo2curves = { version = "0.8.0", features =["derive_serde", "asm"]}
+halo2curves = { version = "0.8.0", features =["derive_serde"]}
 merlin = { version = "3.0.0", default-features = false }
 hex = "0.4.3"
 sha2 = "0.10.7"
@@ -28,6 +28,9 @@ rand = ">=0.8.5"
 flate2 = { version = "1.0.14" }
 num-format = { version = "0.4.3" }
 
+# Enable 'asm' feature when NOT a wasm build
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+halo2curves = { version = "0.8.0", features = ["asm"] }
 
 [features]
 print-trace = ["ark-std/print-trace"]

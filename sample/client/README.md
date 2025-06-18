@@ -12,7 +12,7 @@ Run the install script:
 
 ## Build
 
-Build the extension (3 modes):
+Build the extension (4 modes):
 
 * production build (minified w/o sourcemapping)  
 `npm run build`
@@ -22,6 +22,18 @@ Build the extension (3 modes):
 
 * watch build (watches files and does debug build on save)  
 `npm run build:watch`
+
+* run the client setup script to build the crescent wasm and build the browser extension  
+`./setup_client.sh`
+
+## Show Proof Generation
+
+The show proof can be generated in the browser extension or offloaded to the client helper service. The default is to generate the proof in the browser extension.
+To do the proof generation in the client helper service, set the `CLIENT_HELPER_SHOW_PROOF=true` in the `.env` file or by setting `CLIENT_HELPER_SHOW_PROOF=true` in your environment before running the build command.
+
+```bash
+CLIENT_HELPER_SHOW_PROOF=true ./setup_client.sh
+```
 
 ## Installation
 

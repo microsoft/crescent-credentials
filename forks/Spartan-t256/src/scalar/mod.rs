@@ -1,12 +1,8 @@
-use circ_fields::t256::ScalarField;
-// use ark_serialize::CanonicalDeserialize;
-// use ark_serialize::CanonicalSerialize;
+use halo2curves::t256::Fq as ScalarField;
+use ff::Field;
 
-use ark_ff::PrimeField;
 
-mod scalar;
-
-pub type Scalar = scalar::Scalar;
+pub type Scalar = halo2curves::t256::Fq;
 pub type ScalarBytes = ScalarField;
 
 
@@ -39,8 +35,8 @@ pub trait ScalarBytesFromScalar {
 
 impl ScalarBytesFromScalar for Scalar {
   fn decompress_scalar(s: &Scalar) -> ScalarBytes {
-    // ScalarBytes::deserialize_compressed(&s.to_bytes()[..]).unwrap()
-    ScalarBytes::from_bigint(s.to_bigint()).unwrap()
+    let bytes = s.to_bytes();
+    ScalarBytes::from_bytes(&bytes).unwrap()
   }
 
   fn decompress_vector(s: &[Scalar]) -> Vec<ScalarBytes> {
@@ -48,6 +44,53 @@ impl ScalarBytesFromScalar for Scalar {
       .map(|i| Scalar::decompress_scalar(&s[i]))
       .collect::<Vec<ScalarBytes>>()
   }
+}
+
+pub fn batch_invert(inputs: &mut [Scalar]) -> Scalar {
+  // This code is essentially identical to the FieldElement
+  // implementation, and is documented there.  Unfortunately,
+  // it's not easy to write it generically, since here we want
+  // to use `UnpackedScalar`s internally, and `Scalar`s
+  // externally, but there's no corresponding distinction for
+  // field elements.
+  // We also remove the zeroization support since halo2curves 
+  // does not support it
+
+  let n = inputs.len();
+  let one = Scalar::one();
+
+  let scratch_vec = vec![one; n];
+  let mut scratch = scratch_vec;
+
+  // Keep an accumulator of all of the previous products
+  let mut acc = Scalar::one();
+
+  // Pass through the input vector, recording the previous
+  // products in the scratch space
+  for (input, scratch) in inputs.iter().zip(scratch.iter_mut()) {
+    *scratch = acc;
+
+    acc = acc * input;
+  }
+
+  // acc is nonzero iff all inputs are nonzero
+  debug_assert!(acc != Scalar::zero());
+
+  // Compute the inverse of all products
+  acc = acc.invert().unwrap();
+
+  // We need to return the product of all inverses later
+  let ret = acc;
+
+  // Pass through the vector backwards to compute the inverses
+  // in place
+  for (input, scratch) in inputs.iter_mut().rev().zip(scratch.iter().rev()) {
+    let tmp = &acc * input.clone();
+    *input = &acc * scratch;
+    acc = tmp;
+  }
+
+  ret
 }
 
 #[cfg(test)]

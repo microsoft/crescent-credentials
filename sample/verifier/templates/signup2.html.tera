@@ -11,7 +11,7 @@
 <div class="boxed">
     <h1> {{ site2_verifier_name }} </h1>
     <p style="text-align: center;">
-        <strong>Thank you for proving that you are over 18.</strong><br>
+        <strong>Thank you for proving that you are over {{ site2_age }}.</strong><br>
         You can now create an account.
     </p>
     <h2>Account creation</h2>

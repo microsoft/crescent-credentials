@@ -216,6 +216,7 @@ export class CredentialWithCard extends Credential {
     this._onStatusChangeCallback?.(status)
   }
 
+  // eslint-disable-next-line @typescript-eslint/max-params
   public discloserRequest (url: string, disclosureUid: string, challenge: string, proofSpec: string): void {
     if (this.status !== 'PREPARED') {
       return
@@ -228,8 +229,9 @@ export class CredentialWithCard extends Credential {
     this.status = 'DISCLOSABLE'
   }
 
-  public disclose (url: string, disclosureUid: string, challenge: string, proofSpec: string): void {
-    void verifier.disclose(this, url, disclosureUid, challenge, proofSpec)
+  // eslint-disable-next-line @typescript-eslint/max-params
+  public disclose (url: string, disclosureUid: string, challenge: string, proofSpec: string, devicePrivateKey?: string): void {
+    void verifier.disclose(this, url, disclosureUid, challenge, proofSpec, devicePrivateKey)
     this.status = 'PREPARED'
     window.close()
   }
