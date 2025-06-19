@@ -50,6 +50,12 @@ jobs:
 
       - name: Smoke-test extension export
         run: |
+          df -h
+          ls -la /usr/share/dotnet
+          ls -la /opt/ghc
+          ls -la /usr/local/lib/android
+          ls -la /opt/hostedtoolcache
+
           OUTDIR="${GITHUB_WORKSPACE}/crescent-extension"
           rm -rf "$OUTDIR"
           mkdir -p "$OUTDIR"
