@@ -91,36 +91,34 @@ RUN ./clean_all.sh
 FROM crescent AS setup
 
 WORKDIR /crescent-credentials/circuit_setup/scripts
-RUN ./run_setup.sh rs256
-RUN ./run_setup.sh rs256-sd
-
-RUN ls /crescent-credentials/creds/test-vectors
-
-RUN ./run_setup.sh rs256-db
+# RUN ./run_setup.sh rs256
+# RUN ./run_setup.sh rs256-sd
+# RUN ./run_setup.sh rs256-db
 RUN ./run_setup.sh mdl1
 
 WORKDIR /crescent-credentials/creds
 RUN cargo build --release --features print-trace --bin crescent
 
-FROM setup AS rs256
-RUN ./target/release/crescent zksetup --name rs256
-RUN ./target/release/crescent prove --name rs256
-RUN ./target/release/crescent show --name rs256
-RUN ./target/release/crescent verify --name rs256
+# FROM setup AS rs256
+# RUN ./target/release/crescent zksetup --name rs256
+# RUN ./target/release/crescent prove --name rs256
+# RUN ./target/release/crescent show --name rs256
+# RUN ./target/release/crescent verify --name rs256
 
-FROM rs256 AS rs256-sd
-RUN ./target/release/crescent zksetup --name rs256-sd
-RUN ./target/release/crescent prove --name rs256-sd
-RUN ./target/release/crescent show --name rs256-sd
-RUN ./target/release/crescent verify --name rs256-sd
+# FROM rs256 AS rs256-sd
+# RUN ./target/release/crescent zksetup --name rs256-sd
+# RUN ./target/release/crescent prove --name rs256-sd
+# RUN ./target/release/crescent show --name rs256-sd
+# RUN ./target/release/crescent verify --name rs256-sd
 
-FROM rs256-sd AS rs256-db
-RUN ./target/release/crescent zksetup --name rs256-db
-RUN ./target/release/crescent prove --name rs256-db
-RUN ./target/release/crescent show --name rs256-db
-RUN ./target/release/crescent verify --name rs256-db
+# FROM rs256-sd AS rs256-db
+# RUN ./target/release/crescent zksetup --name rs256-db
+# RUN ./target/release/crescent prove --name rs256-db
+# RUN ./target/release/crescent show --name rs256-db
+# RUN ./target/release/crescent verify --name rs256-db
 
-FROM rs256-db AS mdl1
+# FROM rs256-db AS mdl1
+FROM setup AS mdl1
 RUN ./target/release/crescent zksetup --name mdl1
 RUN ./target/release/crescent prove --name mdl1
 RUN ./target/release/crescent show --name mdl1
