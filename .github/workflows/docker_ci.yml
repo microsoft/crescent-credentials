@@ -9,11 +9,11 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'sample/Dockerfile'
+      - 'Dockerfile'
   pull_request:
     branches: [ main ]
     paths:
-      - 'sample/Dockerfile'
+      - 'Dockerfile'
 
 jobs:
   build-and-smoke-test:
@@ -41,7 +41,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: sample/Dockerfile
+          file: Dockerfile
           load: true
           tags: crescent-sample:weekly
 
