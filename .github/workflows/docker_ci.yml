@@ -1,6 +1,9 @@
 name: Weekly build of Sample Docker CI
 
 on:
+ 
+  workflow_dispatch:
+
   # 1) Weekly schedule
   schedule:
     - cron: '0 0 * * 0'    # every Sunday at 00:00 UTC
