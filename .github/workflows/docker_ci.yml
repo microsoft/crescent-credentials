@@ -1,0 +1,79 @@
+name: Weekly build of Sample Docker CI
+
+on:
+ 
+  workflow_dispatch:
+
+  # 1) Weekly schedule
+  schedule:
+    - cron: '0 0 * * 0'    # every Sunday at 00:00 UTC
+
+  # 2) Trigger when the Dockerfile is changed on main
+  push:
+    branches: [ main ]
+    paths:
+      - 'Dockerfile'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Dockerfile'
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build crescent-sample image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: crescent-sample:weekly
+
+      - name: Smoke-test extension export
+        run: |
+          df -h
+          ls -la /usr/share/dotnet
+          ls -la /opt/ghc
+          ls -la /usr/local/lib/android
+          ls -la /opt/hostedtoolcache
+
+          OUTDIR="${GITHUB_WORKSPACE}/crescent-extension"
+          rm -rf "$OUTDIR"
+          mkdir -p "$OUTDIR"
+
+          # Directly copy the built extension & mDL into the host volume
+          docker run --rm \
+            -v "$OUTDIR:/extension" \
+            crescent-sample:weekly \
+            /bin/bash -c "\
+              cp -r /crescent-credentials/sample/client/dist/* /extension/ && \
+              cp /crescent-credentials/sample/client/mdl.cbor.hex /extension/ \
+            "
+
+          # Fail if nothing was exported
+          if [ -z "$(ls -A "$OUTDIR")" ]; then
+            echo "❌ No extension files found in $OUTDIR"
+            exit 1
+          else
+            echo "✅ Extension export succeeded; files in $OUTDIR:"
+            ls -1 "$OUTDIR"
+          fi
