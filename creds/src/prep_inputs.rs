@@ -19,6 +19,8 @@ use ark_ff::BigInteger;
 use crate::return_error;
 use crate::ProofSpec;
 use crate::ProofSpecInternal;
+use num_traits::Zero;
+use sha2::{Digest, Sha256};
 
 // If not set in config.json, the max_cred_len is set to this value. 
 const DEFAULT_MAX_TOKEN_LENGTH : usize = 2048;
@@ -88,8 +90,49 @@ pub fn pem_to_inputs<F>(issuer_pem : &str) -> Result<Vec<F>, Box<dyn std::error:
     };
 
     Ok(inputs)
-
 }
+
+// Take the issuer's public key in PEM input format, return a hash of the public key
+pub fn pem_to_pubkey_hash<F>(issuer_pem : &str) -> Result<F, Box<dyn std::error::Error>>
+    where F: PrimeField 
+{
+    
+    let inputs = match pem_key_type(issuer_pem) {
+        Ok("RS256") => {
+            let _issuer_pub = RS256PublicKey::from_pem(issuer_pem).unwrap();
+            todo!(); // Currently unsupported -- the RSA circuit expects the issuer public key as integer limbs
+        }
+        Ok("ES256") =>  {
+            // Helper function used to encode bytes as field elements
+            let bytes_to_int = |bytes: &[u8]| -> F {
+                let mut a = BigUint::zero();
+                for i in 0..bytes.len() {
+                    a += BigUint::from(bytes[i] as u64) * BigUint::from(256u64).pow(i as u32);
+                }
+                F::from_le_bytes_mod_order(&a.to_bytes_le())
+            };
+
+            let issuer_pub = ES256PublicKey::from_pem(issuer_pem).unwrap();
+            let issuer_key_bytes = issuer_pub.public_key().to_bytes_uncompressed();
+            let mut digest = Sha256::digest(&issuer_key_bytes[1..]).to_vec();    // skip hashing the first byte
+            digest = digest[0..digest.len()-1].to_vec();    // truncate digest to 248 bits
+            digest.reverse();
+            let pubkey_hash = bytes_to_int(&digest);  
+            println!("pubkey hash in prep_inputs: {:?}", pubkey_hash);
+
+            pubkey_hash
+        }
+        Err(e) =>  {
+            return Err(e.into());
+        }
+        _ => {
+            return Err("unknown error".into())
+        }
+    };
+
+    Ok(inputs)
+}
+
 
 type JsonMap = serde_json::Map<String, Value>;
 

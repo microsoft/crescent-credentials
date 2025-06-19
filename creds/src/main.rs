@@ -153,7 +153,7 @@ fn show_proof_size(show_proof: &ShowProof<CrescentPairing>) -> usize {
 
     let device_proof_size = if show_proof.device_proof.is_some() {
         let tmp = show_proof.device_proof.compressed_size();
-        print!("{} + (device signature proof)", tmp);
+        print!("+ {} (device signature proof)", tmp);
         tmp
     } else {
         0
