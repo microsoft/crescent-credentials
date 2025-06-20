@@ -823,9 +823,8 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         return (false, "".to_string());
     }
     let mut inputs = vec![];
-
-    inputs.extend(revealed_hashed);
-    inputs.extend(public_key_inputs.unwrap());
+    // inputs.extend(revealed_hashed); TODO: uncomment when hashed attributes are implemented
+    inputs.push(public_key_inputs.unwrap());
     inputs.extend(show_proof.revealed_inputs.clone());
     
     let context_str = serde_json::to_string(&proof_spec).unwrap();
