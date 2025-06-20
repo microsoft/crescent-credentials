@@ -217,6 +217,11 @@ export class CardElement extends LitElement {
     else if (status === 'DISCLOSABLE') {
       this.disclose.show()
     }
+    else if (status === 'SHOWPROOF_PENDING') {
+      this.progress.label = 'Generating show proof ...'
+      this.progress.value = -1 // indeterminant
+      this.progress.show()
+    }
   }
 
   error (message: string): void {
@@ -269,7 +274,12 @@ export class CardElement extends LitElement {
         return progressControl.value
       },
       set value (val: number) {
-        progressControl.value = val
+        if (val < 0) { // indeterminant
+          progressControl.removeAttribute('value')
+        }
+        else {
+          progressControl.value = val
+        }
       },
       // eslint-disable-next-line accessor-pairs
       set label (val: string) {

@@ -78,8 +78,9 @@ async function handleDisclose (id: string, destinationUrl: string, disclosureUid
 }
 
 // eslint-disable-next-line @typescript-eslint/max-params
-export async function disclose (cred: Credential, verifierUrl: string, disclosureUid: string, challenge: string, proofSpec: string, devicePrivateKey?: string): Promise<void> {
-  void sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, cred.id, verifierUrl, disclosureUid, challenge, proofSpec, devicePrivateKey)
+export async function disclose (cred: Credential, verifierUrl: string, disclosureUid: string, challenge: string, proofSpec: string, devicePrivateKey?: string): Promise<boolean> {
+  await sendMessage('background', MSG_POPUP_BACKGROUND_DISCLOSE, cred.id, verifierUrl, disclosureUid, challenge, proofSpec, devicePrivateKey)
+  return true
 }
 
 // if this is running the the extension background service worker, then listen for messages
