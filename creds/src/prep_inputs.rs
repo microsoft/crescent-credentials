@@ -17,6 +17,8 @@ use std::fs;
 use ark_std::path::PathBuf;
 use ark_ff::BigInteger;
 use crate::return_error;
+use crate::utils::biguint_to_scalar;
+use crate::utils::bits_to_num;
 use crate::ProofSpec;
 use crate::ProofSpecInternal;
 use num_traits::Zero;
@@ -103,22 +105,13 @@ pub fn pem_to_pubkey_hash<F>(issuer_pem : &str) -> Result<F, Box<dyn std::error:
             todo!(); // Currently unsupported -- the RSA circuit expects the issuer public key as integer limbs
         }
         Ok("ES256") =>  {
-            // Helper function used to encode bytes as field elements
-            let bytes_to_int = |bytes: &[u8]| -> F {
-                let mut a = BigUint::zero();
-                for i in 0..bytes.len() {
-                    a += BigUint::from(bytes[i] as u64) * BigUint::from(256u64).pow(i as u32);
-                }
-                F::from_le_bytes_mod_order(&a.to_bytes_le())
-            };
-
             let issuer_pub = ES256PublicKey::from_pem(issuer_pem).unwrap();
             let issuer_key_bytes = issuer_pub.public_key().to_bytes_uncompressed();
             let mut digest = Sha256::digest(&issuer_key_bytes[1..]).to_vec();    // skip hashing the first byte
             digest = digest[0..digest.len()-1].to_vec();    // truncate digest to 248 bits
-            digest.reverse();
-            let pubkey_hash = bytes_to_int(&digest);  
-            println!("pubkey hash in prep_inputs: {:?}", pubkey_hash);
+            let pubkey_hash = bits_to_num(&digest);
+            println!("pubkey hash in prep_inputs: {}", pubkey_hash);
+            let pubkey_hash = biguint_to_scalar(&pubkey_hash);
 
             pubkey_hash
         }

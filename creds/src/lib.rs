@@ -803,6 +803,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
             let digest = Sha256::digest(data);
             let digest248 = &digest[0..digest.len()-1];
             let digest_uint = utils::bits_to_num(digest248);
+            println!("verifier input: {}", digest_uint);
             let digest_scalar = utils::biguint_to_scalar::<CrescentFr>(&digest_uint);
             revealed_hashed.push(digest_scalar);
         }
@@ -823,10 +824,10 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         return (false, "".to_string());
     }
     let mut inputs = vec![];
-    // inputs.extend(revealed_hashed); TODO: uncomment when hashed attributes are implemented
+    inputs.extend(revealed_hashed);
     inputs.push(public_key_inputs.unwrap());
     inputs.extend(show_proof.revealed_inputs.clone());
-    
+       
     let context_str = serde_json::to_string(&proof_spec).unwrap();
 
     let verify_timer = std::time::Instant::now();

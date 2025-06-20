@@ -81,6 +81,28 @@ struct Args {
     prover_aux: String,
 }
 
+// Interpret the input as a bit string, convert to an integer where the
+// leftmost bit in the string is interpreted as the LSB of the integer
+// Behavior matches circomlib's Bits2Num function.
+fn bits_to_num(bytes : &[u8]) -> BigUint {
+    // Convert bytes to bit array
+    let mut bitvec = vec![];
+    for b in bytes {
+        for i in (0..8).rev() {
+            bitvec.push((b >> i) & 1);
+        }
+    }
+    // Convert to integer
+    let mut e = BigUint::from(1u32);
+    let mut res = BigUint::from(0u32);
+    for i in 0..248 {
+        res += &e * BigUint::from(bitvec[i] as u32);
+        e = BigUint::from(2u32)*e;  // e = 2*e
+    }
+
+    res
+}
+
 fn sha256_padding(prepad_m: &[u8]) -> Vec<u8> {
     let msg_length_bits = (prepad_m.len() * 8) as u32;
     
@@ -587,16 +609,6 @@ fn main() {
     // by the precompEcdsa script. That script extracts the signature from the prover_input.json file.
     prover_inputs.insert("signature".to_string(), serde_json::json!(signature_bytes));
 
-
-    // Helper function used to encode bytes as field elements
-    let bytes_to_int = |bytes: &[u8]| -> String {
-        let mut a = BigUint::zero();
-        for i in 0..bytes.len() {
-            a += BigUint::from(bytes[i] as u64) * BigUint::from(256u64).pow(i as u32);
-        }
-        a.to_str_radix(10)
-    };    
-
     // process the issuer public key
     let issuer_key_bytes = issuer_pub_key.to_sec1_bytes();
     if issuer_key_bytes[0] != 0x04 {
@@ -608,9 +620,8 @@ fn main() {
     prover_inputs.insert("pubkey".to_string(), serde_json::json!(&issuer_key_bytes));
     let mut digest = Sha256::digest(&issuer_key_bytes[1..]).to_vec();    // skip hashing the first byte
     digest = digest[0..digest.len()-1].to_vec();    // truncate digest to 248 bits
-    digest.reverse();
-    let pubkey_hash = bytes_to_int(&digest);  
-    prover_inputs.insert("pubkey_hash".to_string(), serde_json::json!(pubkey_hash));
+    let pubkey_hash = bits_to_num(&digest);
+    prover_inputs.insert("pubkey_hash".to_string(), serde_json::json!(pubkey_hash.to_str_radix(10)));
 
     prover_inputs.insert("message_bytes".to_string(), tbs_data_ints.len().into());
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
@@ -637,6 +648,15 @@ fn main() {
         prover_aux.insert("device_pub_y".to_string(), serde_json::json!(device_pub_key_y.to_str_radix(10)));       
 
         device_key_x.reverse();
+
+        // Helper function used to encode bytes as field elements
+        let bytes_to_int = |bytes: &[u8]| -> String {
+            let mut a = BigUint::zero();
+            for i in 0..bytes.len() {
+                a += BigUint::from(bytes[i] as u64) * BigUint::from(256u64).pow(i as u32);
+            }
+            a.to_str_radix(10)
+        };    
 
         let device_key_0 = bytes_to_int(&device_key_x[0..16]);
         let device_key_1 = bytes_to_int(&device_key_x[16..32]);

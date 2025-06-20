@@ -21,19 +21,15 @@ template Main(max_msg_bytes, field_byte_len) {
     sha2.msg <== pubkey;
     sha2.real_byte_len <== 64;
 
-    // convert the first 31 bytes to 248-bit field element
-    signal fieldHash;
-    var acc = 0;
-    var base = 1;
-    for (var i = 0; i < field_byte_len; i++) {
-        acc += sha2.hash[field_byte_len - 1 - i] * base;
-        base *= 256;
+    // Convert digest bytes to field element
+    component bytes_to_field = BytesToField(31);
+    for(var i = 0; i < 31; i++) {
+        bytes_to_field.bytes[i] <== sha2.hash[i];
     }
-    fieldHash <== acc;
+    log("Computed public key digest as field element: ", bytes_to_field.field_element);
 
-    log("Digest[0..248] as a number: ", fieldHash);
     log("Input pubkey_hash : ", pubkey_hash);
-    fieldHash === pubkey_hash;
+    bytes_to_field.field_element === pubkey_hash;
 
     // *********** verify signature for the message ***********    
     // unpack sig
@@ -182,4 +178,3 @@ template Main(max_msg_bytes, field_byte_len) {
         pow256 = pow256*256;
     }
     device_key_1[15] === device_key_1_value;
-
