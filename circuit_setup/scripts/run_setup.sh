@@ -3,7 +3,6 @@
 
 #!/usr/bin/bash
 
-#set -x
 set -e
 
 CURVE=bn128
@@ -83,6 +82,10 @@ echo "Credential is device bound: $DEVICE_BOUND"
 mkdir $OUTPUTS_DIR 2>/dev/null || true
 mkdir $CIRCOM_DIR 2>/dev/null  || true
 
+# delete the LOG_FILE if it exists (otherwise we'll be parsing old data when setting up the files)
+if [ -f ${LOG_FILE} ]; then
+    rm ${LOG_FILE}
+fi
 touch ${LOG_FILE}
 
 # For JWTs, we create sample issuer keys and a token
@@ -172,8 +175,8 @@ echo "Total number of public I/Os: $NUM_PUBLIC_IOS"
 # clean up the main.sym file as follows. Each entry is of the form #s, #w, #c, name as described in https://docs.circom.io/circom-language/formats/sym/
 awk -v max="$NUM_PUBLIC_IOS" -F ',' '$2 != -1 && $2 <= max {split($4, parts, "."); printf "%s,%s\n", parts[2], $2}' "${CIRCOM_DIR}/main.sym" > "${CIRCOM_DIR}/io_locations.sym"
 
-if [ ${CREDTYPE} == 'mdl' ]; then 
-    echo "=== Generating mDL ===" # delete me
+if [ ${CREDTYPE} == 'mdl' ]; then
+    echo "=== Generating mDL ==="
     # Create the prover inputs (TODO: now that this has been ported to rust, do it in the library like for the JWT case)
     PROVER_INPUTS_FILE=${OUTPUTS_DIR}/prover_inputs.json
     PROVER_AUX_FILE=${OUTPUTS_DIR}/prover_aux.json
@@ -191,7 +194,7 @@ if [ ${CREDTYPE} == 'mdl' ]; then
     # generate the mDL
     cargo run --release --bin mdl-gen -- --claims ${CLAIMS_FILE} --device_priv_key ${DEVICE_PRIV_KEY_FILE} --issuer_private_key ${ISSUER_PRIV_KEY_FILE} --issuer_x5chain ${ISSUER_CERTS_FILE} --output ${MDL_FILE} 2>> ${LOG_FILE}
     if [ $? -ne 0 ]; then
-        echo "Error running prepare_mdl_prover"
+        echo "Error running mdl-gen"
         exit 1
     fi
     

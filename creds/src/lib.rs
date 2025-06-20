@@ -323,7 +323,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
             Ok(loc) => loc,
             Err(_) => {
                 return_error!(
-                    format!("Asked to reveal hashed attribute {}, but did not find it in io_locations\nIO locations: {:?}", attr, io_locations.get_all_names()));
+                    format!("Asked to reveal attribute {}, but did not find it in io_locations\nIO locations: {:?}", attr, io_locations.get_all_names()));
             }
         };
 
@@ -447,7 +447,7 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
         }
         let aux = serde_json::from_str::<Value>(client_state.aux.as_ref().unwrap()).unwrap();
         let aux = aux.as_object().unwrap();
-        revealed_preimages.insert(attr.clone(), json!(aux[attr].clone().to_string()));
+        revealed_preimages.insert(attr.clone(), aux[attr].clone());
     }
 
     // If the credential is device bound, the public key attributes must be committed
@@ -491,6 +491,13 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
         None
     };
 
+    let revealed_preimages = if proof_spec.hashed.is_empty() { 
+        assert!(revealed_preimages.is_empty());
+        None 
+    } else {
+        Some(serde_json::to_string(&revealed_preimages).unwrap())
+    };
+
     let mut show_range_attr= vec![];
     let mut commitment_index = 3; // skip the first 3 commitments (validUntil, device_key_0, device_key_1)
     // for each range-proofed attribute, create a fresh range proof that the attribute is at least "age" years old // TODO: generalize to non-age attributes
@@ -507,7 +514,7 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     }
 
     // Assemble proof and return
-    Ok(ShowProof{ show_groth16, show_range_exp, show_range_attr, revealed_inputs, revealed_preimages: None, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof})
+    Ok(ShowProof{ show_groth16, show_range_exp, show_range_attr, revealed_inputs, revealed_preimages, inputs_len: client_state.inputs.len(), cur_time: time_sec, device_proof})
 }
 
 fn sort_by_io_location(attrs: &[String], io_locations: &IOLocations) -> Vec<String> {
@@ -755,7 +762,51 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         io_types[io_loc - 1] = PublicIOType::Revealed;
     }
 
-    // TODO: hashed attributes (see JWT)
+    // For the attributes revealed as digests, we hash the provided preimage to get the field element
+    let mut revealed_hashed = vec![];
+    let mut preimages = json!(serde_json::Value::Null);
+    if !proof_spec.hashed.is_empty() {
+        assert!(show_proof.revealed_preimages.is_some());
+        let preimages0 = serde_json::from_str::<Value>(show_proof.revealed_preimages.as_ref().unwrap());
+        if preimages0.is_err() {
+            println!("Failed to deserialize revealed_preimages");
+            return (false, "".to_string());
+        }
+        preimages = preimages0.unwrap();
+        let hashed_attributes = sort_by_io_location(&proof_spec.hashed, &io_locations);
+    
+        for attr in &hashed_attributes {
+            let io_loc = io_locations.get_io_location(&format!("{}_digest", &attr));
+            if io_loc.is_err() {
+                println!("Asked to reveal hashed attribute {}, but did not find it in io_locations", attr);
+                println!("IO locations: {:?}", io_locations.get_all_names());
+                return (false, "".to_string());
+            }
+            let io_loc = io_loc.unwrap();
+            io_types[io_loc - 1] = PublicIOType::Revealed;
+
+            let preimage = preimages.get(attr);
+            if preimage.is_none() {
+                println!("Error: preimage for hashed attribute {} not provided by prover", attr);
+                return(false, "".to_string());
+            }
+            
+            let data = match preimage.unwrap() {
+                Value::String(s) =>  {
+                    s.as_bytes()
+                },     
+                _ =>  {
+                    println!("Error: preimage has unsupported type");
+                    return(false, "".to_string());
+                }
+            };
+            let digest = Sha256::digest(data);
+            let digest248 = &digest[0..digest.len()-1];
+            let digest_uint = utils::bits_to_num(digest248);
+            let digest_scalar = utils::biguint_to_scalar::<CrescentFr>(&digest_uint);
+            revealed_hashed.push(digest_scalar);
+        }
+    }
 
     // If the credential is device bound, the device public key attributes must be committed
     if proof_spec.device_bound {
@@ -772,8 +823,9 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         return (false, "".to_string());
     }
     let mut inputs = vec![];
-    // inputs.extend(revealed_hashed); TODO: uncomment when hashed attributes are implemented
-    inputs.push(public_key_inputs.unwrap());
+
+    inputs.extend(revealed_hashed);
+    inputs.extend(public_key_inputs.unwrap());
     inputs.extend(show_proof.revealed_inputs.clone());
     
     let context_str = serde_json::to_string(&proof_spec).unwrap();
@@ -884,7 +936,20 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
     }
 
     // Add the hashed revealed attributes to the output
-    // TODO
+    for attr_name in &proof_spec.hashed {
+        let attr_value = preimages.get(attr_name);
+        if attr_value.is_none() {
+            println!("Error: Proof was valid, but failed to find hashed attribute '{}'", attr_name);
+            return(false, "".to_string());
+        }
+        let value = match attr_value.unwrap() {
+            Value::String(s) => {
+                json!(strip_quotes(s))
+            },
+            _ => attr_value.unwrap().clone()
+        };
+        revealed.insert(attr_name.clone(), value);
+    }
 
     (true, serde_json::to_string(&revealed).unwrap())
 }
