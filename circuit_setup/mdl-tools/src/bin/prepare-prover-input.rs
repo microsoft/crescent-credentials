@@ -37,7 +37,7 @@ use p256::NistP256;
 use serde_json::Map;
 use sha2::{Digest, Sha256};
 use num_bigint::BigUint;
-use num_traits::{Zero, One, ToPrimitive};
+use num_traits::Zero;
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use std::str;
 use std::collections::{BTreeMap,HashSet};
@@ -348,23 +348,6 @@ fn check_config(config: &serde_json::Map<String, serde_json::Value>) {
     if max_cred_len == 0 {
         panic!("Invalid max_cred_len, needs to be > 0: {}", max_cred_len);
     }
-}
-
-fn bytes_to_circom_limbs(bytes: &[u8], limb_size: usize) -> Vec<u128> {
-    let n = BigUint::from_bytes_be(bytes);
-    let mut limbs = Vec::new();
-    // Create a BigUint mask: (1 << limb_size) - 1
-    let msk = (BigUint::one() << limb_size) - BigUint::one();
-    let mut n_copy = n.clone();
-    
-    while n_copy > BigUint::zero() {
-        // Use the BigUint mask in the bitwise AND operation
-        let limb = (n_copy.clone() & msk.clone()).to_u128().unwrap();
-        limbs.push(limb);
-        n_copy >>= limb_size;
-    }
-    
-    limbs
 }
 
 // copied from JWT's proverinput.rs
