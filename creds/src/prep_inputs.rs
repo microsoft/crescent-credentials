@@ -21,7 +21,6 @@ use crate::utils::biguint_to_scalar;
 use crate::utils::bits_to_num;
 use crate::ProofSpec;
 use crate::ProofSpecInternal;
-use num_traits::Zero;
 use sha2::{Digest, Sha256};
 
 // If not set in config.json, the max_cred_len is set to this value. 
