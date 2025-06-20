@@ -23,12 +23,7 @@ async function main() {
     const msg = trimShaPadding(proverInputs.message);
     const key64 = proverInputs.pubkey.slice(1, 65);
 
-    const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(msg))
-        .then(hash => {
-            return Array.from(new Uint8Array(hash));
-        });
-
-    // Do saninity signature check
+    // Do sanity signature check
     await verifySignature(msg, proverInputs.signature, proverInputs.pubkey)
         .then(isValid => {
             console.log('Signature is valid:', isValid);
@@ -38,10 +33,11 @@ async function main() {
 
     const precompSig = flattenEccSigAux(buildSigWitness(msg, proverInputs.signature, key64));
 
+    delete proverInputs.signature; // Signature is no longer required in prover_inputs
+
     const updatedJson = {
         ...proverInputs,
         pubkey: key64,
-        hash,
         sig: precompSig
     };
 

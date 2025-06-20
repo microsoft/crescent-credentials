@@ -2,67 +2,38 @@ pragma circom 2.1.6;
 
 include "./circomlib/circuits/comparators.circom";
 include "./circomlib/circuits/gates.circom";
-include "./ecdsa-p256/sha256.circom";
 include "./strings.circom";
 include "./nope/crypto/ECDSA.circom";
 include "./match_claim.circom";
 
-template Main(max_msg_bytes, field_byte_len, n, k) {
+template Main(max_msg_bytes, field_byte_len) {
 
     signal input message[max_msg_bytes];
-    signal input hash[32];
     signal input pubkey[64];
     signal input pubkey_hash;   // SHA-256(pubkey), truncated to 248 bits
     signal input sig[6254];
-    signal input message_padded_bytes; // length of the message including the padding
-    signal input signature[64]; // TODO: unused? Currently needed because the prover inputs has a signature value
+    signal input message_bytes; // actual length of the message without the padding
 
     // *********** Ensure that SHA256(pubkey) == pubkey_hash ***********
     // ** pubkey is a private input, pubkey_hash is a public input that will also be input by the verifier
     log("Checking public key");
-    component sha2 = Sha256Bytes(128); // expects padded input, so the 64 byte input becomes 128 bytes
-    sha2.in_len_padded_bytes <== 128;
-    for (var i = 0; i < 64; i++) {
-        sha2.in_padded[i] <== pubkey[i];
+    component sha2 = SHA256(64);
+    sha2.msg <== pubkey;
+    sha2.real_byte_len <== 64;
+
+    // convert the first 31 bytes to 248-bit field element
+    signal fieldHash;
+    var acc = 0;
+    var base = 1;
+    for (var i = 0; i < field_byte_len; i++) {
+        acc += sha2.hash[field_byte_len - 1 - i] * base;
+        base *= 256;
     }
-    // Add padding:
-    sha2.in_padded[64] <== 0x80;
-    for (var i = 65; i < 126; i++) {
-        sha2.in_padded[i] <== 0;
-    } 
-    sha2.in_padded[126] <== 0x02;
-    sha2.in_padded[127] <== 0x00;
-    
-    // Compare re-computed digest to input
-    component b2n = Bits2Num(248);
-    for(var i = 0; i < 248; i++) {
-        b2n.in[247-i] <== sha2.out[i];
-    }
-    log("Digest[0..248] as a number: ", b2n.out);
+    fieldHash <== acc;
+
+    log("Digest[0..248] as a number: ", fieldHash);
     log("Input pubkey_hash : ", pubkey_hash);
-    b2n.out === pubkey_hash;
-
-    // *********** hash the padded message ***********
-    log("start hashing");
-    component sha = Sha256Bytes(max_msg_bytes);
-    sha.in_len_padded_bytes <== message_padded_bytes;
-    for (var i = 0; i < max_msg_bytes; i++) {
-        sha.in_padded[i] <== message[i];
-    }   
-
-    signal digest[256];
-    digest <== sha.out;
-    
-    log("compare digest to input");
-    // Compare the computed digest to the input
-    component digest_byte[32];
-    for (var i = 0; i < 32; i++) {
-        digest_byte[i] = Bits2Num(8);
-        for(var j = 0; j < 8; j++) {
-            digest_byte[i].in[j] <== digest[i*8 +(7 - j)];
-        }
-        digest_byte[i].out === hash[i];
-    }
+    fieldHash === pubkey_hash;
 
     // *********** verify signature for the message ***********    
     // unpack sig
@@ -70,7 +41,7 @@ template Main(max_msg_bytes, field_byte_len, n, k) {
     UnpackSig.sig <== sig;
 
     // check ECDSA sig
-    component VerifySig = ECDSAP256ValidateHash();    
+    component VerifySig = ECDSAP256SHA256Verify(max_msg_bytes);    
     VerifySig.sig_s_inv <== UnpackSig.sig_s_inv;
     VerifySig.sig_rx <== UnpackSig.sig_rx;
     VerifySig.sig_ry <== UnpackSig.sig_ry;
@@ -82,7 +53,8 @@ template Main(max_msg_bytes, field_byte_len, n, k) {
     VerifySig.addadva <== UnpackSig.addadva;
     VerifySig.addadvb <== UnpackSig.addadvb;
 
-    VerifySig.hash <== hash;
+    VerifySig.real_msg_byte_len <== message_bytes;
+    VerifySig.msg <== message;
     VerifySig.key <== pubkey;
 
     // #################### Prove validUntil date ####################

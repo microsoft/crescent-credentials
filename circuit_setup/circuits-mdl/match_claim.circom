@@ -3,7 +3,7 @@ pragma circom 2.1.6;
 include "./circomlib/circuits/comparators.circom";
 include "indicator.circom";
 include "./circomlib/circuits/mimc.circom";
-
+include "./nope/crypto/sha256.circom";
 // NOTE: copied from the JWT circuit. TODO: refactor
 
 // Converts an array of ascii digits (base-10) and converts them to a field element.
@@ -369,7 +369,7 @@ template HashRevealClaimValue(msg_json_len, max_claim_byte_len, field_byte_len, 
     var n_blocks = ((max_claim_byte_len*8 + 1 + 64)\512)+1;
     var max_bits_padded = n_blocks * 512;
     var max_bytes_padded = max_bits_padded\8;
-    component sha256 = Sha256General(max_bits_padded);
+    component sha2 = SHA256(max_bits_padded);
 
     signal data_len_bytes <== (r - l);
     component calculate_padding = CalculatePadding();
@@ -429,23 +429,17 @@ template HashRevealClaimValue(msg_json_len, max_claim_byte_len, field_byte_len, 
     }
     signal padded[max_bytes_padded] <== padded2[7];
 
-    // Converts bytes to bits and input to SHA gadget
-    component bits[max_bytes_padded];
-    for (var i = 0; i < max_bytes_padded; i++) {
-        bits[i] = Num2Bits(8);
-        bits[i].in <== padded[i];
-        for (var j = 0; j < 8; j++) {
-            sha256.paddedIn[i*8+j] <== bits[i].out[7-j];
-        }
-    }
-    sha256.in_len_padded_bits <== data_len_padded_bytes*8;
-    
-    component b2n = Bits2Num(248);
-    for(var i = 0; i < 248; i++) {
-        b2n.in[i] <== sha256.out[i];
-    }
+    sha2.msg <== padded;
+    sha2.real_byte_len <== data_len_padded_bytes;
 
-    digest <== b2n.out;
+    // Converts bytes to field element
+    var acc = 0;
+    var base = 1;
+    for (var i = 0; i < field_byte_len; i++) {
+        acc += sha2.hash[field_byte_len - 1 - i] * base;
+        base *= 256;
+    }
+    digest <== acc;
 }
 
 // Generates constraints to enforce that `msg` has the substring `substr` starting at position `l` and ending at position `r`

@@ -27,17 +27,17 @@ template RotateRight(N, S) {
 }
 
 // compute the entrywise xor of 3 arrays (assumed to be binary)
-// template Xor3(N) {
-//   signal input a[N];
-//   signal input b[N];
-//   signal input c[N];
-//   signal output out[N];
-//   signal axorb[N];
-//   for (var i = 0; i < N; i++) {
-//     axorb[i] <== a[i] + b[i] - 2 * a[i] * b[i];
-//     out[i] <== axorb[i] + c[i] - 2 * axorb[i] * c[i];
-//   }
-// }
+template Xor_3(N) {
+  signal input a[N];
+  signal input b[N];
+  signal input c[N];
+  signal output out[N];
+  signal axorb[N];
+  for (var i = 0; i < N; i++) {
+    axorb[i] <== a[i] + b[i] - 2 * a[i] * b[i];
+    out[i] <== axorb[i] + c[i] - 2 * axorb[i] * c[i];
+  }
+}
 
 // add M N-bit numbers (Big Endian) and get the sum as an N-bit number
 // ignore overflow
@@ -89,7 +89,7 @@ template SHAMsgScheduleStep() {
   RotR[0] = RotateRight(32, 7);
   RotR[1] = RotateRight(32, 18);
   SftR[0] = ShiftRight(32, 3);
-  TXor[0] = Xor3(32);
+  TXor[0] = Xor_3(32);
   RotR[0].arr <== wm15;
   RotR[1].arr <== wm15;
   SftR[0].arr <== wm15;
@@ -100,7 +100,7 @@ template SHAMsgScheduleStep() {
   RotR[2] = RotateRight(32, 17);
   RotR[3] = RotateRight(32, 19);
   SftR[1] = ShiftRight(32, 10);
-  TXor[1] = Xor3(32);
+  TXor[1] = Xor_3(32);
   RotR[2].arr <== wm2;
   RotR[3].arr <== wm2;
   SftR[1].arr <== wm2;
@@ -124,7 +124,7 @@ template SHAS1() {
   RotR[0] = RotateRight(32, 6);
   RotR[1] = RotateRight(32, 11);
   RotR[2] = RotateRight(32, 25);
-  TXor = Xor3(32);
+  TXor = Xor_3(32);
   RotR[0].arr <== v;
   RotR[1].arr <== v;
   RotR[2].arr <== v;
@@ -158,7 +158,7 @@ template SHAS0() {
   RotR[0] = RotateRight(32, 2);
   RotR[1] = RotateRight(32, 13);
   RotR[2] = RotateRight(32, 22);
-  TXor = Xor3(32);
+  TXor = Xor_3(32);
   RotR[0].arr <== v;
   RotR[1].arr <== v;
   RotR[2].arr <== v;

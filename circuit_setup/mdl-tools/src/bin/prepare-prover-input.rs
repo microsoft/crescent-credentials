@@ -462,11 +462,10 @@ fn main() {
     println!("msg_len_after_SHA2_padding: {:?}\n", msg_len_after_sha2_padding);
 
     let config_max_cred_len = config["max_cred_len"].as_u64().unwrap() as usize;
-    if msg_len_after_sha2_padding > config_max_cred_len {
+    if tbs_data_ints.len() > config_max_cred_len {
         println!(
-            "Error: mDL too large. Current mDL header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.",
+            "Error: mDL too large. Current mDL header + payload is {} bytes, but maximum length supported is {} bytes.",
             tbs_data_ints.len(),
-            msg_len_after_sha2_padding,
             base64_decoded_size(config_max_cred_len)
         );
         println!(
@@ -573,6 +572,8 @@ fn main() {
     if sig_len % 2 != 0 {
         panic!("Invalid signature length: {}", sig_len);
     }
+    // signature is not required by the circuit, but it is required for the signature verification pre-computations
+    // by the precompEcdsa script. That script extracts the signature from the prover_input.json file.
     prover_inputs.insert("signature".to_string(), serde_json::json!(signature_bytes));
 
 
@@ -600,7 +601,7 @@ fn main() {
     let pubkey_hash = bytes_to_int(&digest);  
     prover_inputs.insert("pubkey_hash".to_string(), serde_json::json!(pubkey_hash));
 
-    prover_inputs.insert("message_padded_bytes".to_string(), msg_len_after_sha2_padding.into());
+    prover_inputs.insert("message_bytes".to_string(), tbs_data_ints.len().into());
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
 
     // If device bound, include the device public key in the prover inputs
