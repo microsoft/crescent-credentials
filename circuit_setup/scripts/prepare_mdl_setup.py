@@ -31,7 +31,7 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
 
     attrs = [k for k in cfg if k not in CRESCENT_CONFIG_KEYS]
 
-    public_inputs = ["pubkey_x", "pubkey_y", "valid_until_value", "device_key_0_value", "device_key_1_value"]
+    public_inputs = ["pubkey_hash", "valid_until_value", "device_key_0_value", "device_key_1_value"]
 
     with open(out_path, "w") as f:
 
@@ -101,19 +101,17 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
     match_{name}_identifier.l <== {name}_identifier_indicator.l;
     match_{name}_identifier.r <== {name}_identifier_indicator.r;
 
-    component {name}_sha_bytes = Sha256Bytes({name}_preimage_len);
-    {name}_sha_bytes.in_padded <== {name}_preimage;
-    {name}_sha_bytes.in_len_padded_bytes <== {name_preimage_len};
-
-    component {name}_hash_bytes = DigestToBytes();
-    {name}_hash_bytes.in <== {name}_sha_bytes.out;
+    component {name}_hash_bytes = SHA256(128);
+    {name}_hash_bytes.msg <== {name}_preimage;
+    // Extract the actual length from the sha-256 padding
+    {name}_hash_bytes.real_byte_len <== ({name}_preimage[126] * 256 + {name}_preimage[127]) / 8;
 
     signal encoded_{name}_digest[35]; // FIXME: don't hardcode 35
     encoded_{name}_digest[0] <== {name}_id; 
     encoded_{name}_digest[1] <== 88;   // == 0x58
     encoded_{name}_digest[2] <== 32;   // == 0x20
     for(var i = 0; i < 32; i++ ) {{
-        encoded_{name}_digest[i + 3] <== {name}_hash_bytes.out[i];
+        encoded_{name}_digest[i + 3] <== {name}_hash_bytes.hash[i];
     }}
     component {name}_indicator = IntervalIndicator(max_msg_bytes);
     {name}_indicator.l <== {name}_encoded_l;
@@ -187,9 +185,7 @@ def generate_circuit(cfg: dict, out_path: str) -> None:
 
 component main {{ public [{pub_list}] }} =
     Main({cfg['max_cred_len']},          // max mDL length
-         {MAX_FIELD_BYTE_LEN},
-         {CIRCOM_P256_LIMB_BITS},
-         {CIRCOM_P256_N_LIMBS});
+         {MAX_FIELD_BYTE_LEN});
 """)
 
 # ======================================================================

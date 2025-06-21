@@ -3,7 +3,7 @@ pragma circom 2.1.6;
 include "./circomlib/circuits/comparators.circom";
 include "indicator.circom";
 include "./circomlib/circuits/mimc.circom";
-
+include "./nope/crypto/sha256.circom";
 // NOTE: copied from the JWT circuit. TODO: refactor
 
 // Converts an array of ascii digits (base-10) and converts them to a field element.
@@ -294,62 +294,6 @@ template IsZeroMod64(n) {
     }
 }
 
-/*
- * A helper template to calculate the amount of SHA-256 padding. 
- * 
- * WARNING:
- * The assignment to `pzbb[BITLEN]` uses the `<--` operator, which does **not** enforce any
- * constraint on the assigned value. Although subsequent constraints verify that each
- * `pzbb[i]` is a binary value (0 or 1), they do **not** force a _unique_ combination of bits
- * to correspond exactly to `padding_zero_bytes`. As a result, this template alone permits
- * “technically valid” witness assignments that do not reflect the correct padding length,
- * leading to an incorrect total length in the final proof.
- *
- * To guarantee correctness, the **caller** must explicitly constrain the final padded length.
- * For example:
- *   ```
- *   component calculate_padding = CalculatePadding();
- *   calculate_padding.data_len_bytes <== data_len_bytes;
- *   signal padding_zero_bytes <== calculate_padding.padding_zero_bytes;
- *   signal data_len_padded_bytes <== data_len_bytes + 1 + 8 + padding_zero_bytes;
- *
- *   //Enforce data_len_padded_bytes mod 64 = 0 : 
- *   component mod64check = IsZeroMod64(32);
- *   mod64check.in <== data_len_padded_bytes;
- *   ```  
-*/
-template CalculatePadding(){
-
-    signal input data_len_bytes;
-    signal output padding_zero_bytes; 
-
-    // We start by calculating the number of padding bytes required as a var
-    // then convert that into a 6-bit integer (the max number of zeroes we add is 55).
-    // Then we convert the bits to a number, and enforce that it's small enough.
-
-    var padding_zero_bytes_var = ((data_len_bytes + 1 + 8 + 63)\64)*64 - (data_len_bytes + 1 + 8); 
-    var BITLEN = 6;
-    var padding_zero_bytes_as_bits[BITLEN];
-    for(var i = 0; i < BITLEN; i++ ) {
-        padding_zero_bytes_as_bits[i] = padding_zero_bytes_var >> i & 1;
-    }
-    signal pzbb[BITLEN] <-- padding_zero_bytes_as_bits;
-    for( var i = 0; i < BITLEN; i++) {
-        (1 - pzbb[i]) * pzbb[i] === 0;  // pzbb[i] is a bit
-    }
-    
-    component b2n_pad = Bits2Num(BITLEN);
-    b2n_pad.in <== pzbb;
-    signal pzb <== b2n_pad.out;
-
-    component pzb_check = LessEqThan(BITLEN);
-    pzb_check.in[0] <== pzb;
-    pzb_check.in[1] <== 55;
-    pzb_check.out === 1;
-
-    padding_zero_bytes <== pzb;
-}
-
 // Hash and Reveal the claim value with claim_byte_len as the maximum length.
 // We do not assume that the claim length is public (only the max)
 template HashRevealClaimValue(msg_json_len, max_claim_byte_len, field_byte_len, is_number) {
@@ -369,83 +313,42 @@ template HashRevealClaimValue(msg_json_len, max_claim_byte_len, field_byte_len, 
     var n_blocks = ((max_claim_byte_len*8 + 1 + 64)\512)+1;
     var max_bits_padded = n_blocks * 512;
     var max_bytes_padded = max_bits_padded\8;
-    component sha256 = Sha256General(max_bits_padded);
+    component sha2 = SHA256(max_claim_byte_len);
 
     signal data_len_bytes <== (r - l);
-    component calculate_padding = CalculatePadding();
-    calculate_padding.data_len_bytes <== data_len_bytes;
-    signal padding_zero_bytes <== calculate_padding.padding_zero_bytes;
-    signal data_len_padded_bytes <== data_len_bytes + 1 + 8 + padding_zero_bytes;
-    //Enforce data_len_padded_bytes mod 64 = 0 : 
-    component mod64check = IsZeroMod64(32);
-    mod64check.in <== data_len_padded_bytes;
 
-    component padding_indicator = IntervalIndicator(max_bytes_padded);
-    padding_indicator.l <== data_len_bytes;
-    padding_indicator.r <== data_len_padded_bytes;
+    sha2.msg <== reveal_claim.value;
+    sha2.real_byte_len <== data_len_bytes;
 
-    signal padded0[max_bytes_padded];
-    for(var i = 0; i < max_claim_byte_len; i++){
-        padded0[i] <== reveal_claim.value[i];
-    }
-    for(var i = max_claim_byte_len; i < max_bytes_padded; i++) {
-        padded0[i] <== 0;
+    // Converts bytes to field element
+    component bytes_to_field = BytesToField(31);
+    for(var i = 0; i < 31; i++) {
+        bytes_to_field.bytes[i] <== sha2.hash[i];
     }
 
-    // add the byte 128 = 10000000_b
-    signal padded1[max_bytes_padded];
-    for(var i = 0; i < max_bytes_padded; i++) {
-        padded1[i] <== padded0[i] * (1 - padding_indicator.start_indicator[i]) + 128 * padding_indicator.start_indicator[i];
-    }
+    digest <== bytes_to_field.field_element;
+}
 
-    // Represent the data length in bits as a 64-bit integer, then convert to bytes
-    signal data_len_bits <== data_len_bytes*8;
-    component len_bits = Num2Bits(64);
-    len_bits.in <== data_len_bits;
-    component len_byte[8];
-    signal len_bytes[8];
-    for(var i = 0; i < 8; i++) {
-        len_byte[i] = Bits2Num(8);
-        for(var j = 0; j < 8; j++) {
-            len_byte[i].in[j] <== len_bits.out[8*i + j];
-        }
-        len_bytes[i] <== len_byte[i].out;
-    }
+template BytesToField(n_bytes) {
+    signal input bytes[n_bytes];
+    signal output field_element;
 
-    // Place each length byte at the end of the padded data
-    signal padded2[8][max_bytes_padded];
-    component length_indicator[8];
-    for(var i = 0; i < 8; i++) {
-        length_indicator[i] = PointIndicator(max_bytes_padded);
-        length_indicator[i].l <== data_len_padded_bytes - 8 + i;
-
-        for(var j = 0; j < max_bytes_padded; j++) {
-            if(i == 0) {
-                padded2[i][j] <== length_indicator[i].indicator[j] * len_bytes[7-i] + padded1[j];
-            } else {
-                padded2[i][j] <== length_indicator[i].indicator[j] * len_bytes[7-i] + padded2[i-1][j];
-            }
-        }
-    }
-    signal padded[max_bytes_padded] <== padded2[7];
-
-    // Converts bytes to bits and input to SHA gadget
-    component bits[max_bytes_padded];
-    for (var i = 0; i < max_bytes_padded; i++) {
-        bits[i] = Num2Bits(8);
-        bits[i].in <== padded[i];
+    // Converts bytes to bits and input to Bits2Num
+    var n_bits = n_bytes*8;
+    component num_to_bits[n_bytes];
+    signal bits[n_bits];
+    for (var i = 0; i < n_bytes; i++) {
+        num_to_bits[i] = Num2Bits(8);
+        num_to_bits[i].in <== bytes[i];
         for (var j = 0; j < 8; j++) {
-            sha256.paddedIn[i*8+j] <== bits[i].out[7-j];
+            bits[i*8+j] <== num_to_bits[i].out[7-j];
         }
     }
-    sha256.in_len_padded_bits <== data_len_padded_bytes*8;
-    
-    component b2n = Bits2Num(248);
-    for(var i = 0; i < 248; i++) {
-        b2n.in[i] <== sha256.out[i];
-    }
+        
+    component b2n = Bits2Num(n_bits);
+    b2n.in <== bits;
 
-    digest <== b2n.out;
+    field_element <== b2n.out;
 }
 
 // Generates constraints to enforce that `msg` has the substring `substr` starting at position `l` and ending at position `r`

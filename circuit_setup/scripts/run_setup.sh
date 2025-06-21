@@ -205,6 +205,9 @@ if [ ${CREDTYPE} == 'mdl' ]; then
         exit 1
     fi
 
+    # extract key and signature from prover_inputs.json and add ecdsa precomputation and hash
+    node ${ROOT_DIR}/scripts/precompEcdsa.mjs ${OUTPUTS_DIR}/prover_inputs.json
+
     cd ${ROOT_DIR}
 fi
 

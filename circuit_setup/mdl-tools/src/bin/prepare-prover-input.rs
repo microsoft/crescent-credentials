@@ -37,7 +37,7 @@ use p256::NistP256;
 use serde_json::Map;
 use sha2::{Digest, Sha256};
 use num_bigint::BigUint;
-use num_traits::{Zero, One, ToPrimitive};
+use num_traits::Zero;
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use std::str;
 use std::collections::{BTreeMap,HashSet};
@@ -46,7 +46,6 @@ static MDL_DOCTYPE: &str = "org.iso.18013.5.1.mDL";
 static ISO_MDL_NAMESPACE: &str = "org.iso.18013.5.1";
 static AAMVA_MDL_NAMESPACE: &str = "org.iso.18013.5.1.aamva";
 static SUPPORTED_NAMESPACES: [&str; 2] = [ISO_MDL_NAMESPACE, AAMVA_MDL_NAMESPACE];
-const CIRCOM_ES256_LIMB_BITS: usize = 43;
 
 lazy_static! {
     static ref CRESCENT_CONFIG_KEYS: HashSet<&'static str> = {
@@ -80,6 +79,28 @@ struct Args {
     /// output JSON file containing the auxiliary data
     #[arg(short = 'a', long = "prover_aux")]
     prover_aux: String,
+}
+
+// Interpret the input as a bit string, convert to an integer where the
+// leftmost bit in the string is interpreted as the LSB of the integer
+// Behavior matches circomlib's Bits2Num function.
+fn bits_to_num(bytes : &[u8]) -> BigUint {
+    // Convert bytes to bit array
+    let mut bitvec = vec![];
+    for b in bytes {
+        for i in (0..8).rev() {
+            bitvec.push((b >> i) & 1);
+        }
+    }
+    // Convert to integer
+    let mut e = BigUint::from(1u32);
+    let mut res = BigUint::from(0u32);
+    for i in 0..248 {
+        res += &e * BigUint::from(bitvec[i] as u32);
+        e = BigUint::from(2u32)*e;  // e = 2*e
+    }
+
+    res
 }
 
 fn sha256_padding(prepad_m: &[u8]) -> Vec<u8> {
@@ -351,23 +372,6 @@ fn check_config(config: &serde_json::Map<String, serde_json::Value>) {
     }
 }
 
-fn bytes_to_circom_limbs(bytes: &[u8], limb_size: usize) -> Vec<u128> {
-    let n = BigUint::from_bytes_be(bytes);
-    let mut limbs = Vec::new();
-    // Create a BigUint mask: (1 << limb_size) - 1
-    let msk = (BigUint::one() << limb_size) - BigUint::one();
-    let mut n_copy = n.clone();
-    
-    while n_copy > BigUint::zero() {
-        // Use the BigUint mask in the bitwise AND operation
-        let limb = (n_copy.clone() & msk.clone()).to_u128().unwrap();
-        limbs.push(limb);
-        n_copy >>= limb_size;
-    }
-    
-    limbs
-}
-
 // copied from JWT's proverinput.rs
 fn pack_string_to_int_unquoted(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Error>> {
     // Must match function "RevealDomainOnly" in match_claim.circom
@@ -463,11 +467,10 @@ fn main() {
     println!("msg_len_after_SHA2_padding: {:?}\n", msg_len_after_sha2_padding);
 
     let config_max_cred_len = config["max_cred_len"].as_u64().unwrap() as usize;
-    if msg_len_after_sha2_padding > config_max_cred_len {
+    if tbs_data_ints.len() > config_max_cred_len {
         println!(
-            "Error: mDL too large. Current mDL header + payload is {} bytes ({} bytes after SHA256 padding), but maximum length supported is {} bytes.",
+            "Error: mDL too large. Current mDL header + payload is {} bytes, but maximum length supported is {} bytes.",
             tbs_data_ints.len(),
-            msg_len_after_sha2_padding,
             base64_decoded_size(config_max_cred_len)
         );
         println!(
@@ -602,12 +605,9 @@ fn main() {
     if sig_len % 2 != 0 {
         panic!("Invalid signature length: {}", sig_len);
     }
-    let r_bytes = &signature_bytes[0..sig_len / 2];
-    let s_bytes = &signature_bytes[sig_len / 2..sig_len];
-    let r_limbs = bytes_to_circom_limbs(r_bytes, CIRCOM_ES256_LIMB_BITS);
-    let s_limbs = bytes_to_circom_limbs(s_bytes, CIRCOM_ES256_LIMB_BITS);
-    prover_inputs.insert("signature_r".to_string(), serde_json::json!(r_limbs));
-    prover_inputs.insert("signature_s".to_string(), serde_json::json!(s_limbs));
+    // signature is not required by the circuit, but it is required for the signature verification pre-computations
+    // by the precompEcdsa script. That script extracts the signature from the prover_input.json file.
+    prover_inputs.insert("signature".to_string(), serde_json::json!(signature_bytes));
 
     // process the issuer public key
     let issuer_key_bytes = issuer_pub_key.to_sec1_bytes();
@@ -617,14 +617,13 @@ fn main() {
     if issuer_key_bytes.len() != 65 {
         panic!("Invalid serialized issuer public key length: {}", issuer_key_bytes.len());
     }
-    // skipping the first byte (0x04) which indicates the key is uncompressed
-    let issuer_key_x = &issuer_key_bytes[1..33];
-    let issuer_key_y = &issuer_key_bytes[33..65];
-    let x_limb = bytes_to_circom_limbs(issuer_key_x, CIRCOM_ES256_LIMB_BITS);
-    let y_limb = bytes_to_circom_limbs(issuer_key_y, CIRCOM_ES256_LIMB_BITS);
-    prover_inputs.insert("pubkey_x".to_string(), serde_json::json!(x_limb));
-    prover_inputs.insert("pubkey_y".to_string(), serde_json::json!(y_limb));
-    prover_inputs.insert("message_padded_bytes".to_string(), msg_len_after_sha2_padding.into());
+    prover_inputs.insert("pubkey".to_string(), serde_json::json!(&issuer_key_bytes));
+    let mut digest = Sha256::digest(&issuer_key_bytes[1..]).to_vec();    // skip hashing the first byte
+    digest = digest[0..digest.len()-1].to_vec();    // truncate digest to 248 bits
+    let pubkey_hash = bits_to_num(&digest);
+    prover_inputs.insert("pubkey_hash".to_string(), serde_json::json!(pubkey_hash.to_str_radix(10)));
+
+    prover_inputs.insert("message_bytes".to_string(), tbs_data_ints.len().into());
     println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
 
     // If device bound, include the device public key in the prover inputs
@@ -650,13 +649,15 @@ fn main() {
 
         device_key_x.reverse();
 
+        // Helper function used to encode bytes as field elements
         let bytes_to_int = |bytes: &[u8]| -> String {
             let mut a = BigUint::zero();
             for i in 0..bytes.len() {
                 a += BigUint::from(bytes[i] as u64) * BigUint::from(256u64).pow(i as u32);
             }
             a.to_str_radix(10)
-        };
+        };    
+
         let device_key_0 = bytes_to_int(&device_key_x[0..16]);
         let device_key_1 = bytes_to_int(&device_key_x[16..32]);
         println!("device_key_0_value: {:?}", device_key_0);

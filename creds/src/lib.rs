@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json,Value};
 use sha2::{Digest, Sha256};
 use utils::{read_from_file, strip_quotes, write_to_file};
+use crate::prep_inputs::pem_to_pubkey_hash;
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
 use crate::structs::{PublicIOType, IOLocations, GenericInputsJSON};
 use crate::groth16rand::ClientState;
@@ -802,6 +803,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
             let digest = Sha256::digest(data);
             let digest248 = &digest[0..digest.len()-1];
             let digest_uint = utils::bits_to_num(digest248);
+            println!("verifier input: {}", digest_uint);
             let digest_scalar = utils::biguint_to_scalar::<CrescentFr>(&digest_uint);
             revealed_hashed.push(digest_scalar);
         }
@@ -816,16 +818,16 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
     }
 
     // Create an inputs vector with the inputs from the prover, and the issuer's public key
-    let public_key_inputs = pem_to_inputs::<<ECPairing as Pairing>::ScalarField>(&vp.issuer_pem);
+    let public_key_inputs = pem_to_pubkey_hash::<<ECPairing as Pairing>::ScalarField>(&vp.issuer_pem);
     if public_key_inputs.is_err() {
         print!("Error: Failed to convert issuer public key to input values");
         return (false, "".to_string());
     }
     let mut inputs = vec![];
     inputs.extend(revealed_hashed);
-    inputs.extend(public_key_inputs.unwrap());
+    inputs.push(public_key_inputs.unwrap());
     inputs.extend(show_proof.revealed_inputs.clone());
-    
+       
     let context_str = serde_json::to_string(&proof_spec).unwrap();
 
     let verify_timer = std::time::Instant::now();

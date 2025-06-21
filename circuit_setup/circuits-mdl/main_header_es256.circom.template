@@ -1,68 +1,57 @@
 pragma circom 2.1.6;
 
-include "./ecdsa-p256/ecdsa.circom";
 include "./circomlib/circuits/comparators.circom";
 include "./circomlib/circuits/gates.circom";
-include "./ecdsa-p256/sha256.circom";
 include "./strings.circom";
+include "./nope/crypto/ECDSA.circom";
 include "./match_claim.circom";
 
-template Main(max_msg_bytes, field_byte_len, n, k) {
+template Main(max_msg_bytes, field_byte_len) {
 
     signal input message[max_msg_bytes];
-    signal input signature_r[k]; 
-    signal input signature_s[k];
-    signal input pubkey_x[k];
-    signal input pubkey_y[k];
-    signal input message_padded_bytes; // length of the message including the padding
-    
-    // *********** hash the padded message ***********
-    log("start hashing");
-    component sha = Sha256Bytes(max_msg_bytes);
-    sha.in_len_padded_bytes <== message_padded_bytes;
-    for (var i = 0; i < max_msg_bytes; i++) {
-        sha.in_padded[i] <== message[i];
-    }   
+    signal input pubkey[64];
+    signal input pubkey_hash;   // SHA-256(pubkey), truncated to 248 bits
+    signal input sig[6254];
+    signal input message_bytes; // actual length of the message without the padding
 
-    signal digest[256];
-    digest <== sha.out;
-    
-    log("convert digest to int");
-    // Convert the digest to an integer
-    var msg_len = k;
-    component base_msg[msg_len];
-    for (var i = 0; i < msg_len; i++) {
-        base_msg[i] = Bits2Num(n);
-    }
-    for (var i = 0; i < 256; i++) {
-        base_msg[i\n].in[i%n] <== digest[255 - i];
-    }
-    for (var i = 256; i < n*msg_len; i++) {
-        base_msg[i\n].in[i%n] <== 0;
-    }
+    // *********** Ensure that SHA256(pubkey) == pubkey_hash ***********
+    // ** pubkey is a private input, pubkey_hash is a public input that will also be input by the verifier
+    log("Checking public key");
+    component sha2 = SHA256(64);
+    sha2.msg <== pubkey;
+    sha2.real_byte_len <== 64;
 
-    signal msg_hash[msg_len];
-    for(var i = 0; i < msg_len; i++) {
-        msg_hash[i] <== base_msg[i].out;
+    // Convert digest bytes to field element
+    component bytes_to_field = BytesToField(31);
+    for(var i = 0; i < 31; i++) {
+        bytes_to_field.bytes[i] <== sha2.hash[i];
     }
+    log("Computed public key digest as field element: ", bytes_to_field.field_element);
 
-    // *********** verify signature for the message ***********
-    log("Calling ecdsa sig ver");
-    component ecdsa = ECDSAVerifyNoPubkeyCheck(n,k);
-    for (var i = 0; i < msg_len; i++) {
-        ecdsa.msghash[i] <== msg_hash[i];
-    }
-    for (var i = msg_len; i < k; i++) {
-        ecdsa.msghash[i] <== 0;
-    }
-    for (var i = 0; i < k; i++) {
-        ecdsa.pubkey[0][i] <== pubkey_x[i];
-        ecdsa.pubkey[1][i] <== pubkey_y[i];
-        ecdsa.r[i] <== signature_r[i];
-        ecdsa.s[i] <== signature_s[i];
-    }
-    log("Result from ecdsa verify component: ", ecdsa.result);
-    ecdsa.result === 1;
+    log("Input pubkey_hash : ", pubkey_hash);
+    bytes_to_field.field_element === pubkey_hash;
+
+    // *********** verify signature for the message ***********    
+    // unpack sig
+    component UnpackSig = ECDSAP256SHA256SigUnpack();
+    UnpackSig.sig <== sig;
+
+    // check ECDSA sig
+    component VerifySig = ECDSAP256SHA256Verify(max_msg_bytes);    
+    VerifySig.sig_s_inv <== UnpackSig.sig_s_inv;
+    VerifySig.sig_rx <== UnpackSig.sig_rx;
+    VerifySig.sig_ry <== UnpackSig.sig_ry;
+    VerifySig.u <== UnpackSig.u;
+    VerifySig.u2sign <== UnpackSig.u2sign;
+    VerifySig.AUX <== UnpackSig.AUX;
+    VerifySig.addres_x <== UnpackSig.addres_x;
+    VerifySig.addres_y <== UnpackSig.addres_y;
+    VerifySig.addadva <== UnpackSig.addadva;
+    VerifySig.addadvb <== UnpackSig.addadvb;
+
+    VerifySig.real_msg_byte_len <== message_bytes;
+    VerifySig.msg <== message;
+    VerifySig.key <== pubkey;
 
     // #################### Prove validUntil date ####################
     signal valid_until_prefix[13] <== [106, 118, 97, 108, 105, 100, 85, 110, 116, 105, 108, 192, 116];
