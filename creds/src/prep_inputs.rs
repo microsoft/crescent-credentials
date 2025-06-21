@@ -110,9 +110,7 @@ pub fn pem_to_pubkey_hash<F>(issuer_pem : &str) -> Result<F, Box<dyn std::error:
             digest = digest[0..digest.len()-1].to_vec();    // truncate digest to 248 bits
             let pubkey_hash = bits_to_num(&digest);
             println!("pubkey hash in prep_inputs: {}", pubkey_hash);
-            let pubkey_hash = biguint_to_scalar(&pubkey_hash);
-
-            pubkey_hash
+            biguint_to_scalar(&pubkey_hash)
         }
         Err(e) =>  {
             return Err(e.into());
