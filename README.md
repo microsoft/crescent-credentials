@@ -1,6 +1,6 @@
 # Crescent
 
-_version 0.5_
+_version 1.0_
 
 Crescent is a library to generate proofs of possession of JSON Web Tokens (JWT) and
 mobile Driver's Licenses (mDL) credentials.
