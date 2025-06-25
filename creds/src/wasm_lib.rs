@@ -2,7 +2,6 @@
 // Licensed under the MIT license.
 
 use crate::create_show_proof;
-use crate::create_show_proof_mdl;
 use crate::utils::write_to_b64url;
 use crate::ClientState;
 use crate::IOLocations;
@@ -116,32 +115,22 @@ pub fn create_show_proof_wasm(
                 None
             };
 
-            let show_proof = if &client_state.credtype == "mdl" {
+            if &client_state.credtype == "mdl" {
                 let age = disc_uid_to_age(&disc_uid)
                     .map_err(|_| "Disclosure UID does not have associated age parameter".to_string())? as u64;
 
                 proof_spec.range_over_year = Some(std::collections::BTreeMap::from([
                     ("birth_date".to_string(), age),
                 ]));
-
-                create_show_proof_mdl(
-                    &mut client_state,
-                    &range_pk,
-                    &proof_spec,
-                    &io_locations,
-                    device_signature,
-                )
-                .map_err(|e| format!("create_show_proof_mdl failed: {:?}", e))?
-            } else {
-                create_show_proof(
+            }
+            let show_proof = create_show_proof(
                     &mut client_state,
                     &range_pk,
                     &io_locations,
                     &proof_spec,
                     device_signature,
                 )
-                .map_err(|e| format!("create_show_proof failed: {:?}", e))?
-            };
+                .map_err(|e| format!("create_show_proof failed: {:?}", e))?;
 
             let show_proof_b64 = write_to_b64url(&show_proof);
             Ok(show_proof_b64)
