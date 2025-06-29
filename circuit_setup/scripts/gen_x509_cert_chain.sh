@@ -12,7 +12,7 @@ export MSYS_NO_PATHCONV=1
 
 # directory where intermediate files are kept
 tmpdir=../generated_files/mdl1
-# force relative paths that will work with openssl on both linux, windows, and macOS.
+# force relative paths that will work with openssl on linux, windows, and macOS.
 current_dir=$(pwd)
 scriptsdir=$(realpath "$current_dir")
 outdir=$(realpath ../inputs/mdl1)
