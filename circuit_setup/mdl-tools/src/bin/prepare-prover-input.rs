@@ -263,7 +263,7 @@ fn find_element_positions(preimage: &[u8], identifier: &str) -> Option<(usize, u
 
     let value_l = element_value_pos + element_value_label.len();
     let value_r = preimage.len();
-    println!("identifier_l: {}, identifier_r: {}, value_l: {}, value_r: {}", identifier_l, identifier_r, value_l, value_r);
+    println!("identifier_l: {identifier_l}, identifier_r: {identifier_r}, value_l: {value_l}, value_r: {value_r}");
     Some((identifier_l, identifier_r, value_l, value_r))
 }
 
@@ -273,7 +273,7 @@ fn extract_text(value: Value) -> String {
         Value::Tag(_, boxed) => extract_text(*boxed),
         Value::Text(s) => s,
         Value::Integer(i) => i128::from(i).to_string(),
-        other => panic!("Expected Text, Integer, or Tag containing Text/Integer, got {:?}", other),
+        other => panic!("Expected Text, Integer, or Tag containing Text/Integer, got {other:?}"),
     }
 }
 
@@ -306,8 +306,8 @@ pub(crate) fn find_value_digest_info(
                 if item.as_ref().element_identifier != claim {
                     continue;
                 }
-                println!("found claim: {}", claim);
-                println!("item: {:?}", item);
+                println!("found claim: {claim}");
+                println!("item: {item:?}");
 
                 info.value = extract_text(item.as_ref().element_value.clone());
                 println!("value: {:?}", info.value);
@@ -325,7 +325,7 @@ pub(crate) fn find_value_digest_info(
                 // print recomputed digest as hex
                 println!("Recomputed digest: {}", hex::encode(&recomputed_value_digest));
                 let ns_digests = mso.value_digests.get(ns)
-                    .ok_or(format!("Namespace {} not found", ns)).unwrap();
+                    .ok_or(format!("Namespace {ns} not found")).unwrap();
                 let signed_value_digest = ns_digests.get(&info.id)
                     .ok_or(format!("Signed value digest not found for digest id {:?}", info.id)).unwrap();
                 println!("signed_value_digest: {:?}", hex::encode(signed_value_digest));
@@ -347,7 +347,7 @@ pub(crate) fn find_value_digest_info(
         }
     }
     
-    println!("Claim not found: {}", claim);
+    println!("Claim not found: {claim}");
     None
 }
 
@@ -356,19 +356,19 @@ fn check_config(config: &serde_json::Map<String, serde_json::Value>) {
     // check the credtype
     let credtype = config["credtype"].as_str().unwrap();
     if credtype != "mdl" {
-        panic!("Invalid credtype: {}", credtype);
+        panic!("Invalid credtype: {credtype}");
     }
 
     // check the signature alg
     let alg = config["alg"].as_str().unwrap();
     if alg != "ES256" {
-        panic!("Unsupported alg: {}", alg);
+        panic!("Unsupported alg: {alg}");
     }
 
     // make sure max_cred_len exists
     let max_cred_len = config["max_cred_len"].as_u64().unwrap();
     if max_cred_len == 0 {
-        panic!("Invalid max_cred_len, needs to be > 0: {}", max_cred_len);
+        panic!("Invalid max_cred_len, needs to be > 0: {max_cred_len}");
     }
 }
 
@@ -379,7 +379,7 @@ fn pack_string_to_int_unquoted(s: &str, n_bytes: usize) -> Result<String, Box<st
     //First convert "s" to bytes and pad with zeros
     let s_bytes = s.bytes();
     if s_bytes.len() > n_bytes {
-        panic!("String to large to convert to integer of n_bytes = {}", n_bytes);
+        panic!("String to large to convert to integer of n_bytes = {n_bytes}");
     }
     let mut s_bytes = s_bytes.collect::<Vec<u8>>();
     for _ in 0 .. n_bytes - s_bytes.len() {
@@ -413,9 +413,9 @@ fn main() {
         .unwrap();
 
     let doc_type = mdoc.doc_type;
-    println!("doc_type: {}\n", doc_type);
+    println!("doc_type: {doc_type}\n");
     if doc_type != MDL_DOCTYPE {
-        panic!("Invalid mDL doc type: {}", doc_type);
+        panic!("Invalid mDL doc type: {doc_type}");
     }
     
     let mso = mdoc.mso;
@@ -430,7 +430,7 @@ fn main() {
     let namespaces = mdoc.namespaces;
     for (key, value) in namespaces.iter() {
         if !SUPPORTED_NAMESPACES.contains(&key.as_str()) {
-            panic!("Invalid mDL namespace: {}", key);
+            panic!("Invalid mDL namespace: {key}");
         }
         println!("{} namespace claim count: {}\n", key, value.len());
     }
@@ -464,7 +464,7 @@ fn main() {
     // convert header and payload to UTF-8 integers in base-10 (e.g., 'e' -> 101, 'y' -> 121, ...)
     let padded_m = sha256_padding(&tbs_data_ints);
     let msg_len_after_sha2_padding = padded_m.len();
-    println!("msg_len_after_SHA2_padding: {:?}\n", msg_len_after_sha2_padding);
+    println!("msg_len_after_SHA2_padding: {msg_len_after_sha2_padding:?}\n");
 
     let config_max_cred_len = config["max_cred_len"].as_u64().unwrap() as usize;
     if tbs_data_ints.len() > config_max_cred_len {
@@ -491,7 +491,7 @@ fn main() {
     let valid_until_pos = valid_until_prefix_pos + valid_until_prefix.len();
     let valid_until_data = &tbs_data_hex[valid_until_pos..valid_until_pos + 40];
     let valid_until_unix_timestamp = ymd_to_timestamp(valid_until_data, true, true).unwrap();
-    println!("valid_until_unix_timestamp: {}", valid_until_unix_timestamp);
+    println!("valid_until_unix_timestamp: {valid_until_unix_timestamp}");
     
     // begin output of prover and auxiliary inputs
     let mut prover_inputs = Map::new();
@@ -510,32 +510,32 @@ fn main() {
             continue;
         }
         let claim_name = key.as_str();
-        let entry = config[claim_name].as_object().ok_or(format!("Config file entry for claim {}, does not have object type", claim_name)).unwrap();
-        let claim_type = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", claim_name)).unwrap();
+        let entry = config[claim_name].as_object().ok_or(format!("Config file entry for claim {claim_name}, does not have object type")).unwrap();
+        let claim_type = entry["type"].as_str().ok_or(format!("Config file entry for claim {claim_name}, is missing 'type'")).unwrap();
         let reveal = entry.get("reveal").and_then(|v| v.as_bool()).unwrap_or(false);
         let reveal_digest = entry.get("reveal_digest").and_then(|v| v.as_bool()).unwrap_or(false);
-        let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().ok_or(format!("Config file entry for claim {} does not have a valid u64 'max_claim_byte_len'", claim_name)).map(|v| v as usize).unwrap();
+        let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().ok_or(format!("Config file entry for claim {claim_name} does not have a valid u64 'max_claim_byte_len'")).map(|v| v as usize).unwrap();
 
         if !reveal && !reveal_digest {
-            println!("Claim {} is not revealed or reveal_digest: skipping", claim_name);
+            println!("Claim {claim_name} is not revealed or reveal_digest: skipping");
             continue;
         }
 
         println!("\nProcessing {} ({}) for {}", claim_name, claim_type, if reveal { "reveal" } else { "reveal_digest" });
 
         let claim_info = find_value_digest_info(&namespaces, &mso, &tbs_data, claim_name).unwrap();
-        println!("claim_info ({}): {:?}", claim_name, claim_info);
-        prover_inputs.insert(format!("{}_id", claim_name).to_string(), serde_json::json!(claim_info.id));
+        println!("claim_info ({claim_name}): {claim_info:?}");
+        prover_inputs.insert(format!("{claim_name}_id").to_string(), serde_json::json!(claim_info.id));
         let claim_value_str = claim_info.value.as_str();
 
         let claim_preimage = sha256_padding(claim_info.preimage.as_ref());
         if claim_preimage.len() != 128 { // FIXME: don't hardcode this value. Currently correct for the mDL we generate, but not in general
             panic!("Invalid {}_preimage length: {}; expected 128 (hardcoded in circom circuit)", claim_name, claim_preimage.len());
         }
-        prover_inputs.insert(format!("{}_preimage", claim_name).to_string(), serde_json::json!(claim_preimage));
-        prover_inputs.insert(format!("{}_encoded_l", claim_name).to_string(), serde_json::json!(claim_info.encoded_l));
-        prover_inputs.insert(format!("{}_encoded_r", claim_name).to_string(), serde_json::json!(claim_info.encoded_r));
-        prover_inputs.insert(format!("{}_identifier_l", claim_name).to_string(), serde_json::json!(claim_info.identifier_l));
+        prover_inputs.insert(format!("{claim_name}_preimage").to_string(), serde_json::json!(claim_preimage));
+        prover_inputs.insert(format!("{claim_name}_encoded_l").to_string(), serde_json::json!(claim_info.encoded_l));
+        prover_inputs.insert(format!("{claim_name}_encoded_r").to_string(), serde_json::json!(claim_info.encoded_r));
+        prover_inputs.insert(format!("{claim_name}_identifier_l").to_string(), serde_json::json!(claim_info.identifier_l));
 
         if reveal {
             match claim_type {
@@ -543,23 +543,23 @@ fn main() {
                     // for string values, we skip the first CBOR byte (0x60) which indicates the string length, to only compare the claim value
                     // FIXME: not true in general, only for short strings!
                     let value_l = claim_info.value_l + 1;
-                    prover_inputs.insert(format!("{}_value_l", claim_name).to_string(), serde_json::json!(value_l));
-                    prover_inputs.insert(format!("{}_value_r", claim_name).to_string(), serde_json::json!(claim_info.value_r));
+                    prover_inputs.insert(format!("{claim_name}_value_l").to_string(), serde_json::json!(value_l));
+                    prover_inputs.insert(format!("{claim_name}_value_r").to_string(), serde_json::json!(claim_info.value_r));
                     let claim_value = pack_string_to_int_unquoted(claim_value_str, max_claim_byte_len).unwrap();
-                    prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
+                    prover_inputs.insert(format!("{claim_name}_value").to_string(), serde_json::json!(claim_value));
                 },
                 "date" => {
                     // we don't need the value_l and value_r for date
                     let claim_value = ymd_to_daystamp(claim_value_str).unwrap();
-                    prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value));
+                    prover_inputs.insert(format!("{claim_name}_value").to_string(), serde_json::json!(claim_value));
                 },
                 "integer" => {
                     // encode integer directly
-                    prover_inputs.insert(format!("{}_value", claim_name).to_string(), serde_json::json!(claim_value_str));
+                    prover_inputs.insert(format!("{claim_name}_value").to_string(), serde_json::json!(claim_value_str));
                 },
                 // TODO: add support for other claim types
                 &_ => {
-                    panic!("Unsupported claim type: {}", claim_type);
+                    panic!("Unsupported claim type: {claim_type}");
                 }
             };
         } else if reveal_digest {
@@ -575,8 +575,8 @@ fn main() {
                         // for string values, we skip the first CBOR byte (0x60) which indicates the string length, to only compare the claim value
                         // FIXME: not true in general, only for short strings!
                         let value_l = claim_info.value_l + 1;
-                        prover_inputs.insert(format!("{}_value_l", claim_name).to_string(), serde_json::json!(value_l));
-                        prover_inputs.insert(format!("{}_value_r", claim_name).to_string(), serde_json::json!(claim_info.value_r));
+                        prover_inputs.insert(format!("{claim_name}_value_l").to_string(), serde_json::json!(value_l));
+                        prover_inputs.insert(format!("{claim_name}_value_r").to_string(), serde_json::json!(claim_info.value_r));
                         prover_aux.insert(claim_name.to_string(), serde_json::json!(claim_value_str));
                     }
                     _ => {
@@ -603,7 +603,7 @@ fn main() {
     // this code assumes |R|==|S|
     let sig_len = signature_bytes.len();
     if sig_len % 2 != 0 {
-        panic!("Invalid signature length: {}", sig_len);
+        panic!("Invalid signature length: {sig_len}");
     }
     // signature is not required by the circuit, but it is required for the signature verification pre-computations
     // by the precompEcdsa script. That script extracts the signature from the prover_input.json file.
@@ -624,7 +624,7 @@ fn main() {
     prover_inputs.insert("pubkey_hash".to_string(), serde_json::json!(pubkey_hash.to_str_radix(10)));
 
     prover_inputs.insert("message_bytes".to_string(), tbs_data_ints.len().into());
-    println!("Number of SHA blocks to hash: {}\n", msg_len_after_sha2_padding);
+    println!("Number of SHA blocks to hash: {msg_len_after_sha2_padding}\n");
 
     // If device bound, include the device public key in the prover inputs
     if config["device_bound"].as_bool().is_some_and(|x| x) {
@@ -635,8 +635,8 @@ fn main() {
             CoseKey::EC2 { x, y, .. } => (x, y),
             _ => panic!("Unsupported curve type, expected EC2 (https://www.rfc-editor.org/rfc/rfc9053.html#name-elliptic-curve-keys)")
         };
-        println!("device_key.x = {:?}", device_key_x);
-        println!("device_key.y = {:?}", device_key_y);
+        println!("device_key.x = {device_key_x:?}");
+        println!("device_key.y = {device_key_y:?}");
         prover_inputs.insert("device_key_x".to_string(), serde_json::json!(device_key_x));
         // device_key_x is Vec<u8>, device_key_y is EC2Y
         let device_pub_key_x = BigUint::from_bytes_be(&device_key_x);
@@ -660,8 +660,8 @@ fn main() {
 
         let device_key_0 = bytes_to_int(&device_key_x[0..16]);
         let device_key_1 = bytes_to_int(&device_key_x[16..32]);
-        println!("device_key_0_value: {:?}", device_key_0);
-        println!("device_key_1_value: {:?}", device_key_1);
+        println!("device_key_0_value: {device_key_0:?}");
+        println!("device_key_1_value: {device_key_1:?}");
         prover_inputs.insert("device_key_0_value".to_string(), serde_json::json!(device_key_0));
         prover_inputs.insert("device_key_1_value".to_string(), serde_json::json!(device_key_1));
 
@@ -696,7 +696,7 @@ fn main() {
 
     // save the auxiliary data to a file
     let prover_aux_json = serde_json::to_string_pretty(&prover_aux).unwrap();
-    println!("Prover auxiliary data: {}", prover_aux_json);
+    println!("Prover auxiliary data: {prover_aux_json}");
     println!("output file: {}", args.prover_aux);
     std::fs::write(&args.prover_aux, prover_aux_json).unwrap();
     println!("Prover auxiliary data saved to: {}\n", args.prover_aux);

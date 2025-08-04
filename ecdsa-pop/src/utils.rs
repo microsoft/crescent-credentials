@@ -468,7 +468,7 @@ pub fn ff_to_big<FF: ff::PrimeField>(i : &FF) -> BigUint {
 /// converts a hex-encoded string into a BigUint
 pub fn hex_to_big(hex: &str) -> BigUint {
   let hex = if hex.len() % 2 != 0 {
-    &format!("0{}", hex)
+    &format!("0{hex}")
   } else {
     hex
   };

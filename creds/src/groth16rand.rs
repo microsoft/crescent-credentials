@@ -291,7 +291,7 @@ impl<E: Pairing> ShowGroth16<E> {
         let groth16_valid = match groth16_result {
             Ok(b) => b, 
             Err(e) => {
-                println!("Failed to verify Groth16 proof with error: {:?}", e);
+                println!("Failed to verify Groth16 proof with error: {e:?}");
                 false
             }
         };

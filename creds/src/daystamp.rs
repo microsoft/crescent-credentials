@@ -36,7 +36,7 @@ fn days_before_month(year: usize, month: usize) -> usize {
 fn ymd_to_ordinal(year: usize, month: usize, day: usize) -> usize {
     assert!((1..=12).contains(&month), "month must be in 1..12");
     let dim = days_in_month(year, month);
-    assert!(1 <= day && day <= dim, "day must be in 1..{}", dim);
+    assert!(1 <= day && day <= dim, "day must be in 1..{dim}");
     days_before_year(year) + days_before_month(year, month) + day
 }  
 
@@ -58,7 +58,7 @@ pub fn days_to_be_age(age: u64) -> usize {
     let past_stamp = ymd_to_ordinal(year - age as usize, month, day);
 
     assert!(today_stamp > past_stamp);
-    println!("To be {} years old, you must be {} days old", age, today_stamp - past_stamp);
+    println!("To be {age} years old, you must be {} days old", today_stamp - past_stamp);
 
     today_stamp - past_stamp
 }

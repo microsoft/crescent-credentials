@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Claims:");
     if let Value::Object(map) = claims.clone() {
         for (k, v) in map {
-            println!("{} : {}", k, v);
+            println!("{k} : {v}");
         }
     } else {
         panic!("Claims are not a JSON object");

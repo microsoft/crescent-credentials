@@ -210,7 +210,7 @@ Result<(JsonMap, JsonMap, JsonMap), Box<dyn Error>>
 
 
     let header_pad = base_64_decoded_header_padding(period_idx)?;
-    let header_and_payload = format!("{}{}{}", jwt_header_decoded, header_pad, claims_decoded);
+    let header_and_payload = format!("{jwt_header_decoded}{header_pad}{claims_decoded}");
     prepare_prover_claim_inputs(&header_and_payload, config, &claims, &mut prover_inputs_json)?;
     prepare_prover_aux(&header_and_payload, config, &claims, device_pub_pem, &mut prover_aux_json)?;
 
@@ -236,25 +236,25 @@ fn prepare_prover_claim_inputs(header_and_payload: &str, config: &serde_json::Ma
         let name = key.clone();
         let name = name.as_str();
 
-        let entry = config[name].as_object().ok_or(format!("Config file entry for claim {}, does not have object type", name))?;
+        let entry = config[name].as_object().ok_or(format!("Config file entry for claim {name}, does not have object type"))?;
 
-        let type_string = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", name))?;
+        let type_string = entry["type"].as_str().ok_or(format!("Config file entry for claim {name}, is missing 'type'"))?;
 
-        let claim_name = format!("\"{}\"", name);
+        let claim_name = format!("\"{name}\"");
         let (claim_l, claim_r) = find_value_interval(msg, &claim_name, type_string)?;
 
-        let name_l = format!("{}_l", name);
-        let name_r = format!("{}_r", name);
+        let name_l = format!("{name}_l");
+        let name_r = format!("{name}_r");
 
         prover_inputs_json.insert(name_l, json!(claim_l.to_string()));
         prover_inputs_json.insert(name_r, json!(claim_r.to_string()));
 
         if entry.contains_key("reveal") {
-            let reveal = entry["reveal"].as_bool().ok_or(format!("reveal for claim {} is not of type bool", name))?;
+            let reveal = entry["reveal"].as_bool().ok_or(format!("reveal for claim {name} is not of type bool"))?;
             if reveal {
                 match type_string {
                     "number" => {
-                        prover_inputs_json.insert(format!("{}_value", name), json!(claims[name].clone().to_string()));
+                        prover_inputs_json.insert(format!("{name}_value"), json!(claims[name].clone().to_string()));
                     }
                     "string" => {
                         let max_claim_byte_len = entry["max_claim_byte_len"].as_u64().unwrap();    // validated by load_config
@@ -267,7 +267,7 @@ fn prepare_prover_claim_inputs(header_and_payload: &str, config: &serde_json::Ma
                         else {
                             pack_string_to_int(claims[name].as_str().ok_or("invalid_type")?, max_claim_byte_len.try_into()?)?
                         };
-                        prover_inputs_json.insert(format!("{}_value", name), json!(packed));
+                        prover_inputs_json.insert(format!("{name}_value"), json!(packed));
                     }
                     _ => {
                         return_error!("Can only reveal number types and string types as a single field element for now. See also `reveal_bytes`.")
@@ -294,11 +294,11 @@ fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String
 
         let name = key.clone();
         let name = name.as_str();
-        let entry = config[name].as_object().ok_or(format!("Config file entry for claim {}, does not have object type", name))?;
-        let type_string = entry["type"].as_str().ok_or(format!("Config file entry for claim {}, is missing 'type'", name))?;
+        let entry = config[name].as_object().ok_or(format!("Config file entry for claim {name}, does not have object type"))?;
+        let type_string = entry["type"].as_str().ok_or(format!("Config file entry for claim {name}, is missing 'type'"))?;
 
         if entry.contains_key("reveal_digest") {
-            let reveal = entry["reveal_digest"].as_bool().ok_or(format!("reveal_digest for predicate {} is not of type bool", name))?;
+            let reveal = entry["reveal_digest"].as_bool().ok_or(format!("reveal_digest for predicate {name} is not of type bool"))?;
             if reveal {
                 match type_string {
                     "number" => {
@@ -346,7 +346,7 @@ fn pack_string_to_int(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Er
     // Must match function "RevealClaimValue" in match_claim.circom, so we add quotes to the string
 
     //First convert "s" to bytes and pad with zeros
-    let s_quoted = format!("\"{}\"",s);
+    let s_quoted = format!("\"{s}\"");
     pack_string_to_int_unquoted(&s_quoted, n_bytes)
 }
 fn pack_string_to_int_unquoted(s: &str, n_bytes: usize) -> Result<String, Box<std::io::Error>> {
@@ -384,12 +384,12 @@ pub fn unpack_int_to_string_unquoted(s_int: &ark_ff::BigInteger256) -> Result<St
 }
 
 fn find_value_interval(msg: &str, claim_name: &str, type_string: &str) -> Result<(usize, usize), Box<dyn Error>> {
-    let l = msg.find(claim_name).ok_or(format!("Failed to find claim {} in token payload", claim_name))?;
+    let l = msg.find(claim_name).ok_or(format!("Failed to find claim {claim_name} in token payload"))?;
     let value_start = l + claim_name.len();
     let mut r = 0;
     match type_string {
         "string" => {
-            let close_quote = msg[value_start+2..].find("\"").ok_or(format!("Parse error, no closing quote, claim {}", claim_name))?;
+            let close_quote = msg[value_start+2..].find("\"").ok_or(format!("Parse error, no closing quote, claim {claim_name}"))?;
             r = close_quote + value_start + 3;
         },
         "number" => {
@@ -573,7 +573,7 @@ pub fn parse_config(config_str: &str) -> Result<serde_json::Map<String, Value>, 
         if max_cred_len % 64 != 0 {
             let round = (64 - (max_cred_len % 64)) + max_cred_len;
             config["max_cred_len"] = json!(round);
-            println!("Warning: max_cred_len not a multiple of 64. Rounded from {} to {}", max_cred_len, round);
+            println!("Warning: max_cred_len not a multiple of 64. Rounded from {max_cred_len} to {round}");
         }
     }
 
@@ -631,7 +631,7 @@ pub(crate) fn create_proof_spec_internal(proof_spec: &ProofSpec, config_str: &st
 
     // Check that all revealed attributes are in the config
     for attr in &proof_spec.revealed {
-        let config_entry = config.get(attr.as_str()).ok_or(format!("Attribute {} not found in config", attr))?;
+        let config_entry = config.get(attr.as_str()).ok_or(format!("Attribute {attr} not found in config"))?;
         if config_entry.get("reveal_digest").is_some() && config_entry.get("reveal_digest").ok_or("Expected boolean value for 'reveal_digest'")?.as_bool().unwrap() {
             hashed.push(attr.to_string());
         }

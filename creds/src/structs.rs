@@ -71,7 +71,7 @@ impl IOLocations {
         match self.public_io_locations.get(key) {
             Some(location) => Ok(*location),
             None => Err(std::io::Error::other(
-                format!("Key {} not found in public_io_locations", key),
+                format!("Key {key} not found in public_io_locations"),
             )),
         }
     }

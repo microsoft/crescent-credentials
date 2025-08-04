@@ -48,7 +48,7 @@ where
 {
     let mut counter = 0;
     loop {
-        let input_iter = format!("{}||{}", input, counter);
+        let input_iter = format!("{input}||{counter}");
         let mut hasher = Sha512::new();
         hasher.update(input_iter);
         let digest = hasher.finalize();
@@ -180,7 +180,7 @@ pub fn read_from_file<T>(path: &str) -> Result<T, SerializationError>
 where
     T: CanonicalDeserialize
 {
-    println!("Reading from file: {}", path);
+    println!("Reading from file: {path}");
     let f = File::open(path).unwrap();
     let buf_reader = BufReader::new(f);
     let state = T::deserialize_uncompressed_unchecked(buf_reader)?;
@@ -232,9 +232,9 @@ mod tests {
     {
         let timer = start_timer!(|| "Time to generate three points");
         for i in 1..4 {
-            let point = hash_to_curve_vartime::<E::G1>(&format!("test string {}", i));
+            let point = hash_to_curve_vartime::<E::G1>(&format!("test string {i}"));
             assert!(point.is_on_curve());
-            println!("point_{} in G1 = {:?}", i, point);
+            println!("point_{i} in G1 = {point:?}");
         }
         end_timer!(timer);
     }

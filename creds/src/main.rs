@@ -24,7 +24,7 @@ fn main() {
 
     match opt.cmd {
         Command::Zksetup{ name } => {
-            let name_path = format!("test-vectors/{}", name);
+            let name_path = format!("test-vectors/{name}");
             let base_path = root.join(name_path);
             let ret = run_zksetup(base_path);
             if ret == 0 {
@@ -32,17 +32,17 @@ fn main() {
             }
         }
         Command::Prove { name } | Command::Prepare { name } => {
-            let name_path = format!("test-vectors/{}", name);
+            let name_path = format!("test-vectors/{name}");
             let base_path = root.join(name_path);
             run_prover(base_path);
         }
         Command::Show { name, presentation_message } => {
-            let name_path = format!("test-vectors/{}", name);
+            let name_path = format!("test-vectors/{name}");
             let base_path = root.join(name_path);
             run_show(base_path, presentation_message);
         }        
         Command::Verify { name, presentation_message } => {
-            let name_path = format!("test-vectors/{}", name);
+            let name_path = format!("test-vectors/{name}");
             let base_path = root.join(name_path);
             run_verifier(base_path, presentation_message);
         }
@@ -97,7 +97,7 @@ pub fn run_prover(
     base_path: PathBuf,
 ) {
     let paths = CachePaths::new(base_path);
-    let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
+    let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {}", paths.config));
     let config = parse_config(&config_str).expect("Failed to parse config");
 
     let client_state = 
@@ -108,7 +108,7 @@ pub fn run_prover(
     }
     else {
         let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
-        let issuer_pem = fs::read_to_string(&paths.issuer_pem).unwrap_or_else(|_| panic!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
+        let issuer_pem = fs::read_to_string(&paths.issuer_pem).unwrap_or_else(|_| panic!("Unable to read issuer public key PEM from {}", paths.issuer_pem));   
         let device_pub_pem = fs::read_to_string(&paths.device_pub_pem).ok();
         let (prover_inputs_json, prover_aux_json, _public_ios_json) = 
             prepare_prover_inputs(&config, &jwt, &issuer_pem, device_pub_pem.as_deref()).expect("Failed to prepare prover inputs");    
@@ -123,15 +123,15 @@ pub fn run_prover(
 fn _show_groth16_proof_size(show_groth16: &ShowGroth16<CrescentPairing>) -> usize {
     print!("Show_Groth16 proof size: ");
     let rand_proof_size = show_groth16.rand_proof.compressed_size();
-    print!("{} (rand_proof) + ", rand_proof_size);
+    print!("{rand_proof_size} (rand_proof) + ");
     let com_hidden_inputs_size = show_groth16.com_hidden_inputs.compressed_size();
-    print!("{} (com_hidden_inputs) + ", com_hidden_inputs_size);
+    print!("{com_hidden_inputs_size} (com_hidden_inputs) + ");
     let pok_inputs_size = show_groth16.pok_inputs.compressed_size();
-    print!("{} (pok_inputs) + ", pok_inputs_size);
+    print!("{pok_inputs_size} (pok_inputs) + ");
     let committed_inputs_size = show_groth16.commited_inputs.compressed_size();
-    print!("{} (committed_inputs) ", committed_inputs_size);
+    print!("{committed_inputs_size} (committed_inputs) ");
     let total = rand_proof_size + com_hidden_inputs_size + pok_inputs_size + committed_inputs_size;
-    println!(" = {} bytes total", total);
+    println!(" = {total} bytes total");
     total
 }
 
@@ -139,44 +139,44 @@ fn show_proof_size(show_proof: &ShowProof<CrescentPairing>) -> usize {
 
     print!("Show proof size: ");
     let groth16_size = show_proof.show_groth16.compressed_size();
-    print!("{} (Groth16 proof) + ", groth16_size);
+    print!("{groth16_size} (Groth16 proof) + ");
     let show_range_size = show_proof.show_range_exp.compressed_size();
-    print!("{} (range proof) ", show_range_size);
+    print!("{show_range_size} (range proof) ");
 
     // accumulate the size of the show_range_attr proofs
     let mut show_range_attr_size = 0;
     for (i, show_range_attr) in show_proof.show_range_attr.iter().enumerate() {
         let tmp = show_range_attr.compressed_size();
-        print!(" + {} (range proof{}) ", tmp, i);
+        print!(" + {tmp} (range proof{i}) ");
         show_range_attr_size += tmp;
     }
 
     let device_proof_size = if show_proof.device_proof.is_some() {
         let tmp = show_proof.device_proof.compressed_size();
-        print!("+ {} (device signature proof)", tmp);
+        print!("+ {tmp} (device signature proof)");
         tmp
     } else {
         0
     };
 
     let total = groth16_size + show_range_size + show_range_attr_size + device_proof_size;
-    println!(" = {} bytes total", total);
+    println!(" = {total} bytes total");
 
     total
 }
 
 fn load_proof_spec(proof_spec_file_path : &str, presentation_message: Option<String>) -> ProofSpec {
     let ps_raw = if PathBuf::from(proof_spec_file_path).exists() {
-        println!("Using proof spec file {}", proof_spec_file_path);
+        println!("Using proof spec file {proof_spec_file_path}");
         fs::read_to_string(proof_spec_file_path).expect("Proof spec file exists, but failed while reading it")
     } else {
-        println!("Proof spec file not found; using default (looked for file: {}) ", proof_spec_file_path);
+        println!("Proof spec file not found; using default (looked for file: {proof_spec_file_path}) ");
         crescent::DEFAULT_PROOF_SPEC.to_string()
     };
     let mut ps : ProofSpec = serde_json::from_str(&ps_raw).unwrap();
 
     if ps.presentation_message.is_some() && presentation_message.is_some() {
-        println!("Error: presentation message was provided twice, once in the proof specification file ({}) and once as a command line option.", proof_spec_file_path);
+        println!("Error: presentation message was provided twice, once in the proof specification file ({proof_spec_file_path}) and once as a command line option.");
         panic!("Multiple presentation messages");
     }
     if presentation_message.is_some() {
@@ -239,7 +239,7 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     
     let (verify_result, data) = verify_show(&vp, &show_proof, &proof_spec);
     if verify_result {
-        println!("Verify succeeded, got data '{}'", data);
+        println!("Verify succeeded, got data '{data}'");
     }
     else {
         println!("Verify failed")

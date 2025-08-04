@@ -169,42 +169,42 @@ impl CachePaths {
     }
 
     pub fn new_from_str(base_path: &str) -> Self {
-        let base_path_str = format!("{}/", base_path);
+        let base_path_str = format!("{base_path}/");
         if fs::metadata(&base_path_str).is_err() {
-            println!("base_path = {}", base_path_str);
+            println!("base_path = {base_path_str}");
             panic!("invalid path");
         }
-        println!("base_path_str = {}", base_path_str);
-        let cache_path = format!("{}cache/", base_path_str);
+        println!("base_path_str = {base_path_str}");
+        let cache_path = format!("{base_path_str}cache/");
     
         if fs::metadata(&cache_path).is_ok() {
-            println!("Found directory {} to store data", cache_path);
+            println!("Found directory {cache_path} to store data");
         } else {
-            println!("Creating directory {} to store data", cache_path);
+            println!("Creating directory {cache_path} to store data");
             fs::create_dir(&cache_path).unwrap();        
         }
 
         CachePaths {
             _base: base_path_str.clone(),
-            jwt: format!("{}token.jwt", base_path_str),
-            issuer_pem: format!("{}issuer.pub", base_path_str),
-            config: format!("{}config.json", base_path_str),
-            io_locations: format!("{}io_locations.sym", base_path_str),
-            wasm: format!("{}main.wasm", base_path_str),
-            r1cs: format!("{}main_c.r1cs", base_path_str),
+            jwt: format!("{base_path_str}token.jwt"),
+            issuer_pem: format!("{base_path_str}issuer.pub"),
+            config: format!("{base_path_str}config.json"),
+            io_locations: format!("{base_path_str}io_locations.sym"),
+            wasm: format!("{base_path_str}main.wasm"),
+            r1cs: format!("{base_path_str}main_c.r1cs"),
             _cache: cache_path.clone(),
-            range_pk: format!("{}range_pk.bin", &cache_path),
-            range_vk: format!("{}range_vk.bin", &cache_path),
-            groth16_vk: format!("{}groth16_vk.bin", &cache_path),
-            groth16_pvk: format!("{}groth16_pvk.bin", &cache_path),
-            prover_params: format!("{}prover_params.bin", &cache_path),
-            client_state: format!("{}client_state.bin", &cache_path),
-            show_proof: format!("{}show_proof.bin", &cache_path),
-            mdl_prover_inputs: format!("{}prover_inputs.json", &base_path_str),
-            mdl_prover_aux: format!("{}prover_aux.json", &base_path_str),
-            proof_spec: format!("{}proof_spec.json", &base_path_str),
-            device_pub_pem: format!("{}device.pub", &base_path_str),
-            device_prv_pem: format!("{}device.prv", &base_path_str),
+            range_pk: format!("{cache_path}range_pk.bin"),
+            range_vk: format!("{cache_path}range_vk.bin"),
+            groth16_vk: format!("{cache_path}groth16_vk.bin"),
+            groth16_pvk: format!("{cache_path}groth16_pvk.bin"),
+            prover_params: format!("{cache_path}prover_params.bin"),
+            client_state: format!("{cache_path}client_state.bin"),
+            show_proof: format!("{cache_path}show_proof.bin"),
+            mdl_prover_inputs: format!("{base_path_str}prover_inputs.json"),
+            mdl_prover_aux: format!("{base_path_str}prover_aux.json"),
+            proof_spec: format!("{base_path_str}proof_spec.json"),
+            device_pub_pem: format!("{base_path_str}device.pub"),
+            device_prv_pem: format!("{base_path_str}device.prv"),
         }             
     }
 }
@@ -244,7 +244,7 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     write_to_file(&vk, &paths.groth16_vk);
     write_to_file(&pvk, &paths.groth16_pvk);
 
-    let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
+    let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {}", paths.config));
     let prover_params = ProverParams{groth16_params: params, groth16_pvk: pvk, config_str};
     write_to_file(&prover_params, &paths.prover_params);    
     end_timer!(serialize_timer);
@@ -309,19 +309,19 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
 
     let credtype = client_state.credtype.clone();
     if credtype != "jwt" && credtype != "mdl" {
-        return_error!(format!("Unsupported credential type: {}", credtype));
+        return_error!(format!("Unsupported credential type: {credtype}"));
     }
     let proof_spec = create_proof_spec_internal(proof_spec, &client_state.config_str)?;
 
     // Commit the expiration date (for non-expired range proof)
     let exp_claim_name = 
         if credtype == "jwt" { "exp" } else { "valid_until" };
-    let exp_value_pos = io_locations.get_io_location(&format!("{}_value", exp_claim_name)).unwrap();
+    let exp_value_pos = io_locations.get_io_location(&format!("{exp_claim_name}_value")).unwrap();
     let mut io_types = vec![PublicIOType::Hidden; client_state.inputs.len()];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
     // For each range proofed attribute, set the position to Committed
     for (attr, _) in &proof_spec.range_over_year {
-        let io_loc = io_locations.get_io_location(&format!("{}_value", &attr)).unwrap();
+        let io_loc = io_locations.get_io_location(&format!("{attr}_value")).unwrap();
         io_types[io_loc - 1] = PublicIOType::Committed;
     }
     // For the public key attributes, set the position to Revealed
@@ -332,11 +332,11 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     // For the attributes revealed as field elements, we set the position to Revealed and send the value
     let mut revealed_inputs = vec![];
     for attr in &proof_spec.revealed {
-        let io_loc = match io_locations.get_io_location(&format!("{}_value", &attr)) {
+        let io_loc = match io_locations.get_io_location(&format!("{attr}_value")) {
             Ok(loc) => loc,
             Err(_) => {
                 return_error!(
-                    format!("Asked to reveal attribute {}, but did not find it in io_locations\nIO locations: {:?}", attr, io_locations.get_all_names()));
+                    format!("Asked to reveal attribute {attr}, but did not find it in io_locations\nIO locations: {:?}", io_locations.get_all_names()));
             }
         };
         io_types[io_loc - 1] = PublicIOType::Revealed;
@@ -346,17 +346,17 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     // For the attributes revealed as digests, we provide the preimage, the verifier will hash it to get the field element
     let mut revealed_preimages = serde_json::Map::new();
     for attr in &proof_spec.hashed {
-        let io_loc = match io_locations.get_io_location(&format!("{}_digest", &attr)) {
+        let io_loc = match io_locations.get_io_location(&format!("{attr}_digest")) {
             Ok(loc) => loc,
             Err(_) => {
                 return_error!(
-                    format!("Asked to reveal hashed attribute {}, but did not find it in io_locations\nIO locations: {:?}", attr, io_locations.get_all_names()));
+                    format!("Asked to reveal hashed attribute {attr}, but did not find it in io_locations\nIO locations: {:?}", io_locations.get_all_names()));
             }
         };        
         io_types[io_loc - 1] = PublicIOType::Revealed;
 
         if client_state.aux.is_none() {
-            return_error!(format!("Proof spec asked to reveal hashed attribute {}, but client state is missing aux data", attr));
+            return_error!(format!("Proof spec asked to reveal hashed attribute {attr}, but client state is missing aux data"));
         }
         let aux = serde_json::from_str::<Value>(client_state.aux.as_ref().unwrap()).unwrap();
         let aux = aux.as_object().unwrap();
@@ -434,7 +434,7 @@ fn sort_by_io_location(attrs: &[String], io_locations: &IOLocations) -> Vec<Stri
     let mut attrs_with_locs: Vec<(usize, String)> = attrs
         .iter()
         .map(|attr| {
-            let io_loc = io_locations.get_io_location(&format!("{}_digest", attr)).unwrap();
+            let io_loc = io_locations.get_io_location(&format!("{attr}_digest")).unwrap();
             (io_loc, attr.clone())
         })
         .collect();
@@ -461,16 +461,16 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     // set the expiration claim to Committed
     let exp_claim_name = 
         if credtype == "jwt" { "exp" } else { "valid_until" };
-    let exp_value_pos = io_locations.get_io_location(&format!("{}_value", exp_claim_name)).unwrap();
+    let exp_value_pos = io_locations.get_io_location(&format!("{exp_claim_name}_value")).unwrap();
     let mut io_types = vec![PublicIOType::Hidden; show_proof.inputs_len];
     io_types[exp_value_pos - 1] = PublicIOType::Committed;
 
     // for each range proofed attribute, set the position to Committed
     for (attr, _) in &proof_spec.range_over_year {
-        let io_loc = match io_locations.get_io_location(&format!("{}_value", &attr)) {
+        let io_loc = match io_locations.get_io_location(&format!("{attr}_value")) {
             Ok(loc) => loc,
             Err(_) => {
-                println!("Asked to prove range for attribute {}, but did not find it in io_locations", attr);
+                println!("Asked to prove range for attribute {attr}, but did not find it in io_locations");
                 return (false, "".to_string());
             }
         };
@@ -484,9 +484,9 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
 
     // Set disclosed attributes to Revealed
     for attr in &proof_spec.revealed {
-        let io_loc = io_locations.get_io_location(&format!("{}_value", &attr));
+        let io_loc = io_locations.get_io_location(&format!("{attr}_value"));
         if io_loc.is_err() {
-            println!("Asked to reveal attribute {}, but did not find it in io_locations", attr);
+            println!("Asked to reveal attribute {attr}, but did not find it in io_locations");
             println!("IO locations: {:?}", io_locations.get_all_names());
             return (false, "".to_string());
         }
@@ -509,9 +509,9 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         let hashed_attributes = sort_by_io_location(&proof_spec.hashed, &io_locations);
     
         for attr in &hashed_attributes {
-            let io_loc = io_locations.get_io_location(&format!("{}_digest", &attr));
+            let io_loc = io_locations.get_io_location(&format!("{attr}_digest"));
             if io_loc.is_err() {
-                println!("Asked to reveal hashed attribute {}, but did not find it in io_locations", attr);
+                println!("Asked to reveal hashed attribute {attr}, but did not find it in io_locations");
                 println!("IO locations: {:?}", io_locations.get_all_names());
                 return (false, "".to_string());
             }
@@ -520,7 +520,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
 
             let preimage = preimages.get(attr);
             if preimage.is_none() {
-                println!("Error: preimage for hashed attribute {} not provided by prover", attr);
+                println!("Error: preimage for hashed attribute {attr} not provided by prover");
                 return(false, "".to_string());
             }
             
@@ -578,10 +578,10 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     let cur_time = Fr::from(show_proof.cur_time);
     let now_seconds = utc_now_seconds();
     let delta = now_seconds.saturating_sub(show_proof.cur_time);
-    println!("Proof created {} seconds ago", delta);    
+    println!("Proof created {delta} seconds ago");    
 
     if delta > SHOW_PROOF_VALIDITY_SECONDS {
-        println!("Invalid show proof -- older than {} seconds", SHOW_PROOF_VALIDITY_SECONDS);
+        println!("Invalid show proof -- older than {SHOW_PROOF_VALIDITY_SECONDS} seconds");
         return (false, "".to_string());
     }
 
@@ -593,7 +593,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         &vp.range_vk,
         &io_locations,
         &vp.pvk,
-        format!("{}_value", exp_claim_name).as_str(),
+        format!("{exp_claim_name}_value").as_str(),
     );
     if !ret {
         println!("show_range.verify failed");
@@ -604,14 +604,14 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         // calculate the index of the range proof commitment (skip 1 for expiration value + 2 (optional) for device keys)
         let commitment_index = i + if proof_spec.device_bound { 3 } else { 1 };
         let attr_name = &proof_spec.range_over_year[i].0;
-        let attr_label = format!("{}_value", &attr_name);
+        let attr_label = format!("{attr_name}_value");
         let age = proof_spec.range_over_year[i].1;
         let days_in_age = Fr::from(days_to_be_age(age) as u64);
         let mut ped_com_attr_value = show_proof.show_groth16.commited_inputs[commitment_index];
         let io_pos = match io_locations.get_io_location(&attr_label) {
             Ok(loc) => loc,
             Err(_) => {
-                println!("Asked to prove range for attribute {}, but did not find it in io_locations", attr_name);
+                println!("Asked to prove range for attribute {attr_name}, but did not find it in io_locations");
                 return (false, "".to_string());
             }
         };
@@ -629,7 +629,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
             println!("show_range_attr.verify failed");
             return (false, "".to_string());
         }
-        println!("range proof for {} such that age is over {} succeeded", attr_name, age);
+        println!("range proof for {attr_name} such that age is over {age} succeeded");
     }
 
     if proof_spec.device_bound {
@@ -667,7 +667,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
             match unpack_int_to_string_unquoted(&show_proof.revealed_inputs[revealed_idx].into_bigint()) {
                 Ok(val) => json!(val),
                 Err(_) => {
-                    println!("Error: Proof was valid, but failed to unpack '{}' attribute", attr_name);
+                    println!("Error: Proof was valid, but failed to unpack '{attr_name}' attribute");
                     return (false, "".to_string());
                 }
             }
@@ -679,7 +679,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
     for attr_name in &proof_spec.hashed {
         let attr_value = preimages.get(attr_name);
         if attr_value.is_none() {
-            println!("Error: Proof was valid, but failed to find hashed attribute '{}'", attr_name);
+            println!("Error: Proof was valid, but failed to find hashed attribute '{attr_name}'");
             return(false, "".to_string());
         }
         let value = match attr_value.unwrap() {
@@ -726,11 +726,11 @@ mod tests {
     }
 
     fn run_test(name: &str, cred_type: &str) {
-        let base_path = PathBuf::from(format!("test-vectors/{}", name));
+        let base_path = PathBuf::from(format!("test-vectors/{name}"));
         let paths = CachePaths::new(base_path.clone());
 
-        println!("Running end-to-end-test for {}, credential type {}", name, cred_type);
-        println!("Requires that `../setup/run_setup.sh {}` has already been run", name);
+        println!("Running end-to-end-test for {name}, credential type {cred_type}");
+        println!("Requires that `../setup/run_setup.sh {name}` has already been run");
         println!("These tests are slow; best run with the `--release` flag"); 
 
         println!("Running zksetup");
@@ -738,7 +738,7 @@ mod tests {
         assert!(ret == 0);
 
         println!("Running prove (creating client state)");
-        let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {} ", paths.config));
+        let config_str = fs::read_to_string(&paths.config).unwrap_or_else(|_| panic!("Unable to read config from {}", paths.config));
         let config = parse_config(&config_str).expect("Failed to parse config");
     
         let (prover_inputs, prover_aux) = 
@@ -747,7 +747,7 @@ mod tests {
         }
         else {
             let jwt = fs::read_to_string(&paths.jwt).unwrap_or_else(|_| panic!("Unable to read JWT file from {}", paths.jwt));
-            let issuer_pem = fs::read_to_string(&paths.issuer_pem).unwrap_or_else(|_| panic!("Unable to read issuer public key PEM from {} ", paths.issuer_pem));   
+            let issuer_pem = fs::read_to_string(&paths.issuer_pem).unwrap_or_else(|_| panic!("Unable to read issuer public key PEM from {}", paths.issuer_pem));   
             let device_pub_pem = fs::read_to_string(&paths.device_pub_pem).ok();
             let (prover_inputs_json, prover_aux_json, _public_ios_json) = 
                 prepare_prover_inputs(&config, &jwt, &issuer_pem, device_pub_pem.as_deref()).expect("Failed to prepare prover inputs");    
