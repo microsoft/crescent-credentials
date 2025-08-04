@@ -545,7 +545,7 @@ impl ECDSAProof {
     end_timer!(t);
 
     let msg_proof_len = format!("NIZK::proof_compressed_len {:?}", proof_encoded.len());
-    println!("{}", msg_proof_len);
+    println!("{msg_proof_len}");
 
     (R.x, R.y, proof_encoded) // TODO: return errors too
   }
@@ -848,7 +848,7 @@ mod tests {
     end_timer!(t);
 
     let msg_proof_len = format!("NIZK::proof_compressed_len {:?}", proof_encoded.len());
-    println!("{}", msg_proof_len);
+    println!("{msg_proof_len}");
 
     let t = start_timer!(|| "Decompress proof");
     let mut decoder = ZlibDecoder::new(Vec::new());

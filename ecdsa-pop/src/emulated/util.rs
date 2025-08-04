@@ -195,7 +195,7 @@ pub fn decompose(
     num_limbs: usize,
 ) -> Result<Vec<BigInt>, SynthesisError> {
     if input.bits() as usize > num_limbs * num_bits_per_limb {
-        eprintln!("Not enough limbs to represent input {:?}", input);
+        eprintln!("Not enough limbs to represent input {input:?}");
         return Err(SynthesisError::Unsatisfiable);
     }
 
@@ -229,7 +229,7 @@ pub fn allocated_num_to_emulated_fe<CS, F1, EFP>(mut cs: CS, a : &AllocatedNum<F
             limb_size
         };
         let limb_bits = &a_bits[i*limb_size .. i*limb_size + this_limb_size];
-        let limb_i = pack_bits(&mut cs.namespace(|| format!("pack limb {}", i)), limb_bits)?.into();
+        let limb_i = pack_bits(&mut cs.namespace(|| format!("pack limb {i}")), limb_bits)?.into();
         limbs.push(limb_i);
     }
 

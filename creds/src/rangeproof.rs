@@ -385,7 +385,7 @@ impl<E: Pairing> RangeProof<E> {
                 return false;
             },
             Err(ret) => {
-                println!("Error verifying range proof, batch_check failed with error: {:?} ", ret);
+                println!("Error verifying range proof, batch_check failed with error: {ret:?} ");
                 return false;
             }
         }

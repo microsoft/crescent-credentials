@@ -133,7 +133,7 @@ impl<G: Group> DLogPoK<G> {
 
         let mut recomputed_k = Vec::new();
         for i in 0..y.len() {
-            assert_eq!(bases[i].len(), self.s[i].len(), "i: {}", i);
+            assert_eq!(bases[i].len(), self.s[i].len(), "i: {i}");
             let mut bases_affine : Vec<G::Affine> = bases[i].iter().map(|x| x.into_affine()).collect();
             bases_affine.push(y[i].into_affine());
             let mut scalars = vec![];
@@ -202,8 +202,7 @@ impl<G: Group> DLogPoK<G> {
         let mut bases_g: Vec<G::Affine> = Vec::new();
         for i in 1..3 {
             bases_g.push(hash_to_curve_vartime::<G>(&format!(
-                "Pedersen commitment base {}",
-                i
+                "Pedersen commitment base {i}"
             )));
         }
         bases_g

@@ -71,7 +71,7 @@ fn mdoc_builder(claims: String, device_priv_key: String) -> Builder {
 
     // Handle the ISO MDL namespace
     let isomdl_claims = parsed.get(ISO_MDL_NAMESPACE)
-        .ok_or_else(|| format!("Missing key: {}", ISO_MDL_NAMESPACE))
+        .ok_or_else(|| format!("Missing key: {ISO_MDL_NAMESPACE}"))
         .unwrap();
     let isomdl_data = OrgIso1801351::from_json(isomdl_claims)
         .unwrap()

@@ -1339,8 +1339,7 @@ mod tests {
                     cs.enforce(
                         || {
                             format!(
-                                "c constant limb {i} equality for condition = {:?}",
-                                condition_bools
+                                "c constant limb {i} equality for condition = {condition_bools:?}"
                             )
                         },
                         |lc| lc + &res_limbs[i].lc(Fp::one()),
@@ -1418,8 +1417,7 @@ mod tests {
                     cs.enforce(
                         || {
                             format!(
-                                "c variable limb {i} equality for condition = {:?}",
-                                condition_bools
+                                "c variable limb {i} equality for condition = {condition_bools:?}"
                             )
                         },
                         |lc| lc + &res_limbs[i].lc(Fp::one()),
@@ -1764,7 +1762,7 @@ mod tests {
             let limb_size = if i == num_limbs - 1 && a.len()%bpl!=0 {a.len()%bpl} else {bpl};
             let limb_bits = &a[i*bpl .. i*bpl + limb_size];
             let limb_bits : Vec<Boolean> = limb_bits.iter().map(|x| Boolean::from(x.clone())).collect();
-            let limb_i = pack_bits(&mut cs.namespace(|| format!("pack limb {}", i)), &limb_bits)?.into();
+            let limb_i = pack_bits(&mut cs.namespace(|| format!("pack limb {i}")), &limb_bits)?.into();
             limbs.push(limb_i);
         }
         
@@ -1794,12 +1792,12 @@ mod tests {
 
         let mut a_bits = vec![];
         for i in 0..a_int.bits() {
-            let bit = AllocatedBit::alloc(&mut cs.namespace(||format!("bit {}", i)), Some(a_int.bit(i))).unwrap();
+            let bit = AllocatedBit::alloc(&mut cs.namespace(||format!("bit {i}")), Some(a_int.bit(i))).unwrap();
             a_bits.push(bit);
         }
         for i in a_int.bits()..128 {
-            let bit = AllocatedBit::alloc(&mut cs.namespace(||format!("bit {}", i)), Some(false)).unwrap();
-            a_bits.push(bit);            
+            let bit = AllocatedBit::alloc(&mut cs.namespace(||format!("bit {i}")), Some(false)).unwrap();
+            a_bits.push(bit);
         }
 
         let a = allocated_bits_to_emulated_fe(&mut cs.namespace(||"a_bits to a"), &a_bits).unwrap();
