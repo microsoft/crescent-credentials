@@ -7,7 +7,7 @@ use crescent::device::TestDevice;
 use crescent::groth16rand::{ClientState, ShowGroth16};
 use crescent::rangeproof::{RangeProofPK, RangeProofVK};
 use crescent::utils::{read_from_file, string_to_byte_vec, write_to_file};
-use crescent::{create_client_state, create_show_proof, create_show_proof_mdl, run_zksetup, verify_show, verify_show_mdl, CachePaths, ShowProof, VerifierParams, ProofSpec};
+use crescent::{create_client_state, create_show_proof, run_zksetup, verify_show, CachePaths, ShowProof, VerifierParams, ProofSpec};
 use crescent::CrescentPairing;
 use crescent::prep_inputs::{prepare_prover_inputs, parse_config};
 use crescent::structs::{GenericInputsJSON, IOLocations, ProverInput};
@@ -215,11 +215,7 @@ pub fn run_show(
         None
     };
 
-    let show_proof = if client_state.credtype == "mdl" {
-        create_show_proof_mdl(&mut client_state, &range_pk, &proof_spec, &io_locations, device_signature).unwrap()
-    } else {
-        create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature).unwrap()
-    };
+    let show_proof = create_show_proof(&mut client_state, &range_pk, &io_locations, &proof_spec, device_signature).unwrap();
     println!("Proving time: {:?}", proof_timer.elapsed());
 
     let _ = show_proof_size(&show_proof);
@@ -236,19 +232,12 @@ pub fn run_verifier(base_path: PathBuf, presentation_message: Option<String>) {
     let io_locations_str = std::fs::read_to_string(&paths.io_locations).unwrap();
     let issuer_pem = std::fs::read_to_string(&paths.issuer_pem).unwrap();
     let config_str = std::fs::read_to_string(&paths.config).unwrap();
-    let config_json: serde_json::Value = serde_json::from_str(&config_str).unwrap();
-    // read the credtype from the config, default to "jwt" if not present
-    let credtype = config_json.get("credtype").and_then(|v| v.as_str()).unwrap_or("jwt");
     let vp = VerifierParams{vk, pvk, range_vk, io_locations_str, issuer_pem, config_str};
 
     let proof_spec = load_proof_spec(&paths.proof_spec, presentation_message);  
     println!("show_proof.show_range_attr.len() = {}", show_proof.show_range_attr.len());
-    let (verify_result, data) = if credtype == "mdl" {
-        verify_show_mdl(&vp, &show_proof, &proof_spec)
-    } else {
-        verify_show(&vp, &show_proof, &proof_spec)
-    };
-
+    
+    let (verify_result, data) = verify_show(&vp, &show_proof, &proof_spec);
     if verify_result {
         println!("Verify succeeded, got data '{}'", data);
     }

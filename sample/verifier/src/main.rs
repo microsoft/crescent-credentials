@@ -3,7 +3,7 @@
 
 #[macro_use] extern crate rocket;
 
-use crescent::{verify_show_mdl, ProofSpec};
+use crescent::ProofSpec;
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
 use rocket_dyn_templates::{context, Template};
@@ -364,17 +364,14 @@ async fn verify(proof_info: Json<ProofInfo>, verifier_config: &State<VerifierCon
     let mut ps : ProofSpec = serde_json::from_str(&config_proof_spec).unwrap();
     // hash the challenge to use as the presentation message (we need to hash it because device (for device-bound creds) only support signing digests)   
     ps.presentation_message = Some(Sha256::digest(challenge).to_vec());       
-    if cred_type == "jwt" {
-        let (valid, info) = verify_show(&vp, &show_proof, &ps);
-        is_valid = valid;
-        disclosed_info = Some(info);
-    } else {
+    if cred_type == "mdl" {
         let age = disc_uid_to_age(&proof_info.disclosure_uid).unwrap() as u64; // disclosure UID validated, so unwrap should be safe
         ps.range_over_year = Some(std::collections::BTreeMap::from([("birth_date".to_string(), age)]));
-        let (valid, info) = verify_show_mdl(&vp, &show_proof, &ps);
-        is_valid = valid;
-        disclosed_info = Some(info);
     }
+    let (valid, info) = verify_show(&vp, &show_proof, &ps);
+    is_valid = valid;
+    disclosed_info = Some(info);
+
     println!("Proof is valid: {}", is_valid);
     println!("Disclosed info: {:?}", disclosed_info);
 

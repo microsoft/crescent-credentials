@@ -4,6 +4,7 @@ include "./circomlib/circuits/comparators.circom";
 include "indicator.circom";
 include "./circomlib/circuits/mimc.circom";
 include "./circomlib/circuits/bitify.circom";
+include "utils/utils.circom";
 
 // Converts an array of ascii digits (base-10) and converts them to a field element.
 // The input is big endian and may contain trailing zeros. 
@@ -445,6 +446,12 @@ template HashRevealClaimValue(msg_json_len, max_claim_byte_len, field_byte_len, 
             sha256.paddedIn[i*8+j] <== bits[i].out[7-j];
         }
     }
+    // Ensuring in_len_padded_bits is in range [0, max_bits_padded],
+    // which is necessary for the SHA256General component!
+    var max_bits_padded_bits = log2_ceil(max_bits_padded);
+    component rangeCheck = Num2Bits(max_bits_padded_bits);
+    rangeCheck.in <== data_len_padded_bytes * 8;
+
     sha256.in_len_padded_bits <== data_len_padded_bytes*8;
     
     component b2n = Bits2Num(248);

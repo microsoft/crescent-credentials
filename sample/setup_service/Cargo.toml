@@ -1,6 +1,6 @@
 [package]
 name = "crescent-sample-setup-service"
-version = "0.5.0"
+version = "1.0.0"
 edition = "2021"
 default-run = "crescent-sample-setup-service"
 

@@ -6,6 +6,9 @@ include "../circomlib/circuits/comparators.circom";
 include "./utils.circom";
 
 // A modified version of the SHA256 circuit that allows specified length messages up to a max to all work via array indexing on the SHA256 compression circuit.
+// Assumption: The value of `in_len_padded_bits` must fit within `ceil(log2(maxBitsPadded))` bits.
+// This constraint is required to ensure soundness of the LessEqThan comparator. 
+// It is not enforced here: it must be guaranteed by the "caller" via a Num2Bits check!
 template Sha256General(maxBitsPadded) {
     // maxBitsPadded must be a multiple of 512, and the bit circuits in this file are limited to 15 so must be raised if the message is longer.
     assert(maxBitsPadded % 512 == 0);
