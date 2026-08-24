@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 mod arithmetic;
 mod curve;
 pub mod ff_ext;
