@@ -55,14 +55,14 @@ bn256-table = []
 derive_serde = ["serde/derive", "serde_arrays", "hex"]
 print-trace = ["ark-std/print-trace"]
 
-[profile.bench]
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
-lto = true
-incremental = false
-codegen-units = 1
+# [profile.bench]
+# opt-level = 3
+# debug = false
+# debug-assertions = false
+# overflow-checks = false
+# lto = true
+# incremental = false
+# codegen-units = 1
 
 [[bench]]
 name = "field_arith"

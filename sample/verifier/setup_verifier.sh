@@ -1,19 +1,19 @@
-#!/bin/bash
+#!/usr/bin/bash
+#
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+#
+
 set -e
 
+# Change to the script's directory (which should be verifier/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Define the source and target directories as arrays
-# Note: the rs256-db (device binding) set also supports selective disclosure, so we use that set for both features
 SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/rs256-db" "../../creds/test-vectors/mdl1")
 TARGET_DIRS=("./data/issuers/jwt_corporate_1/shared" "./data/issuers/jwt_sd/shared" "./data/issuers/mdl_1/shared")
-# Directory to clean up before copying new files
 CLEANUP_DIR="./data/issuers"
-
-# Make sure we're in the right directory
-CURRENT_DIR=${PWD##*/}
-if [ "$CURRENT_DIR" != "verifier" ]; then
-    echo "Run this script from the verifier/ folder"
-    exit 1
-fi
 
 # Remove and re-create the cleanup directory (could contain old creds)
 echo "Removing and re-creating $CLEANUP_DIR directory"

@@ -59,7 +59,7 @@ impl SafeMemory {
     }
 
     /// Gets an immutable view to the memory in 32 byte chunks
-    pub fn view(&self) -> MemoryView<u32> {
+    pub fn view(&self) -> MemoryView<'_, u32> {
         self.memory.view()
     }
 

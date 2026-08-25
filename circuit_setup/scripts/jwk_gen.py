@@ -1,11 +1,12 @@
+#!/usr/bin/python3
+#
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
+#
 
-#!/usr/bin/python3
-
-# Depends on python-jwt:
-#   pip install python_jwt
-# https://pypi.org/project/python-jwt/
+# Depends on jwcrypto:
+#   pip install jwcrypto
+# https://pypi.org/project/jwcrypto/
 
 # The registry of supported algorithms in JWS is found here:
 #    https://www.iana.org/assignments/jose/jose.xhtml
@@ -22,7 +23,7 @@
 # Inspect public RSA key with
 #   openssl rsa -inform PEM -text -noout -in test.pub -pubin
 
-import python_jwt as jwt, jwcrypto.jwk as jwk, datetime
+import jwcrypto.jwk as jwk, datetime
 import sys, os
 
 def usage():

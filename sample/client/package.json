@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "clean": "rimraf ./dist/**/*",
-    "build": "cross-env NODE_ENV=production rollup -c",
+    "build": "npm run build:release",
+    "build:release": "cross-env NODE_ENV=production rollup -c",
     "build:debug": "cross-env NODE_ENV=development rollup -c",
     "build:watch": "npm run build:debug -- -w",
     "lint": "eslint .",
@@ -16,6 +17,9 @@
   },
   "author": "",
   "license": "MIT",
+  "dependencies": {
+    "cross-env": "^7.0.3"
+  },
   "devDependencies": {
     "@rollup/plugin-commonjs": "28.0.0",
     "@rollup/plugin-eslint": "^9.0.5",
@@ -26,7 +30,6 @@
     "@stylistic/eslint-plugin": "^2.8.0",
     "@types/chrome": "0.0.272",
     "crescent": "file:../../creds/pkg",
-    "cross-env": "^7.0.3",
     "dotenv": "^16.4.5",
     "eslint": "8.57.1",
     "eslint-config-love": "71.0.0",

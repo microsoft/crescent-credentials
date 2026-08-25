@@ -12,9 +12,10 @@ def usage():
     print(f"Usage: ./{exe}  <config.json>  <out.circom>")
 
 def circom_header(cfg):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     if cfg.get("alg") != "ES256":
         print("Unsupported alg:", cfg.get("alg")); sys.exit(-1)
-    with open("circuits-mdl/main_header_es256.circom.template") as f:
+    with open(os.path.join(script_dir, "../circuits-mdl/main_header_es256.circom.template")) as f:
         return f.read()
 
 def get_cbor_encoded_name_identifier(name: str):

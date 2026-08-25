@@ -1,7 +1,9 @@
+#!/usr/bin/bash
+#
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
+#
 
-#!/bin/bash
 # This script generates 3-cert ECDSA chains (root -> CA -> issuer).
 # The leaf cert uses P-256 and is valid for 1 year, the CA and root CA use
 # the increasingly stronger P-384 and P-521, and are valid for
@@ -9,6 +11,9 @@
 
 # prevent gitbash from auto-converting paths to windows syntax
 export MSYS_NO_PATHCONV=1
+
+# Change to the directory where the script is located
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit
 
 # directory where intermediate files are kept
 tmpdir=../generated_files/mdl1

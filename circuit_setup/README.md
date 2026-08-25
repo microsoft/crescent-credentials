@@ -30,7 +30,7 @@ curl --proto '=https' --tlsv1.3 -sSf https://sh.rustup.rs | sh
 3. Install required Python modules
 
 ```bash
-pip install python_jwt
+pip install jwcrypto cbor2
 ```
 
 4. Install [Circom](https://github.com/iden3/circom)
@@ -53,21 +53,6 @@ Either clone this repo with the option `--recurse-submodules`, or for existing r
 git submodule update --init --recursive
 ```
 
-6. For mDL credentials, the [pyMDOC-CBOR](https://github.com/IdentityPython/pyMDOC-CBOR) Python module must be installed, with the command
-
-```bash
-# Linux
-pip install git+https://github.com/peppelinux/pyMDOC-CBOR.git
-```
-
-```bash
-# Windows
-# pyMDL-MDOC has a bug in the setup we need to fix for proper installation on Windows
-git clone https://github.com/peppelinux/pyMDL-MDOC.git
-cd pyMDL-MDOC
-sed -i "s|i.replace(f'{_pkg_name}/', '')|i.replace(f'{_pkg_name}\\\\\\\\', '')|g" setup.py
-pip install .
-```
 ## Sample JWT and mDL
 
 To work with Crescent, the prover and verifier both need the issuer's public key, and the prover needs a JWT.

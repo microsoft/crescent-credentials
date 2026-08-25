@@ -1,19 +1,17 @@
-#!/bin/bash
-set -e
+#!/usr/bin/bash
+#
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+#
+set -e -o errexit
+# Change to the script's directory (which should be client_helper/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Define the source and target directories as arrays
-# Note: the rs256-db (device binding) set also supports selective disclosure, so we use that set for both features
-SOURCE_DIRS=("../../creds/test-vectors/rs256" "../../creds/test-vectors/rs256-db" "../../creds/test-vectors/mdl1")
-TARGET_DIRS=("./data/creds/jwt_corporate_1/shared" "./data/creds/jwt_sd/shared" "./data/creds/mdl_1/shared")
-# Directory to clean up before copying new files
+SOURCE_DIRS=(../../creds/test-vectors/{rs256,rs256-db,mdl1})
+TARGET_DIRS=(./data/creds/{jwt_corporate_1/shared,jwt_sd/shared,mdl_1/shared})
 CLEANUP_DIR="./data/creds"
-
-# Make sure we're in the right directory
-CURRENT_DIR=${PWD##*/}
-if [ "$CURRENT_DIR" != "client_helper" ]; then
-    echo "Run this script from the client_helper/ folder"
-    exit 1
-fi
 
 # Remove and re-create the cleanup directory (could contain old creds)
 echo "Removing and re-creating $CLEANUP_DIR directory"
@@ -25,22 +23,27 @@ for i in "${!SOURCE_DIRS[@]}"; do
     SOURCE_DIR="${SOURCE_DIRS[i]}"
     TARGET_DIR="${TARGET_DIRS[i]}"
 
-    # Remove and re-create the target directory
+    # Ensure the source directory exists
+    if [ ! -d "$SOURCE_DIR" ]; then
+        echo -e "\033[0;31mSource directory $SOURCE_DIR does not exist. Run run_setup.sh first.\033[0m"
+        exit 1
+    fi
+
     echo "Removing and re-creating $TARGET_DIR directory"
     mkdir -p "$TARGET_DIR"
     mkdir -p "${TARGET_DIR}/cache"
 
     echo "Copying files from $SOURCE_DIR to $TARGET_DIR"
     set -x
-    cp "${SOURCE_DIR}/config.json" "${TARGET_DIR}/"
-    cp "${SOURCE_DIR}/main.wasm" "${TARGET_DIR}/"
-    cp "${SOURCE_DIR}/main_c.r1cs" "${TARGET_DIR}/"
-    cp "${SOURCE_DIR}/io_locations.sym" "${TARGET_DIR}/"
-    [ -f "${SOURCE_DIR}/device.prv" ] && cp "${SOURCE_DIR}/device.prv" "${TARGET_DIR}/"
-    [ -f "${SOURCE_DIR}/device.pub" ] && cp "${SOURCE_DIR}/device.pub" "${TARGET_DIR}/"
-    cp "${SOURCE_DIR}/cache/prover_params.bin" "${TARGET_DIR}/cache/"
-    cp "${SOURCE_DIR}/cache/groth16_pvk.bin" "${TARGET_DIR}/cache/"
-    cp "${SOURCE_DIR}/cache/range_pk.bin" "${TARGET_DIR}/cache/"
+    ln "${SOURCE_DIR}/config.json" "${TARGET_DIR}/"
+    ln "${SOURCE_DIR}/main.wasm" "${TARGET_DIR}/"
+    ln "${SOURCE_DIR}/main_c.r1cs" "${TARGET_DIR}/"
+    ln "${SOURCE_DIR}/io_locations.sym" "${TARGET_DIR}/"
+    [ -f "${SOURCE_DIR}/device.prv" ] && ln "${SOURCE_DIR}/device.prv" "${TARGET_DIR}/"
+    [ -f "${SOURCE_DIR}/device.pub" ] && ln "${SOURCE_DIR}/device.pub" "${TARGET_DIR}/"
+    ln "${SOURCE_DIR}/cache/prover_params.bin" "${TARGET_DIR}/cache/"
+    ln "${SOURCE_DIR}/cache/groth16_pvk.bin" "${TARGET_DIR}/cache/"
+    ln "${SOURCE_DIR}/cache/range_pk.bin" "${TARGET_DIR}/cache/"
     set +x
 
     echo "Finished copying for $TARGET_DIR"

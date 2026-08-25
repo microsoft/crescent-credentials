@@ -1,4 +1,7 @@
-generated_files/*
+generated_files/*/**
 !generated_files/README.md
-logs
+
+inputs/*/**
+!inputs/*/*.json
+
 scripts/__pycache__/*

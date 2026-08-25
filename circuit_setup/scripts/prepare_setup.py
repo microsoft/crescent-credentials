@@ -16,10 +16,10 @@ def usage():
     print("\t./" + os.path.basename(sys.argv[0]) + " <config file> <circom output file>")
 
 def main_circom_header(config):
-
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     template_filename = ''
     if config['alg'] == 'RS256':
-        template_filename = "circuits/main_header_rs256.circom.template"
+        template_filename = os.path.join(script_dir, "../circuits/main_header_rs256.circom.template")
 # TODO: add support for ES256K
 #    elif config['alg'] == 'ES256K':
 #       template_filename = "circuits/main_header_es256k.circom.template"

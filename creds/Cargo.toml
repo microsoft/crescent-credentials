@@ -2,7 +2,7 @@
 name = "crescent"
 version = "1.0.0"
 edition = "2021"
-default-run = "crescent"
+default-run = "crescent-cli"
 
 [dependencies]
 ark-crypto-primitives = { version = "=0.4.0" }
@@ -73,8 +73,6 @@ criterion = { version = "0.5", features = ["html_reports"] }
 serial_test = "*"
 ark-bls12-381 = "0.4.0"
 
-
-
 [build-dependencies]
 cargo-patch = "0.3"
 
@@ -98,6 +96,6 @@ harness = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[profile.dev.package."*"]
-#opt-level = 3               # optimize dependencies, even in dev builds
-debug-assertions = false    # We need this to work around a bug in Wasmer
+[[bin]]
+name = "crescent-cli"
+path = "src/main.rs"

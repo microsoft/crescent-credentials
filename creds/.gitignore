@@ -1,0 +1,2 @@
+test-vectors/*/**
+!test-vectors/README

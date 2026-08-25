@@ -179,8 +179,10 @@ impl GenericInputsJSON {
     }
 }
 
+#[cfg(not(feature = "wasm"))]
 const BN254_PRIME: &str = "21888242871839275222246405745257275088548364400416034343698204186575808495617";
 
+#[cfg(not(feature = "wasm"))]
 fn normalize_i64_to_biguint(val: i64) -> BigUint {
     let prime = BigInt::from_str(BN254_PRIME).unwrap();
     let bigint = BigInt::from(val);

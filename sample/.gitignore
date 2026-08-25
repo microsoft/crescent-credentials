@@ -1,0 +1,8 @@
+issuer/.well-known/
+issuer/keys/
+client/node_modules
+client/mdl.json
+client/dist
+client/.env
+client_helper/data
+verifier/data

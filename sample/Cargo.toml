@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "client_helper", 
+    "issuer",
+    "verifier",
+    "setup_service"
+]
+
+[profile.dev.package.wasmer-vm]
+opt-level = 3
+debug-assertions = false    # We need this to work around a bug in Wasmer
+
+[profile.dev]
+opt-level = 3

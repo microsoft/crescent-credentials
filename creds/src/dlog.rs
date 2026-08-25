@@ -66,10 +66,10 @@ impl<G: Group> DLogPoK<G> {
             r.push(ri);
         }
 
-        if eq_pos.is_some() {
+        if let Some(eq_pos_vec) = eq_pos.as_ref() {
             assert!(y.len() == 2);
 
-            for (i,j) in eq_pos.unwrap().iter() {
+            for (i, j) in eq_pos_vec.iter() {
                 r[1][*j] = r[0][*i];
             }
         }
@@ -152,10 +152,10 @@ impl<G: Group> DLogPoK<G> {
             add_to_transcript(&mut ts, b"y", &y[i]);
         }
 
-        if eq_pos.is_some() {
+        if let Some(eq_pos_vec) = eq_pos.as_ref() {
             assert!(y.len() == 2);
 
-            for (i,j) in eq_pos.unwrap().iter() {
+            for (i, j) in eq_pos_vec.iter() {
                 if self.s[0][*i] != self.s[1][*j] {
                     println!("DLogPoK verification failed: eq_pos mismatch");
                     return false;

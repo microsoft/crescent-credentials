@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "creds",
+    "sample/client_helper", 
+    "sample/issuer",
+    "sample/verifier",
+    "sample/setup_service",
+    "circuit_setup/mdl-tools"
+]
+
+# project profiles go here and not in child Cargo.toml files
+
+[profile.dev.package."crescent-sample-client-helper"]
+
+[profile.dev.package."crescent-sample-issuer"]
+
+[profile.dev.package."crescent-sample-verifier"]
+
+[profile.dev.package.crescent]
+
+[profile.dev.package.wasmer-vm]
+opt-level = 3
+debug-assertions = false    # We need this to work around a bug in Wasmer
+
+[profile.dev]
+opt-level = 3

@@ -28,6 +28,14 @@ jobs:
       - name: Check out the project
         uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
 
+      - name: Install Rust 1.88
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.88.0
+          override: true
+          profile: minimal
+          components: clippy
+
       - name: Set up Python
         uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4.9.1
         with:
@@ -37,9 +45,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y python3-pip nodejs
-          curl --proto '=https' --tlsv1.3 -sSf https://sh.rustup.rs | sh -s -- -y
-          source $HOME/.cargo/env
-          pip install python_jwt
+          pip install jwcrypto cbor2
           git clone https://github.com/iden3/circom.git
           cd circom
           git checkout v2.1.6
@@ -48,7 +54,6 @@ jobs:
           export PATH=$PATH:~/.cargo/bin
           cd ..
           git submodule update --init --recursive
-          pip install git+https://github.com/peppelinux/pyMDOC-CBOR.git
 
       - name: Run circuit setup for rs256
         run: |
@@ -96,85 +101,85 @@ jobs:
       - name: Run ZKSetup for rs256
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace zksetup --name rs256
+          cargo run --bin crescent-cli --release --features print-trace zksetup --name rs256
 
       - name: Run Prove for rs256
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace prove --name rs256
+          cargo run --bin crescent-cli --release --features print-trace prove --name rs256
 
       - name: Run Show for rs256
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace show --name rs256
+          cargo run --bin crescent-cli --release --features print-trace show --name rs256
 
       - name: Run Verify for rs256
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace verify --name rs256
+          cargo run --bin crescent-cli --release --features print-trace verify --name rs256
 
 # RS256-sd Commands
       - name: Run ZKSetup for rs256-sd
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace zksetup --name rs256-sd
+          cargo run --bin crescent-cli --release --features print-trace zksetup --name rs256-sd
 
       - name: Run Prove for rs256-sd
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace prove --name rs256-sd
+          cargo run --bin crescent-cli --release --features print-trace prove --name rs256-sd
 
       - name: Run Show for rs256-sd
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace show --name rs256-sd
+          cargo run --bin crescent-cli --release --features print-trace show --name rs256-sd
 
       - name: Run Verify for rs256-sd
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace verify --name rs256-sd
+          cargo run --bin crescent-cli --release --features print-trace verify --name rs256-sd
 
 # RS256-db Commands
       - name: Run ZKSetup for rs256-db
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace zksetup --name rs256-db
+          cargo run --bin crescent-cli --release --features print-trace zksetup --name rs256-db
 
       - name: Run Prove for rs256-db
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace prove --name rs256-db
+          cargo run --bin crescent-cli --release --features print-trace prove --name rs256-db
 
       - name: Run Show for rs256-db
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace show --name rs256-db
+          cargo run --bin crescent-cli --release --features print-trace show --name rs256-db
 
       - name: Run Verify for rs256-db
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace verify --name rs256-db
+          cargo run --bin crescent-cli --release --features print-trace verify --name rs256-db
 
 # mDL Commands
       - name: Run ZKSetup for mDL
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace zksetup --name mdl1
+          cargo run --bin crescent-cli --release --features print-trace zksetup --name mdl1
 
       - name: Run Prove for mDL
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace prove --name mdl1
+          cargo run --bin crescent-cli --release --features print-trace prove --name mdl1
 
       - name: Run Show for mDL
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace show --name mdl1
+          cargo run --bin crescent-cli --release --features print-trace show --name mdl1
 
       - name: Run Verify for mDL
         run: |
           cd creds
-          cargo run --bin crescent --release --features print-trace verify --name mdl1
+          cargo run --bin crescent-cli --release --features print-trace verify --name mdl1
 
 # Build sample
       - name: Run the sample setup script
