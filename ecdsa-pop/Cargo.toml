@@ -28,8 +28,8 @@ rand = ">=0.8.5"
 flate2 = { version = "1.0.14" }
 num-format = { version = "0.4.3" }
 
-# Enable 'asm' feature when NOT a wasm build
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# halo2curves assembly is only supported on x86_64.
+[target.'cfg(target_arch = "x86_64")'.dependencies]
 halo2curves = { version = "0.8.0", features = ["asm"] }
 
 [features]
