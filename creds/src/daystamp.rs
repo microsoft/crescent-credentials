@@ -11,7 +11,7 @@ const DAYS_IN_MONTH: [usize; 13] = [usize::MAX, 31, 28, 31, 30, 31, 30, 31, 31, 
 const DAYS_BEFORE_MONTH : [usize; 13] = [usize::MAX, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 // Returns 1 if leap year, 0 otherwise.
 fn is_leap(year: usize) -> bool {
-    (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0))
+    year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
 }
 // Returns the number of days that came before the given year (from year 0)
 fn days_before_year(year: usize) -> usize {

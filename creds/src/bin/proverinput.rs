@@ -77,8 +77,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Load the device public key, if present
-    let device_key_pem = if opts.device_key.is_some() {
-        Some(fs::read_to_string(opts.device_key.unwrap())?)
+    let device_key_pem = if let Some(device_key) = &opts.device_key {
+        Some(fs::read_to_string(device_key)?)
     } else {
         None
     };
@@ -115,6 +115,5 @@ fn write_json_file(path: PathBuf, data: &mut serde_json::Map<String, Value>) -> 
     serde_json::to_writer_pretty(buf_writer, data)?;
     Ok(())
 }
-
 
 
