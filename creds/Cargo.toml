@@ -70,7 +70,7 @@ getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-serial_test = "*"
+serial_test = "=3.2.0"
 ark-bls12-381 = "0.4.0"
 
 
