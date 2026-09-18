@@ -10,6 +10,7 @@
     missing_docs
 )]
 #![allow(clippy::many_single_char_names, clippy::op_ref)]
+#![allow(warnings)]
 #![forbid(unsafe_code)]
 
 #[macro_use]
