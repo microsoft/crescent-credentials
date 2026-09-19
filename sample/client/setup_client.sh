@@ -13,7 +13,7 @@ fi
 
 echo "Building crescent wasm package"
 pushd $CRESCENT_DIR > /dev/null
-cargo install wasm-pack
+cargo install wasm-pack --version 0.14.0
 
 # Build crescent wasm package 
 RUSTFLAGS="-A unused-imports -A unused-assignments -A unused-variables --cfg getrandom_backend=\"wasm_js\"" \

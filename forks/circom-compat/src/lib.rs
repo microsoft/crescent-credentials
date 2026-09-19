@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 //! Arkworks - Circom Compatibility layer
 //!
 //! Provides bindings to Circom's R1CS, for Groth16 Proof and Witness generation in Rust.

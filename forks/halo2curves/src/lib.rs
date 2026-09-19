@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 mod arithmetic;
 mod curve;
 pub mod ff_ext;
