@@ -8,7 +8,7 @@ fn decompose(e: &BigUint, number_of_limbs: usize, limb_size: usize) -> Vec<BigUi
     (0usize..)
         .step_by(limb_size)
         .take(number_of_limbs)
-        .map(|shift| ((e >> shift) & mask))
+        .map(|shift| (e >> shift) & mask)
         .collect::<Vec<_>>()
 }
 

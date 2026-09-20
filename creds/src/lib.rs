@@ -412,18 +412,16 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     };
     let mut show_range_attr= vec![];
     // calculate the index of the first range proof commitment (1 used for expiration + 2 optional for device keys)
-    let mut commitment_index = if proof_spec.device_bound { 3 } else { 1 };
+    let first_commitment_index = if proof_spec.device_bound { 3 } else { 1 };
     // for each range-proofed attribute, create a fresh range proof that the attribute is at least "age" years old // TODO: generalize to non-age attributes
-    for (_, age) in &proof_spec.range_over_year {
+    for (offset, (_, age)) in proof_spec.range_over_year.iter().enumerate() {
         let days_in_age = Fr::from(days_to_be_age(*age) as u64);
+        let commitment_index = first_commitment_index + offset;
         let mut com_attr = client_state.committed_input_openings[commitment_index].clone();
         com_attr.m -= days_in_age;
         com_attr.c -= com_attr.bases[0] * days_in_age;
-
         let show_range_a = client_state.show_range(&com_attr, RANGE_PROOF_INTERVAL_BITS, range_pk);       
-
         show_range_attr.push(show_range_a);
-        commitment_index += 1;
     }
 
     // Assemble the proof

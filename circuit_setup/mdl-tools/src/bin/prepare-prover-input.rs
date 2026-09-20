@@ -111,7 +111,7 @@ fn sha256_padding(prepad_m: &[u8]) -> Vec<u8> {
     padded_m.push(0x80);
 
     // Pad with zeros until the total length + 4 bytes (32-bit message length) is a multiple of 64 bytes (512 bits)
-    while (padded_m.len() + 4) * 8 % 512 != 0 {
+    while !((padded_m.len() + 4) * 8).is_multiple_of(512) {
         padded_m.push(0);
     }
 
@@ -602,7 +602,7 @@ fn main() {
     // See https://www.rfc-editor.org/rfc/rfc7515#appendix-A.3.1 for ECDSA encoding details, the signature is R||S
     // this code assumes |R|==|S|
     let sig_len = signature_bytes.len();
-    if sig_len % 2 != 0 {
+    if !sig_len.is_multiple_of(2) {
         panic!("Invalid signature length: {sig_len}");
     }
     // signature is not required by the circuit, but it is required for the signature verification pre-computations

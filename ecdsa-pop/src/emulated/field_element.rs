@@ -1759,7 +1759,7 @@ mod tests {
         
         for i in 0..num_limbs {    // foreach limb
             let bpl = EFP::bits_per_limb();
-            let limb_size = if i == num_limbs - 1 && a.len()%bpl!=0 {a.len()%bpl} else {bpl};
+            let limb_size = if i == num_limbs - 1 && !a.len().is_multiple_of(bpl) {a.len()%bpl} else {bpl};
             let limb_bits = &a[i*bpl .. i*bpl + limb_size];
             let limb_bits : Vec<Boolean> = limb_bits.iter().map(|x| Boolean::from(x.clone())).collect();
             let limb_i = pack_bits(&mut cs.namespace(|| format!("pack limb {i}")), &limb_bits)?.into();

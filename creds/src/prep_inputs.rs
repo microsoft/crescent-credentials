@@ -321,9 +321,8 @@ fn prepare_prover_aux(_header_and_payload: &str, config: &serde_json::Map<String
     }
 
     // Get the device public key
-    if device_key_pem.is_some() {
-
-        let device_pub = VerifyingKey::from_public_key_pem(device_key_pem.unwrap())?;
+    if let Some(device_key_pem) = device_key_pem {
+        let device_pub = VerifyingKey::from_public_key_pem(device_key_pem)?;
         let device_pub = device_pub.to_encoded_point(false);
         let x = BigUint::from_bytes_be(device_pub.x().unwrap());
         let y = BigUint::from_bytes_be(device_pub.y().unwrap());
@@ -464,23 +463,13 @@ fn is_minified(msg: &str) -> bool {
 // decoding, then the decoding circuit outputs 0's for these padding characters.
 // (Software decoders don't have this output, but it's quite awkward to do in a circuit)
 fn base_64_decoded_header_padding(header_len: usize) -> Result<String, Box<dyn std::error::Error>> {
-
-    if header_len % 4 == 0 {
-        Ok("".to_string())
+    match header_len % 4 {
+        0 => Ok("".to_string()),
+        1 => return_error!("Invalid period_idx, the base64 encoding of the header is invalid"),
+        2 => Ok("\0\0".to_string()),
+        3 => Ok("\0".to_string()),
+        _ => unreachable!(),
     }
-    else if header_len % 4 == 1 {
-        return_error!("Invalid period_idx, the base64 encoding of the header is invalid");
-    }
-    else if header_len % 4 == 2 {
-        Ok("\0\0".to_string())
-    }
-    else if header_len % 4 == 3 {
-        Ok("\0".to_string())
-    }
-    else {
-        panic!();
-    }
-
 }
 
 // Convert integer n to limbs, encoded as strings
